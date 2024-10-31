@@ -19,6 +19,7 @@ package ad
 import (
 	"context"
 	"fmt"
+
 	"github.com/specterops/bloodhound/analysis"
 	"github.com/specterops/bloodhound/analysis/impact"
 	"github.com/specterops/bloodhound/dawgs/cardinality"
@@ -36,6 +37,8 @@ func PostOwner(ctx context.Context, db graph.Database, groupExpansions impact.Pa
 		return &analysis.AtomicPostProcessingStats{}, fmt.Errorf("failed fetching admin group ids values for postowner: %w", err)
 	} else {
 		operation := analysis.NewPostRelationshipOperation(ctx, db, "PostOwnerWriteOwner")
+
+		// Get all source nodes of Owns ACEs (i.e., owning principals) where the target node has no ACEs granting explicit permissions to OWNER RIGHTS
 		operation.Operation.SubmitReader(func(ctx context.Context, tx graph.Transaction, outC chan<- analysis.CreatePostRelationshipJob) error {
 			return tx.Relationships().Filter(
 				query.And(
@@ -45,6 +48,8 @@ func PostOwner(ctx context.Context, db graph.Database, groupExpansions impact.Pa
 				),
 			).Fetch(func(cursor graph.Cursor[*graph.Relationship]) error {
 				for rel := range cursor.Chan() {
+
+					// If any domain enforces BlockOwnerImplicitRights (dSHeuristics[28] == 1), check if the target node is a computer or derived object (MSA or GMSA)
 					if anyEnforced {
 						if targetNode, err := ops.FetchNode(tx, rel.EndID); err != nil {
 							continue
@@ -55,7 +60,6 @@ func PostOwner(ctx context.Context, db graph.Database, groupExpansions impact.Pa
 							if !ok {
 								enforced = false
 							}
-
 							if !enforced {
 								outC <- analysis.CreatePostRelationshipJob{
 									FromID:        rel.StartID,
@@ -65,6 +69,9 @@ func PostOwner(ctx context.Context, db graph.Database, groupExpansions impact.Pa
 								}
 							} else if isComputerDerived, err := isTargetNodeComputerDerived(targetNode); err != nil {
 								continue
+
+								// If the target node is NOT a computer or derived object, add the Owns edge
+								// If the target node is a computer or derived object, add the Owns edge if the owning principal is a member of DA/EA (or is either group SID)
 							} else if (isComputerDerived && adminGroupIds.Contains(rel.StartID.Uint64())) || !isComputerDerived {
 								outC <- analysis.CreatePostRelationshipJob{
 									FromID:        rel.StartID,
@@ -74,6 +81,8 @@ func PostOwner(ctx context.Context, db graph.Database, groupExpansions impact.Pa
 								}
 							}
 						}
+
+						// If no domain enforces BlockOwnerImplicitRights (dSHeuristics[28] == 1), we can skip this analysis and just add the Owns relationship
 					} else {
 						outC <- analysis.CreatePostRelationshipJob{
 							FromID:        rel.StartID,
@@ -88,6 +97,7 @@ func PostOwner(ctx context.Context, db graph.Database, groupExpansions impact.Pa
 			})
 		})
 
+		// Get all source nodes of WriteOwner ACEs where the target node has no ACEs granting explicit permissions to OWNER RIGHTS
 		operation.Operation.SubmitReader(func(ctx context.Context, tx graph.Transaction, outC chan<- analysis.CreatePostRelationshipJob) error {
 			return tx.Relationships().Filter(
 				query.And(
@@ -97,6 +107,8 @@ func PostOwner(ctx context.Context, db graph.Database, groupExpansions impact.Pa
 				),
 			).Fetch(func(cursor graph.Cursor[*graph.Relationship]) error {
 				for rel := range cursor.Chan() {
+
+					// If any domain enforces BlockOwnerImplicitRights (dSHeuristics[28] == 1), check if the target node is a computer or derived object (MSA or GMSA)
 					if anyEnforced {
 						if targetNode, err := ops.FetchNode(tx, rel.EndID); err != nil {
 							continue
@@ -107,7 +119,6 @@ func PostOwner(ctx context.Context, db graph.Database, groupExpansions impact.Pa
 							if !ok {
 								enforced = false
 							}
-
 							if !enforced {
 								outC <- analysis.CreatePostRelationshipJob{
 									FromID:        rel.StartID,
@@ -117,6 +128,8 @@ func PostOwner(ctx context.Context, db graph.Database, groupExpansions impact.Pa
 								}
 							} else if isComputerDerived, err := isTargetNodeComputerDerived(targetNode); err != nil {
 								continue
+
+								// If the target node is NOT a computer or derived object, add the WriteOwner edge
 							} else if !isComputerDerived {
 								outC <- analysis.CreatePostRelationshipJob{
 									FromID:        rel.StartID,
@@ -126,6 +139,8 @@ func PostOwner(ctx context.Context, db graph.Database, groupExpansions impact.Pa
 								}
 							}
 						}
+
+						// If no domain enforces BlockOwnerImplicitRights (dSHeuristics[28] == 1), we can skip this analysis and just add the WriteOwner relationship
 					} else {
 						outC <- analysis.CreatePostRelationshipJob{
 							FromID:        rel.StartID,

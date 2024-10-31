@@ -223,12 +223,21 @@ func ParseACEData(aces []ACE, targetID string, targetType graph.Kind) []Ingestib
 		} else if !ad.IsACLKind(rightKind) {
 			log.Errorf("Non-ace edge type given to process aces: %s", ace.RightName)
 			continue
+
+			// Get Owner SID from ACE granting Owns permission
 		} else if rightKind.Is(ad.Owns) || rightKind.Is(ad.OwnsRaw) {
 			ownerPrincipalInfo = ace.GetCachedValue().SourceData
+
+			// Cache ACEs where the OWNER RIGHTS SID is granted explicit abusable permissions
 		} else if strings.HasSuffix(ace.PrincipalSID, "S-1-3-4") {
 			ownerLimitedPrivs = append(ownerLimitedPrivs, rightKind.String())
+
+			// Cache ACEs where WriteOwner permission is granted
 		} else if rightKind.Is(ad.WriteOwner) || rightKind.Is(ad.WriteOwnerRaw) {
+			// *** Should this be writeOwnerPrincipals, since this is not limited to specific rights yet?
 			writeOwnerLimitedPrincipals = append(writeOwnerLimitedPrincipals, ace.GetCachedValue())
+
+			// Create edges for all other ACEs
 		} else {
 			converted = append(converted, NewIngestibleRelationship(
 				IngestibleSource{
@@ -247,8 +256,14 @@ func ParseACEData(aces []ACE, targetID string, targetType graph.Kind) []Ingestib
 		}
 	}
 
+	// Process permissions granted to the OWNER RIGHTS SID if any were found
 	if len(ownerLimitedPrivs) > 0 {
+
+		// Process WriteOwner permissions granted to OWNER RIGHTS SID
 		for _, limitedPrincipal := range writeOwnerLimitedPrincipals {
+
+			// *** Why can't we remove this? If we're here, we know that we don't need to check dSHeuristics for this node's ACL. Just for the sake of WriteOwnerRaw being present for every ACE containing WriteOwner permission?
+			// Create non-traversable WriteOwnerRaw edges with LimitedRightsCreated bool for each WriteOwner permission granted to OWNER RIGHTS SID for post-processing
 			converted = append(converted, NewIngestibleRelationship(
 				limitedPrincipal.SourceData,
 				IngestibleTarget{
@@ -256,11 +271,13 @@ func ParseACEData(aces []ACE, targetID string, targetType graph.Kind) []Ingestib
 					TargetType: targetType,
 				},
 				IngestibleRel{
+					// *** Should IsInherited always be false here for WriteOwnerRaw?
 					RelProps: map[string]any{ad.IsACL.String(): true, ad.IsInherited.String(): false, ad.LimitedRightsCreated.String(): true},
 					RelType:  ad.WriteOwnerRaw,
 				},
 			))
 
+			// Create one traversable WriteOwnerLimitedRights edge containing all WriteOwner permissions granted to OWNER RIGHTS SID that ARE inherited (i.e., are abusable)
 			converted = append(converted, NewIngestibleRelationship(
 				limitedPrincipal.SourceData,
 				IngestibleTarget{
@@ -268,13 +285,18 @@ func ParseACEData(aces []ACE, targetID string, targetType graph.Kind) []Ingestib
 					TargetType: targetType,
 				},
 				IngestibleRel{
+					// Only inherited permissions granted to OWNER RIGHTS are abusable with WriteOwner permission
 					RelProps: map[string]any{ad.IsACL.String(): true, ad.IsInherited.String(): limitedPrincipal.IsInherited, "privileges": ownerLimitedPrivs},
 					RelType:  ad.WriteOwnerLimitedRights,
 				},
 			))
 		}
 
+		// Process other permissions granted to OWNER RIGHTS SID
 		if ownerPrincipalInfo.Source != "" {
+
+			// *** Why can't we remove this? If we're here, we know that we don't need to check dSHeuristics for this node's ACL. Just for the sake of OwnsRaw being present for every ACE containing Owns permission?
+			// Create non-traversable OwnsRaw edges for each abusable permission granted to OWNER RIGHTS SID for post-processing
 			converted = append(converted, NewIngestibleRelationship(
 				ownerPrincipalInfo,
 				IngestibleTarget{
@@ -282,11 +304,13 @@ func ParseACEData(aces []ACE, targetID string, targetType graph.Kind) []Ingestib
 					TargetType: targetType,
 				},
 				IngestibleRel{
+					// *** Should IsInherited always be false here for OwnsRaw?
 					RelProps: map[string]any{ad.IsACL.String(): true, ad.IsInherited.String(): false, ad.LimitedRightsCreated.String(): true},
 					RelType:  ad.OwnsRaw,
 				},
 			))
 
+			// Create one traversable OwnsLimitedRights edge containing all abusable permissions granted to OWNER RIGHTS SID
 			converted = append(converted, NewIngestibleRelationship(
 				ownerPrincipalInfo,
 				IngestibleTarget{
@@ -294,12 +318,17 @@ func ParseACEData(aces []ACE, targetID string, targetType graph.Kind) []Ingestib
 					TargetType: targetType,
 				},
 				IngestibleRel{
+					// *** Should IsInherited always be false here for OwnsLimitedRights?
 					RelProps: map[string]any{ad.IsACL.String(): true, ad.IsInherited.String(): false, "privileges": ownerLimitedPrivs},
 					RelType:  ad.OwnsLimitedRights,
 				},
 			))
 		}
+
+		// No permissions granted to OWNER RIGHTS SID in the ACL
 	} else {
+
+		// Create non-traversable OwnsRaw edge and note that OWNER RIGHTS was not present in the ACL (LimitedRightsCreated: false) for post-processing
 		if ownerPrincipalInfo.Source != "" {
 			converted = append(converted, NewIngestibleRelationship(
 				ownerPrincipalInfo,
@@ -308,12 +337,14 @@ func ParseACEData(aces []ACE, targetID string, targetType graph.Kind) []Ingestib
 					TargetType: targetType,
 				},
 				IngestibleRel{
+					// Owns permission is never inherited
 					RelProps: map[string]any{ad.IsACL.String(): true, ad.IsInherited.String(): false, ad.LimitedRightsCreated.String(): false},
 					RelType:  ad.OwnsRaw,
 				},
 			))
 		}
 
+		// Create non-traversable WriteOwnerRaw edge and note that OWNER RIGHTS was not present in the ACL (LimitedRightsCreated: false) for post-processing
 		for _, limitedPrincipal := range writeOwnerLimitedPrincipals {
 			converted = append(converted, NewIngestibleRelationship(
 				limitedPrincipal.SourceData,
@@ -322,6 +353,7 @@ func ParseACEData(aces []ACE, targetID string, targetType graph.Kind) []Ingestib
 					TargetType: targetType,
 				},
 				IngestibleRel{
+					// *** Should IsInherited always be false here for WriteOwnerRaw?
 					RelProps: map[string]any{ad.IsACL.String(): true, ad.IsInherited.String(): false, ad.LimitedRightsCreated.String(): false},
 					RelType:  ad.WriteOwnerRaw,
 				},
