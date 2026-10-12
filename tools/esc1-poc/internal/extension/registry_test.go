@@ -40,8 +40,7 @@ func registryDefinitions() []extension.Definition {
 			Schema:            extension.Metadata{Name: "cyberark", DisplayName: "CyberArk", Namespace: "PoC_CA", Version: "v1"},
 			PostProcessing:    &extension.ProcessingSettings{ReferenceCommit: strings.Repeat("b", 40)},
 			NodeKinds:         []extension.NodeKind{{Name: "PoC_CA_Account"}},
-			ExternalNodeKinds: []string{"PoC_AD_User"},
-			RelationshipKinds: []extension.RelationshipKind{{Name: "PoC_CA_Admin", Endpoints: []extension.Endpoint{{SourceKind: "PoC_AD_User", TargetKind: "PoC_CA_Account"}}, PostProcessing: &extension.RelationshipProcessing{Query: "ca_admin.cypher"}}},
+			RelationshipKinds: []extension.RelationshipKind{{Name: "PoC_CA_Admin", CompatibleKinds: []extension.Endpoint{{SourceKind: "PoC_AD_User", TargetKind: "PoC_CA_Account"}}, PostProcessing: &extension.RelationshipProcessing{Query: "ca_admin.cypher"}}},
 		},
 	}
 }
@@ -125,12 +124,11 @@ func TestLoadRegistryRejectsGlobalConflictsAndInvalidDependencies(t *testing.T) 
 			definitions[1].Schema.Namespace = "PoC_AD"
 			definitions[1].NodeKinds[0].Name = "PoC_AD_Account"
 			definitions[1].RelationshipKinds[0].Name = "PoC_AD_Admin"
-			definitions[1].RelationshipKinds[0].Endpoints[0].TargetKind = "PoC_AD_Account"
+			definitions[1].RelationshipKinds[0].CompatibleKinds[0].TargetKind = "PoC_AD_Account"
 		}, "duplicate schema namespace"},
 		{"duplicate kind across nested namespaces", func(definitions []extension.Definition, _ map[string]string) {
 			definitions[1].Schema.Namespace = "PoC"
 			definitions[1].NodeKinds = []extension.NodeKind{{Name: "PoC_AD_User"}, {Name: "PoC_CA_Account"}}
-			definitions[1].ExternalNodeKinds = nil
 		}, "duplicate declared kind"},
 		{"duplicate output", func(definitions []extension.Definition, _ map[string]string) {
 			definitions[1].RelationshipKinds[0].PostProcessing.Query = "ad_users.cypher"
@@ -189,7 +187,7 @@ func TestRegistryCombinesNativeComparisonSettings(t *testing.T) {
 	)
 	definitions[0].Schema.Namespace = "PoC"
 	definitions[0].PostProcessing.CompareNativeESC1 = true
-	definitions[0].RelationshipKinds = []extension.RelationshipKind{{Name: "PoC_ADCSESC1", Endpoints: []extension.Endpoint{{SourceKind: "PoC_AD_User", TargetKind: "PoC_AD_User"}}, PostProcessing: &extension.RelationshipProcessing{Query: "ad_esc1.cypher"}}}
+	definitions[0].RelationshipKinds = []extension.RelationshipKind{{Name: "PoC_ADCSESC1", CompatibleKinds: []extension.Endpoint{{SourceKind: "PoC_AD_User", TargetKind: "PoC_AD_User"}}, PostProcessing: &extension.RelationshipProcessing{Query: "ad_esc1.cypher"}}}
 	queries["ad_esc1.cypher"] = "// depends-on: query:ad_users.cypher\nRETURN $ad_users"
 	plan, err := extension.Load(writeRegistry(t, definitions, queries))
 	if err != nil {
@@ -223,5 +221,45 @@ func TestIsSchemaFileRequiresSafeSnakeCaseBasename(t *testing.T) {
 				t.Fatalf("IsSchemaFile(%q) = %v; expected %v", testCase.name, actual, testCase.want)
 			}
 		})
+	}
+}
+
+// Kind references are checked after all definitions have been read. They do
+// not create a query execution dependency by themselves.
+func TestMutualKindReferencesAndNativeKinds(t *testing.T) {
+	var definitions = registryDefinitions()
+	definitions[0].RelationshipKinds = []extension.RelationshipKind{{Name: "PoC_AD_CollectedLink", CompatibleKinds: []extension.Endpoint{{SourceKind: "PoC_CA_Account", TargetKind: "PoC_AD_User"}}}}
+	for _, native := range []string{"User", "Base", "ADLocalGroup", "ADLocalUser", "AZUser", "AZBase", "Zone"} {
+		definitions[0].RelationshipKinds[0].CompatibleKinds = append(definitions[0].RelationshipKinds[0].CompatibleKinds, extension.Endpoint{SourceKind: native, TargetKind: "PoC_AD_User"})
+	}
+	for _, order := range [][]extension.Definition{definitions, {definitions[1], definitions[0]}} {
+		if err := extension.ValidateDefinitions(order); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, missing := range []string{"PoC_Missing_Node", "PoC_CA_Admin", "MemberOf", "LocalGroup"} {
+		definitions[0].RelationshipKinds[0].CompatibleKinds[0].SourceKind = missing
+		err := extension.ValidateDefinitions(definitions)
+		if err == nil || !strings.Contains(err.Error(), missing) || !strings.Contains(err.Error(), "include the schema") {
+			t.Fatal("missing node definition not explained", err)
+		}
+	}
+}
+
+func TestDefinitionNoLongerAcceptsRepeatedExternalKindsOrOldFieldName(t *testing.T) {
+	var (
+		definition    = modelDefinition()
+		contents, err = json.Marshal(definition)
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, invalid := range []string{
+		strings.Replace(string(contents), `"compatible_kinds"`, `"endpoints"`, 1),
+		strings.Replace(string(contents), `"node_kinds":`, `"external_node_kinds":["User"],"node_kinds":`, 1),
+	} {
+		if _, err := extension.ParseDefinition([]byte(invalid)); err == nil {
+			t.Fatal("old field silently accepted")
+		}
 	}
 }

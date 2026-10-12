@@ -75,7 +75,7 @@ BloodHound is again at `http://127.0.0.1:28080/`.
 1. Open `http://127.0.0.1:18081/`. This is the rule page, separate from BloodHound.
 2. The supplied Compose setup enables local editing at this exact address, so the page needs no pasted token. Keep `rules.env` private: BloodHound and programmatic clients still use its secret.
 3. For the ESC1 example, select [extension/schema.json](extension/schema.json) and **every `.cypher` file** in [extension](extension), including the membership and trust prerequisites. Select only the schema and query files, not `QUERY_NOTES.md`. For a smaller first extension, follow [DEVELOPERS.md](DEVELOPERS.md#quick-start).
-4. Click **Review uploaded changes**, inspect the proposed plan, then click **Activate reviewed revision**. Choose explicitly whether to overwrite each existing file whose contents differ, including its declared dependencies. An accepted change shows its active revision; **uploading rules alone does not execute them**.
+4. Click **Save upload and review**, inspect the proposed plan, then click **Activate reviewed revision**. Choose explicitly whether to overwrite each existing file whose contents differ, including its declared dependencies. An accepted change shows its active revision; **uploading rules alone does not execute them**.
 5. Open BloodHound at `http://127.0.0.1:28080/` and upload collection data through its normal upload process. It accepts the supported directory and OpenGraph JSON collections and ZIP archives.
 6. After BloodHound imports the data and successfully finishes its native checks, it runs the affected active rules. Return to the rule page and click **Refresh rules and status** to inspect the execution report. Explore the resulting connections in BloodHound's normal browser.
 
@@ -96,6 +96,12 @@ The button needs three settings in private `rules.env`: `BLOODHOUND_API_URL`, `B
 Leave all three empty to omit this connection; uploads and automatic analysis still work. The page then explains why Run Analysis is unavailable. The browser never receives the BloodHound key and needs no extra pasted token in the supplied local setup. The rule server uses the key only for the existing analysis request and status calls. No additional BloodHound code change is needed for this button. The earlier application changes are still required to run extension rules after native analysis.
 
 ## Change the active rules
+
+Use **Save upload and review** to save an inactive draft. A draft can be incomplete: add the missing schema or query in another upload, in either order. Its files survive refresh and service restart. The page explains what is missing and keeps **Review saved draft** unavailable until the complete proposal validates. Active rules and their saved graph results keep working while the draft is incomplete.
+
+Once ready, review the proposed files and use **Activate reviewed revision**. Saving a draft never activates it. **Discard preview** closes the review but keeps the saved draft; **Discard saved draft** removes only the draft. Draft files can be downloaded individually. Changed existing files still need explicit overwrite choices. There is one shared draft per rule service, subject to the same file and size limits as the active set.
+
+If active rules change after a draft is saved, download the draft files, discard the old draft, and upload them again against the current active revision. This requires fresh overwrite choices and review instead of silently replacing newer work. Mutual schema references are allowed; a circular requirement for newly calculated query results still prevents activation.
 
 The page uses one table for all uploaded extensions. Click a column heading to sort by **Order**, **Name**, **Stage**, **Date added**, or **Extension**, or use the extension filter to narrow the list. Expand a rule to read its full query, prerequisites, dependents, inputs, and outputs. The state column explains whether it is enabled, explicitly disabled, or paused because another rule is disabled. The analysis indicator and latest report describe BloodHound's last reported attempt.
 
@@ -161,9 +167,10 @@ To regenerate a page after changing a schema, build the local command and run:
 ./scripts/go.sh build -o esc1-poc .
 ./esc1-poc model -extension extension > model.html
 ./esc1-poc model -extension examples/vault/extension > examples/vault/model.html
+./esc1-poc model -extension examples/cross-platform/extension > work/cross-platform-model.html
 ```
 
-These commands need the installed Go tooling and cached dependencies described above; viewing the saved HTML needs neither Go nor a running database. You can also choose a local definition inside the page. Regenerating a page after a schema edit does not require rebuilding the container.
+These commands need the installed Go tooling and cached dependencies described above; viewing the saved HTML needs neither Go nor a running database. You can also select several local schema files together inside the page. For cross-extension kinds, include their defining schemas; the viewer reads the whole set before checking references. Native kinds need no extra file. The `model` command likewise reads every `schema.json` and named `.schema.json` file in the directory, without requiring queries or a database. Regenerating a page after a schema edit does not require rebuilding the container.
 
 ## Troubleshooting
 
@@ -177,6 +184,7 @@ These commands need the installed Go tooling and cached dependencies described a
 | Rule service cannot join its network | Start the selected lab database first. Use the shown `BH_DOCKER_NETWORK=esc1-poc-persistent_default` override. |
 | Rule service cannot write its state | Check the selected `RULE_STATE_DIR`, its `0700` permissions, and the user/group IDs in `rules.env`. Neo4j and PostgreSQL use different rule-state directories. |
 | Local rule page rejects a request | Use exactly `http://127.0.0.1:18081/`, matching Compose's `-local-ui-origin`. Writes require this Origin and JSON. Manual mode still needs the matching secret from `rules.env`. |
+| Draft cannot activate | Read the missing-schema or query explanation. Add the defining schemas and required query files to the same saved draft, then review it again. |
 | Upload rejects a schema update | Include every required query, preserve each existing schema’s filename and name, and explicitly choose overwritten files. Shared relationship producers must agree on the update policy. Removal and reassignment are allowed after complete-plan validation. Refresh and preview again if another tab changed the revision. |
 | Upload succeeded but no new connections appeared | Upload a subsequent collection, wait for native analysis, then compare the execution report's revision and time. Uploading rules alone only stores files. |
 | Collection succeeded but extension failed | Read the separate rule report and BloodHound log. Correct the rule, upload its replacement, and upload a subsequent collection so successful native analysis can run the new files. Idle retries keep the failed attempt's original files. Earlier saved connections may remain and be out of date. |

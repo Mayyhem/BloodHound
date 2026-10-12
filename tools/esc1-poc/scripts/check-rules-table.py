@@ -46,6 +46,7 @@ def main():
     state = {'revision': 'first', 'files': {name: rule['text'] for name, rule in zip(names, rules)}, 'disabled': []}
     state['files']['active_directory.schema.json'] = '{}'
     writes, changes, errors = [], [], []
+    draft = {'revision': '', 'files': {}, 'ready': False}
     stale_activation = False
     analysis_requests = []
     native_status = {'available': True, 'pending': False, 'running': False, 'native_status': 'Idle', 'message': ''}
@@ -77,7 +78,7 @@ def main():
         page.on('pageerror', lambda error: errors.append(str(error)))
 
         def route(request):
-            nonlocal current_rules, stale_activation
+            nonlocal current_rules, stale_activation, draft
             path = request.request.url.split('/')[-1]
             method = request.request.method
             if path == 'browser-mode':
@@ -99,8 +100,20 @@ def main():
                 value = {'state': 'running', 'revision': state['revision']}
             elif path == 'plan':
                 value = plan(state['revision'])
+            elif path == 'draft':
+                if method == 'PUT':
+                    change = request.request.post_data_json
+                    draft['files'].update(change['files'])
+                    draft.update(revision='draft', ready=True, overwrite=change.get('overwrite', []))
+                elif method == 'DELETE':
+                    draft = {'revision': '', 'files': {}, 'ready': False}
+                    request.fulfill(status=204)
+                    return
+                value = draft
             elif path == 'preview':
                 change = request.request.post_data_json
+                if change.get('draft_revision'):
+                    change = {**change, 'files': draft['files'], 'overwrite': draft.get('overwrite', [])}
                 changes.append(change)
                 proposed = copy.deepcopy(current_rules)
                 removed = []

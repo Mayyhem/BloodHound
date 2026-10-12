@@ -28,7 +28,7 @@
       "name": "PoC_ADCSESC1",
       "description": "Independently calculated experimental ESC1 connection, checked against native BloodHound results.",
       "is_traversable": true,
-      "endpoints": [
+      "compatible_kinds": [
         {
           "source_kind": "User",
           "target_kind": "Domain"
@@ -42,17 +42,10 @@
           "target_kind": "Domain"
         },
         {
-          "source_kind": "LocalGroup",
+          "source_kind": "ADLocalGroup",
           "target_kind": "Domain"
         }
       ]
     }
-  ],
-  "external_node_kinds": [
-    "Computer",
-    "Domain",
-    "Group",
-    "LocalGroup",
-    "User"
   ]
 }

@@ -327,9 +327,9 @@ func TestRemovalKeepsGraphReadersAndEndpointConsumers(t *testing.T) {
 	}
 	relationships := schema["relationship_kinds"].([]any)
 	relationships = append(relationships,
-		map[string]any{"name": "PoC_Vault_HelperEdge", "endpoints": []any{map[string]any{"source_kind": "PoC_Vault_Helper", "target_kind": "User"}}, "post_processing": map[string]any{"query": "endpoint.cypher"}},
-		map[string]any{"name": "PoC_Vault_ReadHelper", "endpoints": []any{map[string]any{"source_kind": "PoC_Vault_Container", "target_kind": "User"}}, "post_processing": map[string]any{"query": "node_reader.cypher"}},
-		map[string]any{"name": "PoC_Vault_ReadEdge", "endpoints": []any{map[string]any{"source_kind": "PoC_Vault_Container", "target_kind": "User"}}, "post_processing": map[string]any{"query": "edge_reader.cypher"}},
+		map[string]any{"name": "PoC_Vault_HelperEdge", "compatible_kinds": []any{map[string]any{"source_kind": "PoC_Vault_Helper", "target_kind": "User"}}, "post_processing": map[string]any{"query": "endpoint.cypher"}},
+		map[string]any{"name": "PoC_Vault_ReadHelper", "compatible_kinds": []any{map[string]any{"source_kind": "PoC_Vault_Container", "target_kind": "User"}}, "post_processing": map[string]any{"query": "node_reader.cypher"}},
+		map[string]any{"name": "PoC_Vault_ReadEdge", "compatible_kinds": []any{map[string]any{"source_kind": "PoC_Vault_Container", "target_kind": "User"}}, "post_processing": map[string]any{"query": "edge_reader.cypher"}},
 	)
 	schema["relationship_kinds"] = relationships
 	contents, err := json.Marshal(schema)

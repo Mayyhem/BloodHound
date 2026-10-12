@@ -171,15 +171,19 @@ func execute(ctx context.Context, configuration configuration) error {
 	case "model":
 		// Writing to standard output also works from the command container.
 		// No credentials, Docker connection, or running database are needed.
-		definition, err := extension.LoadDefinition(configuration.extensionDirectory)
+		definitions, err := extension.LoadDefinitions(configuration.extensionDirectory)
 		if err != nil {
 			return err
 		}
-		contents, err := json.Marshal(definition)
-		if err != nil {
-			return err
+		var contents [][]byte
+		for _, definition := range definitions {
+			encoded, err := json.Marshal(definition)
+			if err != nil {
+				return err
+			}
+			contents = append(contents, encoded)
 		}
-		page, err := modelview.Render(contents)
+		page, err := modelview.Render(contents...)
 		if err != nil {
 			return err
 		}

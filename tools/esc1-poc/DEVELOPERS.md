@@ -61,16 +61,12 @@ Save this as **`getting_started.schema.json`**:
       "color": "#5965D8"
     }
   ],
-  "external_node_kinds": [
-    "User",
-    "Group"
-  ],
   "relationship_kinds": [
     {
       "name": "PoC_Start_DirectMemberOf",
       "description": "Learning example: an existing direct user-to-group membership.",
       "is_traversable": false,
-      "endpoints": [
+      "compatible_kinds": [
         {
           "source_kind": "User",
           "target_kind": "Group"
@@ -113,7 +109,7 @@ This checks the schema, filenames, declared prerequisites, output declarations, 
 ### 3. Activate the two files
 
 1. Open the lab's rule page at `http://127.0.0.1:18081/`.
-2. Select the two files, then click **Review uploaded changes**.
+2. Select the two files, then click **Save upload and review**.
 3. Check the proposed rule and output kind. If replacing files, explicitly choose which files to overwrite.
 4. Click **Activate reviewed revision**.
 
@@ -207,13 +203,16 @@ Use a distinct named schema, such as `my_extension.schema.json`, and descriptive
 | `schema.version` | A semantic version such as `v1.0.0`; this experiment requires the `v` prefix. |
 | `schema.namespace` | Prefix for this schema's declared kinds. With `PoC_Start`, kinds must begin `PoC_Start_`. Namespaces must be unique. |
 | `node_kinds` / `relationship_kinds` | Arrays describing your own kinds. Current BloodHound registration requires at least one local node kind; relationships may be `[]`. Do not redeclare another extension's kinds. |
-| `external_node_kinds` | Existing endpoint kinds you refer to, such as native `User`, or helper kinds declared by another extension. This does not create or relabel objects. |
-| Relationship `endpoints` | Exact allowed source/target kind pairs. Allowing `User → Domain` and `Group → Computer` does not allow `User → Computer`. |
+| Relationship `compatible_kinds` | Exact allowed source/target kind pairs. Allowing `User → Domain` and `Group → Computer` does not allow `User → Computer`. |
 | `is_traversable` | Whether pathfinding may follow the relationship. Use `false` for factual associations that do not establish an attack step. |
 
 Current experiment restriction: **calculated kinds and helper ID prefixes must start with `PoC_`**. They must also follow their schema namespace rules. This separates experimental output from native output.
 
-A declared kind with no producing query is descriptive or collected data; declaring it alone does not schedule graph changes. If its last producing rule was deleted, previously managed results are cleared on the next successful run. The runner registers the display schema separately from calculating results. The custom `external_node_kinds` and `endpoints` fields are interpreted by this architecture, not by an ordinary OpenGraph schema upload.
+A declared kind with no producing query is descriptive or collected data; declaring it alone does not schedule graph changes. If its last producing rule was deleted, previously managed results are cleared on the next successful run. The runner registers the display schema separately from calculating results. The custom `compatible_kinds` field is interpreted by this architecture, not by an ordinary OpenGraph schema upload.
+
+Reference native BloodHound kinds directly. For a kind defined by another extension, use its defining schema; do not repeat its declaration in your own file.
+
+All schemas are read before references are checked, so they can refer to one another in either file order. Missing definitions keep an uploaded draft inactive; upload the remaining schemas and queries, review the complete result, then activate it. Mutual type references are allowed. Calculations that each require the other's new answer still have no valid execution order and cannot activate.
 
 **Do not add `post_processing` blocks.** Output declarations live in Cypher. The platform supplies the reference build and the shipped ESC1 experiment’s native-agreement check. Declare each relationship kind once in a schema; several query files may return it.
 
@@ -221,7 +220,7 @@ Keep an activated schema's filename and name stable when updating it. You can ad
 
 ## Dependencies and shared queries
 
-Every query starts with a `depends-on` comment. Declare the node and relationship kinds it reads, plus any earlier query answers it consumes:
+Every query starts with a `depends-on` comment. Declare the node and relationship kinds it reads, plus any earlier query answers it consumes. Declared graph inputs must be native kinds or have a defining schema in the complete set; a missing custom schema keeps the draft inactive:
 
 ```cypher
 // depends-on: node:User, node:Group, relationship:MemberOf,
@@ -374,6 +373,8 @@ None of these actions alone runs queries or changes graph output. An in-progress
 ### Updating older bundles
 
 Use a literal `kind` in each relationship query and literal helper `kinds`. Remove old schema `post_processing` blocks, including any owner field. Move an `existing_edge_policy` setting to each producer’s `existing-edge-policy` comment, using the same value for all producers of that type. Helper IDs must begin with their kind name plus `_`.
+
+Rename each relationship's `endpoints` field to `compatible_kinds`, keeping every `source_kind`/`target_kind` pair and its direction. Remove `external_node_kinds`; native kinds come from BloodHound, and custom kinds come from the accompanying schemas.
 
 Preview and activate a complete set of current files together. Saved ownership metadata is no longer part of the format. Existing graph properties such as `poc_owner` do not grant or prevent updates.
 

@@ -285,9 +285,16 @@ SPDX-License-Identifier: Apache-2.0
         <summary>Upload rules and download schemas</summary>
         <label for="files">Schema definitions and .cypher files</label>
         <input id="files" type="file" multiple accept=".json,.cypher">
-        <p class="muted">Use schema.json or extension_name.schema.json, plus uniquely named snake_case.cypher files. Upload a complete extension to begin; later, upload only changed files. Each changed existing file requires its own overwrite choice. Maximum: 32 files, 1 MiB per file, 4 MiB in total.</p>
+        <p class="muted">Use schema.json or extension_name.schema.json, plus uniquely named snake_case.cypher files. Uploads are saved as inactive drafts. Add missing schemas or queries in later uploads, then review and activate the complete set. Each changed existing file requires its own overwrite choice. Maximum: 32 files, 1 MiB per file, 4 MiB in total.</p>
         <div id="schema-downloads"></div>
-        <button id="preview" class="primary">Review uploaded changes</button>
+        <button id="preview" class="primary">Save upload and review</button>
+        <div id="draft-controls" hidden>
+          <h3>Inactive draft</h3>
+          <p id="draft-state" role="status"></p>
+          <div id="draft-downloads"></div>
+          <button id="review-draft">Review saved draft</button>
+          <button id="discard-draft">Discard saved draft</button>
+        </div>
       </details>
       <h2 id="table-title">Rules</h2>
       <p id="active-revision" class="revision">No active revision loaded.</p>
@@ -354,7 +361,7 @@ SPDX-License-Identifier: Apache-2.0
     <dialog id="overwrite-dialog" aria-labelledby="overwrite-title">
       <h2 id="overwrite-title">Choose whether to overwrite</h2>
       <p id="overwrite-name"></p>
-      <p>The uploaded contents differ from the active file. Choose an action for this file.</p>
+      <p>The uploaded contents differ from the saved draft or active file. Choose an action for this file.</p>
       <p id="overwrite-effect"></p>
       <button id="overwrite-file" class="primary">Overwrite this file</button>
       <button id="skip-file">Skip this file</button>
@@ -386,6 +393,7 @@ SPDX-License-Identifier: Apache-2.0
       let active = { revision: '', files: {}, disabled: [] };
       let activePlan = { queries: [], extensions: [] };
       let pending = null;
+      let draft = { revision: '', files: {}, ready: false };
 
       let selected = new Set();
       let expanded = new Set();
@@ -444,6 +452,8 @@ SPDX-License-Identifier: Apache-2.0
           byID(id).disabled = busy || (id === 'preview' && (!loaded || !!pending));
         }
         byID('activate').disabled = busy || !pending;
+        byID('review-draft').disabled = busy || !loaded || !!pending || !draft.ready;
+        byID('discard-draft').disabled = busy || !loaded || !!pending || !draft.revision;
         byID('run-analysis').disabled = busy || polling || !loaded || !!pending || !nativeAnalysis || !nativeAnalysis.available || nativeAnalysis.pending || nativeAnalysis.running;
         byID('files').disabled = busy || !!pending;
         byID('token').disabled = busy;
@@ -478,7 +488,7 @@ SPDX-License-Identifier: Apache-2.0
           headers.Authorization = 'Bearer ' + byID('token').value;
         }
         const response = await fetch((localUI ? '/ui/' : '/v1/') + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
-        const value = await response.json();
+        const value = response.status === 204 ? null : await response.json();
         if (!response.ok) {
           const error = Error(value.error || 'HTTP ' + response.status);
           error.status = response.status;
@@ -557,7 +567,21 @@ SPDX-License-Identifier: Apache-2.0
           button.onclick = () => download(name, active.files[name]);
           byID('schema-downloads').append(button);
         }
-        byID('active-revision').textContent = active.revision ? 'Active revision: ' + active.revision : 'No active rules. Upload a complete extension to begin.';
+        byID('active-revision').textContent = active.revision ? 'Active revision: ' + active.revision : 'No active rules. Upload files to start an inactive draft.';
+      }
+
+      function renderDraft() {
+        byID('draft-controls').hidden = !draft.revision;
+        byID('draft-state').textContent = draft.ready
+          ? 'Saved and ready for review. This draft is not active.'
+          : 'Saved but cannot be activated: ' + (draft.validation_error || 'No draft saved.');
+        const downloads = byID('draft-downloads');
+        downloads.replaceChildren();
+        for (const name of Object.keys(draft.files).sort()) {
+          const button = element('button', 'Download draft ' + name);
+          button.onclick = () => download(name, draft.files[name]);
+          downloads.append(button);
+        }
       }
 
       function renderFilter() {
@@ -704,17 +728,19 @@ SPDX-License-Identifier: Apache-2.0
       }
 
       async function readSnapshot() {
-        const [bundle, plan, status] = await Promise.all([call('rules').catch(error => {
+        const [bundle, plan, status, savedDraft] = await Promise.all([call('rules').catch(error => {
             if (error.status === 404 && error.message === 'no active rule bundle') {
               return { revision: '', files: {}, disabled: [] };
             }
             throw error;
-          }), call('plan'), loadStatus(), refreshNativeStatus()]);
+          }), call('plan'), loadStatus(), call('draft'), refreshNativeStatus()]);
         if (bundle.revision !== plan.revision) {
           throw Error('The active revision changed while loading. Refresh to load the complete plan.');
         }
         active = bundle;
         activePlan = plan;
+        draft = savedDraft;
+        renderDraft();
         loaded = true;
         selected.clear();
         renderSchemas();
@@ -776,7 +802,7 @@ SPDX-License-Identifier: Apache-2.0
         byID('review-revisions').textContent = 'Based on: ' + (review.base_revision || 'no active revision') + '\nProposed revision: ' + review.revision;
         const changes = byID('review-changes');
         changes.replaceChildren();
-        entry(changes, 'New files', describe(Object.keys(change.files || {}).filter(name => !Object.hasOwn(active.files, name)).sort()));
+        entry(changes, 'New files', describe(Object.keys(change.files || (change.draft_revision ? draft.files : {})).filter(name => !Object.hasOwn(active.files, name)).sort()));
         entry(changes, 'Overwritten files', describe(review.overwritten));
         entry(changes, 'All deleted files', describe(review.removed));
         entry(changes, 'Disabled rules', describe(review.disabled));
@@ -800,6 +826,7 @@ SPDX-License-Identifier: Apache-2.0
             throw Error('Select at most 32 files.');
           }
           const files = {}, overwrite = [], seen = new Set();
+          const savedFiles = { ...active.files, ...draft.files };
           for (const file of uploads) {
             if (file.name !== 'schema.json' && !/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\.schema\.json|\.cypher)$/.test(file.name)) {
               throw Error('Use schema.json, extension_name.schema.json, or snake_case.cypher filenames.');
@@ -812,8 +839,8 @@ SPDX-License-Identifier: Apache-2.0
               throw Error('File exceeds 1 MiB: ' + file.name);
             }
             const contents = await file.text();
-            if (Object.hasOwn(active.files, file.name)) {
-              if (active.files[file.name] === contents) {
+            if (Object.hasOwn(savedFiles, file.name)) {
+              if (savedFiles[file.name] === contents) {
                 continue;
               }
               const choice = await chooseOverwrite(file.name);
@@ -831,12 +858,20 @@ SPDX-License-Identifier: Apache-2.0
           if (!Object.keys(files).length) {
             throw Error('Select new or changed files to upload.');
           }
-          const change = { base_revision: active.revision, files, overwrite };
+          const change = { base_revision: active.revision, draft_revision: draft.revision, files, overwrite };
           if (new TextEncoder().encode(JSON.stringify(change)).length > 4194304) {
             throw Error('Upload exceeds 4 MiB.');
           }
-          showPreview(change, await call('preview', 'POST', change));
-          message('Review the proposed rules, then activate this revision.');
+          draft = await call('draft', 'PUT', change);
+          byID('files').value = '';
+          renderDraft();
+          if (draft.ready) {
+            const proposed = { base_revision: active.revision, draft_revision: draft.revision };
+            showPreview(proposed, await call('preview', 'POST', proposed));
+            message('Draft saved. Review the proposed rules, then activate this revision.');
+          } else {
+            message('Inactive draft saved. ' + draft.validation_error + '. Add or replace the required files in another upload. Active rules are unchanged.');
+          }
         } catch (error) {
           discardPreview();
           message(error.message + (error.status === 409 ? ' Refresh and review your changes again.' : ''));
@@ -845,6 +880,39 @@ SPDX-License-Identifier: Apache-2.0
           updateButtons();
         }
       }
+      async function reviewDraft() {
+        if (busy || !loaded || pending || !draft.ready) return;
+        busy = true;
+        updateButtons();
+        try {
+          const change = { base_revision: active.revision, draft_revision: draft.revision };
+          showPreview(change, await call('preview', 'POST', change));
+          message('Review the saved draft before activation.');
+        } catch (error) {
+          message(error.message);
+        } finally {
+          busy = false;
+          updateButtons();
+        }
+      }
+
+      async function discardDraft() {
+        if (busy || !loaded || pending || !draft.revision) return;
+        busy = true;
+        updateButtons();
+        try {
+          await call('draft', 'DELETE', { draft_revision: draft.revision });
+          draft = { revision: '', files: {}, ready: false };
+          renderDraft();
+          message('Saved draft discarded. Active rules are unchanged.');
+        } catch (error) {
+          message(error.message);
+        } finally {
+          busy = false;
+          updateButtons();
+        }
+      }
+
       // Show every affected rule before a delete, disable, or enable change can be saved.
       function confirmAction(action, names, review) {
         const dialog = byID('confirm-dialog'), deleting = action === 'remove';
@@ -915,13 +983,22 @@ SPDX-License-Identifier: Apache-2.0
           return;
         }
         message('Activating the reviewed revision…', true);
+        const draftRevision = pending.change.draft_revision;
         const bundle = await call('rules', 'PUT', { ...pending.change, confirm_revision: pending.review.revision });
+        let cleanupMessage = '';
+        if (draftRevision) {
+          try {
+            await call('draft', 'DELETE', { draft_revision: draftRevision });
+          } catch (error) {
+            cleanupMessage = ' Activation succeeded, but the saved draft remains: ' + error.message;
+          }
+        }
         pending = null;
         byID('review').hidden = true;
         byID('table-title').textContent = 'Rules';
         byID('files').value = '';
         await readSnapshot();
-        message('Revision ' + bundle.revision + ' activated. New settings apply to the next analysis. Deleted connections are cleared after its next successful run.');
+        message('Revision ' + bundle.revision + ' activated. New settings apply to the next analysis. Deleted connections are cleared after its next successful run.' + cleanupMessage);
       }
 
       async function activate() {
@@ -944,6 +1021,8 @@ SPDX-License-Identifier: Apache-2.0
       byID('refresh').onclick = refresh;
       byID('run-analysis').onclick = runAnalysis;
       byID('preview').onclick = previewUpload;
+      byID('review-draft').onclick = reviewDraft;
+      byID('discard-draft').onclick = discardDraft;
       byID('activate').onclick = activate;
       byID('cancel-preview').onclick = () => {
         discardPreview();

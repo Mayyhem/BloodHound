@@ -298,11 +298,10 @@ func TestCrossSchemaDisableAlsoPausesManagedKindAndEndpointConsumers(t *testing.
 	}
 	relationships := schema["relationship_kinds"].([]any)
 	relationships = append(relationships,
-		map[string]any{"name": "PoC_CyberArk_HelperFor", "endpoints": []any{map[string]any{"source_kind": "PoC_AD_User", "target_kind": "User"}}, "post_processing": map[string]any{"query": "helper_endpoint.cypher"}},
-		map[string]any{"name": "PoC_CyberArk_ReadHelper", "endpoints": []any{map[string]any{"source_kind": "PoC_CyberArk_Account", "target_kind": "User"}}, "post_processing": map[string]any{"query": "helper_reader.cypher"}},
+		map[string]any{"name": "PoC_CyberArk_HelperFor", "compatible_kinds": []any{map[string]any{"source_kind": "PoC_AD_User", "target_kind": "User"}}, "post_processing": map[string]any{"query": "helper_endpoint.cypher"}},
+		map[string]any{"name": "PoC_CyberArk_ReadHelper", "compatible_kinds": []any{map[string]any{"source_kind": "PoC_CyberArk_Account", "target_kind": "User"}}, "post_processing": map[string]any{"query": "helper_reader.cypher"}},
 	)
 	schema["relationship_kinds"] = relationships
-	schema["external_node_kinds"] = []any{"User", "PoC_AD_User"}
 	contents, err := json.Marshal(schema)
 	if err != nil {
 		t.Fatal(err)

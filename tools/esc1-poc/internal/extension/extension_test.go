@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"strings"
 	"testing"
 
@@ -39,41 +38,25 @@ func writeExtension(t *testing.T, schema extension.Schema, queries map[string]st
 		directory     = t.TempDir()
 		nodes         = []map[string]any{}
 		relationships = []map[string]any{}
-		localKinds    = make(map[string]bool)
-		externalKinds = make(map[string]bool)
-		externalNames = []string{}
 	)
 	// These tests build the same single definition that an extension author
 	// writes. The execution settings sit beside the ordinary display settings.
 	for _, node := range schema.Nodes {
-		localKinds[node.Kind] = true
 		nodes = append(nodes, map[string]any{"name": node.Kind, "post_processing": map[string]any{"query": node.Query, "id_prefix": node.IDPrefix}})
 	}
 	for _, relationship := range schema.Relationships {
-		definition := map[string]any{"name": relationship.Kind, "endpoints": relationship.Endpoints, "post_processing": map[string]any{"query": relationship.Query}}
+		definition := map[string]any{"name": relationship.Kind, "compatible_kinds": relationship.Endpoints, "post_processing": map[string]any{"query": relationship.Query}}
 		if relationship.ExistingEdgePolicy != "" {
 			definition["existing_edge_policy"] = relationship.ExistingEdgePolicy
 		}
 		relationships = append(relationships, definition)
-		for _, endpoint := range relationship.Endpoints {
-			for _, kind := range []string{endpoint.SourceKind, endpoint.TargetKind} {
-				if !localKinds[kind] {
-					externalKinds[kind] = true
-				}
-			}
-		}
 	}
-	for kind := range externalKinds {
-		externalNames = append(externalNames, kind)
-	}
-	sort.Strings(externalNames)
 	var (
 		definition = map[string]any{
-			"schema":              map[string]any{"name": schema.Name, "display_name": schema.Name, "version": "v1.0.0", "namespace": "PoC"},
-			"node_kinds":          nodes,
-			"relationship_kinds":  relationships,
-			"external_node_kinds": externalNames,
-			"post_processing":     map[string]any{"reference_commit": schema.ReferenceCommit, "compare_native_esc1": schema.CompareNativeESC1},
+			"schema":             map[string]any{"name": schema.Name, "display_name": schema.Name, "version": "v1.0.0", "namespace": "PoC"},
+			"node_kinds":         nodes,
+			"relationship_kinds": relationships,
+			"post_processing":    map[string]any{"reference_commit": schema.ReferenceCommit, "compare_native_esc1": schema.CompareNativeESC1},
 		}
 		contents, err = json.Marshal(definition)
 	)

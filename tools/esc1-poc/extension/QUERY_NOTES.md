@@ -44,7 +44,7 @@ The query sequence is:
    only for those direct principals and their nested candidates. No label
    filter applies to nested members. `special_groups.cypher` selects Group
    nodes ending in the exact SID suffixes `-S-1-1-0` or `-S-1-5-11`.
-   `membership.cypher` derives Group/LocalGroup flags and nested special status.
+   `membership.cypher` derives Group/ADLocalGroup flags and nested special status.
 6. `esc1.cypher` selects ordered direct permission sets for each target. Its
    `group-overlap` JSON comment names the membership prerequisite and invokes
    the reusable group-aware set calculation. Its `batch-on` declaration permits

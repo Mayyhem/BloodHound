@@ -60,7 +60,7 @@ func esc1Cases() []esc1Case {
 		{"ca_generic_all_is_not_enroll", "MATCH (u:User)-[r:Enroll]->(ca:EnterpriseCA) DELETE r CREATE (u)-[:GenericAll]->(ca)", nil},
 		{"template_generic_all", "MATCH (g:Group)-[r:Enroll]->(ct:CertTemplate) DELETE r CREATE (g)-[:GenericAll]->(ct)", []string{"User"}},
 		{"template_all_extended_rights", "MATCH (g:Group)-[r:Enroll]->(ct:CertTemplate) DELETE r CREATE (g)-[:AllExtendedRights]->(ct)", []string{"User"}},
-		{"local_membership", "MATCH (u:User)-[r:MemberOf]->(g:Group) DELETE r CREATE (local:Base:LocalGroup {objectid:'PoC_Test_Local', poc_fixture:true}), (u)-[:MemberOfLocalGroup]->(local), (local)-[:MemberOf]->(g)", []string{"User"}},
+		{"local_membership", "MATCH (u:User)-[r:MemberOf]->(g:Group) DELETE r CREATE (local:Base:ADLocalGroup {objectid:'PoC_Test_Local', poc_fixture:true}), (u)-[:MemberOfLocalGroup]->(local), (local)-[:MemberOf]->(g)", []string{"User"}},
 		{"special_ca_group", "MATCH (u:User)-[r:Enroll]->(ca:EnterpriseCA) DELETE r CREATE (special:Base:Group {objectid:'PoC_Test_S-S-1-5-11',poc_fixture:true})-[:Enroll]->(ca)", []string{"Group"}},
 		{"nested_special_ca_group", "MATCH (u:User)-[r:Enroll]->(ca:EnterpriseCA) DELETE r CREATE (special:Base:Group {objectid:'PoC_Test_S-S-1-5-11',poc_fixture:true})-[:MemberOf]->(outer:Base:Group {objectid:'PoC_Test_Outer',poc_fixture:true})-[:Enroll]->(ca)", []string{"Group"}},
 		{"both_sides_special", "MATCH (u:User)-[ca_right:Enroll]->(ca:EnterpriseCA), (g:Group)-[template_right:Enroll]->(ct:CertTemplate) DELETE ca_right, template_right CREATE (everyone:Base:Group {objectid:'PoC_Test_S-S-1-1-0',poc_fixture:true})-[:Enroll]->(ct), (auth:Base:Group {objectid:'PoC_Test_S-S-1-5-11',poc_fixture:true})-[:Enroll]->(ca)", []string{"S-S-1-1-0", "S-S-1-5-11"}},

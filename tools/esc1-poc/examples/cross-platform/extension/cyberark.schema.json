@@ -36,15 +36,12 @@
       "name": "PoC_CyberArk_AccountFor",
       "description": "Factual association of an account with a directory user whose SID matches. It makes no credential access or attack path claim.",
       "is_traversable": false,
-      "endpoints": [
+      "compatible_kinds": [
         {
           "source_kind": "PoC_CyberArk_Account",
           "target_kind": "User"
         }
       ]
     }
-  ],
-  "external_node_kinds": [
-    "User"
   ]
 }

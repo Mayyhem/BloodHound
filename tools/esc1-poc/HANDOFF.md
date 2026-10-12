@@ -2,6 +2,34 @@
 
 Use [DEVELOPERS.md](DEVELOPERS.md) for current authoring instructions and [USAGE.md](USAGE.md) for the persistent lab. Entries below record earlier implementations and deployments; old schema processing blocks, ownership settings, commands, and performance limits are not a second current authoring format.
 
+
+## Schema kinds and inactive drafts — 11 October 2026
+
+The user requested TODO #8, then explicitly chose: “Save incomplete uploads as inactive drafts, and prevent activation until the required schemas are present.” This authorizes the draft storage and upload-page work alongside the schema simplification. Keep the user's separate `.gitignore`, `AGENTS.md`, and existing documentation edits; nothing was staged or committed.
+
+`external_node_kinds` is removed. `RelationshipKind.CompatibleKinds` reads `compatible_kinds`; it still supplies exact directed endpoint pairs to the existing runner. Internal execution bindings and saved retirement scopes retain their endpoint representation. The complete schema set is checked before kind references are resolved. Native kinds come from this checkout's `graphschema.CombinedGraphSchema`, using a local root-module dependency in the pilot's `go.mod`; Go aligned a few transitive versions with the root module. No BloodHound or DAWGS source edits were needed. Validation also checks explicitly declared `depends-on` graph inputs against native and uploaded kinds, including relationship kinds whose endpoints are all native. It does not infer missing dependencies or validate the complete Cypher language; that remains TODO #2.
+
+The new native check exposed the old ESC1 `LocalGroup` label. The schema, membership query, corresponding fixture, and current notes now use BloodHound's actual `ADLocalGroup`. Both graph backends are included in the integration checks.
+
+`internal/ruleservice/draft.go` stores one bounded, private `draft.json` separately from active rules. Upload saves may report missing schemas/queries or other plan errors without losing the files. The worker still receives only the active bundle. Review and activation accept a `draft_revision`, recheck the active revision, and run complete plan validation. Mutual schema references and reads of each other's collected edge types work; circular dependencies on new calculations do not. Drafts persist across restart. A newer draft invalidates an old preview; changed active rules require downloading, discarding, and resubmitting the old draft for fresh overwrite choices. The browser clears an applied draft separately after successful activation and distinguishes cleanup failure from activation failure.
+
+The offline model command loads all schemas in a directory, without queries or a database. The page accepts multiple local schema files and derives native references from its embedded BloodHound kind list. Both HTML examples were regenerated. Shared Go validation replaces the viewer's separate Go validator; browser checks cover the same directed pairs and mutual references in either file order.
+
+Verification and logs are recorded in the new REVIEW.md section. Browser draft checks start disposable loopback services with no application/graph connection and preserve their state/screenshots under `work/`. Test networking required sandbox escalation; no deployed application was restarted, no live rules were activated, and no large dataset was loaded. A new local CLI was built for checks.
+
+**Before a later deployment:** existing saved schema files still using `endpoints` or `external_node_kinds` need conversion before the new service can reopen them. Preserve rule history and recompute the bundle revision as part of that conversion; do not restart the live registry against unchanged old-format state. This task intentionally did not migrate live state. There is no compatibility reader for the removed fields.
+
+After reviewing this change and the existing user edits, a manual commit is appropriate. From the repository root, run:
+
+```sh
+just prepare-for-codereview
+# Review any generated changes and all existing edits before staging.
+git add tools/esc1-poc
+git commit -m "feat: Simplify schema kind declarations <Jira tag>"
+```
+
+Replace the Jira placeholder. `just prepare-for-codereview` has not been run during this task. The user's separate `AGENTS.md` edit has trailing whitespace; it was preserved, and the changed-file whitespace check excludes that file.
+
 ## Ownership removed and shared relationship producers — 11 October 2026
 
 The user approved implementation after discussing Disable/Delete. This supersedes the earlier documentation-only restriction for this change. Preserve their separate documentation and `AGENTS.md` edits. Do not stage or commit.

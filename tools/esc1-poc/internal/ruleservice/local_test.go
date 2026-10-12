@@ -69,6 +69,12 @@ func TestBrowserHandlerLocalRequests(t *testing.T) {
 	}{
 		{name: "read plan", method: "GET", path: "/ui/plan", code: 204, machinePath: "/v1/plan"},
 		{name: "read rules", method: "GET", path: "/ui/rules", code: 204, machinePath: "/v1/rules"},
+		{name: "read draft", method: "GET", path: "/ui/draft", code: 204, machinePath: "/v1/draft"},
+		{name: "save draft", method: "PUT", path: "/ui/draft", origin: origin, contentType: "application/json", code: 204, machinePath: "/v1/draft"},
+		{name: "discard draft", method: "DELETE", path: "/ui/draft", origin: origin, contentType: "application/json", code: 204, machinePath: "/v1/draft"},
+		{name: "draft cross site", method: "PUT", path: "/ui/draft", origin: "http://evil.example", contentType: "application/json", code: 403},
+		{name: "discard draft missing origin", method: "DELETE", path: "/ui/draft", contentType: "application/json", code: 403},
+		{name: "draft form rejected", method: "PUT", path: "/ui/draft", origin: origin, contentType: "text/plain", code: 415},
 		{name: "read status", method: "GET", path: "/ui/status", code: 204, machinePath: "/v1/status"},
 		{name: "analysis status", method: "GET", path: "/ui/analysis", code: 204, machinePath: "/v1/analysis"},
 		{name: "run analysis", method: "POST", path: "/ui/analysis", origin: origin, contentType: "application/json", code: 204, machinePath: "/v1/analysis"},

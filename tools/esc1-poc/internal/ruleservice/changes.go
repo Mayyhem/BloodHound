@@ -34,6 +34,7 @@ var ErrConflict = errors.New("the rules changed or the replacement has not been 
 // tab from replacing newer work or activating something different from its preview.
 type Change struct {
 	BaseRevision    string            `json:"base_revision"`
+	DraftRevision   string            `json:"draft_revision,omitempty"`
 	ConfirmRevision string            `json:"confirm_revision,omitempty"`
 	Files           map[string]string `json:"files,omitempty"`
 	Overwrite       []string          `json:"overwrite,omitempty"`
@@ -89,6 +90,16 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 		preview   = Preview{BaseRevision: s.active.Revision, Removed: []string{}, Overwritten: []string{}}
 		allowed   = map[string]bool{}
 	)
+	if change.DraftRevision != "" {
+		if s.draft.Revision != change.DraftRevision || s.draft.BaseRevision != s.active.Revision {
+			return Bundle{}, extension.Plan{}, preview, ErrConflict
+		}
+		if len(change.Files)+len(change.Remove)+len(change.Enable)+len(change.Disable)+len(change.Overwrite) != 0 {
+			return Bundle{}, extension.Plan{}, preview, fmt.Errorf("review the saved draft on its own; save any further edits first")
+		}
+		change.Files = s.draft.Files
+		change.Overwrite = s.draft.Overwrite
+	}
 	if change.BaseRevision != s.active.Revision {
 		return Bundle{}, extension.Plan{}, preview, ErrConflict
 	}

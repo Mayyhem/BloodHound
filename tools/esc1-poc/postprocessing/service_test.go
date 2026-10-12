@@ -280,7 +280,7 @@ func TestServiceRegistersStandardSchemaBeforePublishing(t *testing.T) {
 	var registrations int
 	service.configuration.RegisterSchema = func(ctx context.Context, payload []byte) error {
 		registrations++
-		if strings.Contains(string(payload), "post_processing") || strings.Contains(string(payload), "existing_edge_policy") || strings.Contains(string(payload), "endpoints") {
+		if strings.Contains(string(payload), "post_processing") || strings.Contains(string(payload), "existing_edge_policy") || strings.Contains(string(payload), "compatible_kinds") {
 			t.Fatal("proposed fields leaked to native schema")
 		}
 		_, release, err := service.gate.EnterWrite(ctx)

@@ -2,24 +2,9 @@
 
 Give extension authors a clear path from an idea to working rules: create an extension, check its files, explore and test its execution chains, review the proposed results, and activate the rules.
 
-This is a backlog of proposed improvements, not a description of features already available. Keep the engine's existing shared calculations, scope and identity checks, complete-result validation, and all-or-nothing saving. The interactive execution graph below replaces the earlier suggestion for a separate development-mode execution preview.
+Open items describe proposed improvements; completed work is listed under [Done](#done). Keep the engine's existing shared calculations, scope and identity checks, complete-result validation, and all-or-nothing saving. The interactive execution graph below replaces the earlier suggestion for a separate development-mode execution preview.
 
-Start with authoring consistency, earlier validation, and useful execution reports. Then build the interactive graph and its testing controls. Starter tooling and easier sharing build on those capabilities. Coordinate the Cypher work with the existing [implementation plan](CYPHER_IMPLEMENTATION_PLAN.md).
-
-## 1. Keep the authoring instructions and examples consistent
-
-**Status: documentation work completed on 11 October 2026; permanent automated example tests remain pending approval for code changes.** Queries declare their output kind, and the platform supplies reference settings. Keep that agreement clear as the project changes.
-
-- [x] Check the current guides and example documentation against the authoring rules. Remove obsolete instructions and unnecessary alternative ways to express the same thing; label historical formats as history.
-- [ ] Test the quick-start files and shipped examples automatically so an author can copy them and get the documented result.
-- [x] Provide one minimal starting example, followed by examples for shared answers, helper objects, and relationships with properties.
-- [x] Explain which settings describe the extension's meaning and which decisions BloodHound handles automatically.
-
-The guide now names each file to add or replace, reuses one schema, and states the expected result at each step. A one-time check extracted the four tutorial stages and loaded them with the existing local `plan` command; all four passed, as did the three shipped example directories. These checks do not execute queries or prove results on either database. The documentation review and the remaining automated-test work are recorded in [REVIEW.md](REVIEW.md#authoring-documentation-check).
-
-**Done when:** the guide, starter files, examples, and file checks agree, and authors do not need to inspect Go code to discover the required format.
-
-Start in [DEVELOPERS.md](DEVELOPERS.md), [the examples](examples), and [the definition and query loader](internal/extension).
+Start with earlier validation and useful execution reports. Then build the interactive graph and its testing controls. Starter tooling and easier sharing build on those capabilities. Keep the completed authoring documentation current as the engine changes. Coordinate the Cypher work with the existing [implementation plan](CYPHER_IMPLEMENTATION_PLAN.md).
 
 ## 2. Catch mistakes before rules are activated
 
@@ -30,6 +15,7 @@ Checking filenames, declarations, and the final `RETURN` is not enough to establ
 - [ ] Find graph kinds and prerequisite parameters that are visible in the query and check them against declared dependencies. Suggest corrections; handle uncertain cases conservatively.
 - [ ] Investigate automatically supplying dependencies that can be established reliably, while keeping exceptional dependencies explicit. Agree on any change to author requirements before implementing it.
 - [ ] Add regression cases for a misspelled `MATCH`, a query that reads `MemberOf` without declaring it, missing prerequisites, unsupported syntax, and incorrect output columns.
+- [ ] Add permanent automated tests for the quick-start files and shipped examples, including extracting each tutorial stage from Markdown and checking its expected results on both databases. Cover disabled and missing-property users, helper identities, property updates, and complete empty answers. Moved from #1; this requires approval for code changes.
 
 **Done when:** authors receive actionable feedback before activation, and a query cannot silently omit an input that validation can identify.
 
@@ -120,14 +106,27 @@ ESC1 currently uses comments that ask Go code to transform query results. Runnin
 
 Start in [the Cypher implementation plan](CYPHER_IMPLEMENTATION_PLAN.md) and [the current ESC1 query notes](extension/QUERY_NOTES.md).
 
-## 8. Simplify schema kind declarations
+## Done
 
-Use the separately uploaded schema that defines a kind when another extension refers to it. Authors should not need to repeat those kinds in an extra list if the existing schemas already provide the information needed to check their rules.
+### 1. Keep the authoring instructions and examples consistent
 
-- [ ] Determine whether `external_node_kinds` is still necessary when referenced kinds are defined by native BloodHound or a separately uploaded extension schema. Remove it if those definitions are sufficient. Explain a missing required schema rather than asking authors to repeat its kind declarations.
-- [ ] Rename the relationship schema field `endpoints` to `compatible_kinds`. Preserve the explicit `source_kind`/`target_kind` pairs and their direction, so the rename does not allow additional combinations.
-- [ ] When these changes are implemented, update validation, the model viewer, examples, tests, and authoring documentation together. The current field names remain in use until then.
+**Completed: documentation work on 11 October 2026.** The remaining permanent automated tests are tracked under [#2](#2-catch-mistakes-before-rules-are-activated), pending approval for code changes.
 
-**Done when:** cross-extension references use their defining schemas, `external_node_kinds` is removed if redundant, and relationship compatibility is described consistently as `compatible_kinds`.
+- [x] Check the current guides and example documentation against the authoring rules. Remove obsolete instructions and unnecessary alternative ways to express the same thing; label historical formats as history.
+- [x] Provide one minimal starting example, followed by examples for shared answers, helper objects, and relationships with properties.
+- [x] Explain which settings describe the extension's meaning and which decisions BloodHound handles automatically.
 
-Start in [the schema reader](internal/extension/definition.go), [the definition registry](internal/extension/registry.go), and [the developer guide](DEVELOPERS.md).
+The guide names each file to add or replace, reuses one schema, and states the expected result at each step. The recorded one-time check loaded all four tutorial stages and all three shipped example directories with the existing local `plan` command. Those checks did not execute queries or prove results on either database. See [REVIEW.md](REVIEW.md#authoring-documentation-check) for the scope of that review.
+
+Maintain [DEVELOPERS.md](DEVELOPERS.md) and [the example documentation](examples) as the authoring rules change.
+
+### 8. Simplify schema kind declarations
+
+**Completed: 11 October 2026.** Missing schemas may be uploaded later through the inactive draft workflow requested during this work.
+
+- [x] Remove `external_node_kinds`. Native kinds come from BloodHound's graph definitions; custom kinds come from the complete uploaded schema set. Check both compatible endpoint kinds and explicitly declared graph inputs. Resolve references after all schemas are read, so file order and mutual schema references are allowed.
+- [x] Rename relationship `endpoints` to `compatible_kinds`, preserving explicit, directed `source_kind`/`target_kind` pairs.
+- [x] Update validation, the offline model viewer, shipped schemas, examples, tests, and authoring documentation together.
+- [x] Save incomplete uploads as inactive drafts, retain them across restarts, and accept additional files in later uploads. Keep active rules unchanged; require complete validation and explicit review before activation. Circular calculation dependencies still prevent activation.
+
+The offline viewer opens accompanying schemas together. The native kind check also identified and corrected the ESC1 example's `LocalGroup` label to BloodHound's actual `ADLocalGroup` label. See [REVIEW.md](REVIEW.md#schema-kind-declarations-and-inactive-drafts) for validation and [USAGE.md](USAGE.md#change-the-active-rules) for draft handling.

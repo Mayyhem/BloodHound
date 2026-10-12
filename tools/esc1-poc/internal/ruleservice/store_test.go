@@ -252,7 +252,7 @@ func TestAddingProducerAndRemovingItButRejectingRename(t *testing.T) {
 		t.Fatal(err)
 	}
 	relationships := schema["relationship_kinds"].([]any)
-	newBinding := map[string]any{"name": "PoC_Vault_Additional", "endpoints": relationships[1].(map[string]any)["endpoints"], "description": "Additional calculated edge"}
+	newBinding := map[string]any{"name": "PoC_Vault_Additional", "compatible_kinds": relationships[1].(map[string]any)["compatible_kinds"], "description": "Additional calculated edge"}
 	schema["relationship_kinds"] = append(relationships, newBinding)
 	contents, err := json.Marshal(schema)
 	if err != nil {

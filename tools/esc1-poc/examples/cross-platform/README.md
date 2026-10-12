@@ -9,7 +9,7 @@ Upload the five files in [extension](extension) together, or add the CyberArk sc
 | [active_directory.schema.json](extension/active_directory.schema.json) | Active Directory | `PoC_AD` | `ad_users.cypher` |
 | [cyberark.schema.json](extension/cyberark.schema.json) | CyberArk | `PoC_CyberArk` | `cyberark_accounts.cypher`, `cyberark_links.cypher` |
 
-The schemas describe types and endpoints. They contain no `post_processing` blocks or reference commit. The platform supplies reference settings; neither extension compares its results with native ESC1. Outputs have no ownership settings. See [the developer guide](../../DEVELOPERS.md#updating-older-bundles) for updating older files.
+The schemas describe types and directed `compatible_kinds` pairs. Native kinds need no extra declaration; another extension's custom kinds use its defining schema. They contain no `post_processing` blocks or reference commit. The platform supplies reference settings; neither extension compares its results with native ESC1. Outputs have no ownership settings. See [the developer guide](../../DEVELOPERS.md#updating-older-bundles) for updating older files.
 
 | Query file | What it returns | Earlier answer it needs |
 | --- | --- | --- |

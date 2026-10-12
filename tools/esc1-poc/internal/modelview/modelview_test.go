@@ -27,13 +27,12 @@ import (
 )
 
 const fixture = `{
- "schema":{"name":"example","namespace":"EXAMPLE","version":"1"},
- "node_kinds":[{"name":"A"},{"name":"B"},{"name":"Isolated"}],
- "external_node_kinds":["User"],
+ "schema":{"name":"example","display_name":"Example","namespace":"PoC","version":"v1"},
+ "node_kinds":[{"name":"PoC_A"},{"name":"PoC_B"},{"name":"PoC_Isolated"}],
  "relationship_kinds":[
-  {"name":"CanReach","is_traversable":true,"endpoints":[{"source_kind":"A","target_kind":"B"},{"source_kind":"B","target_kind":"User"}]},
-  {"name":"AlsoReaches","is_traversable":true,"endpoints":[{"source_kind":"A","target_kind":"B"}]},
-  {"name":"SelfSupport","is_traversable":false,"endpoints":[{"source_kind":"A","target_kind":"A"}]}
+  {"name":"PoC_CanReach","is_traversable":true,"compatible_kinds":[{"source_kind":"PoC_A","target_kind":"PoC_B"},{"source_kind":"PoC_B","target_kind":"User"}]},
+  {"name":"PoC_AlsoReaches","is_traversable":true,"compatible_kinds":[{"source_kind":"PoC_A","target_kind":"PoC_B"}]},
+  {"name":"PoC_SelfSupport","is_traversable":false,"compatible_kinds":[{"source_kind":"PoC_A","target_kind":"PoC_A"}]}
  ]
 }`
 
@@ -44,7 +43,7 @@ func TestRenderEscapesEmbeddedJSON(t *testing.T) {
 		page        = string(html)
 		startMarker = `<script id="model-definition" type="application/json">`
 		start       = strings.Index(page, startMarker)
-		decoded     map[string]any
+		decoded     []map[string]any
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -59,10 +58,10 @@ func TestRenderEscapesEmbeddedJSON(t *testing.T) {
 	if err = json.Unmarshal([]byte(page[start:start+strings.Index(page[start:], "</script>")]), &decoded); err != nil {
 		t.Fatalf("embedded definition is not valid JSON: %v", err)
 	}
-	if decoded["schema"].(map[string]any)["name"] != "</script><script>window.injected=true</script>&" {
+	if decoded[0]["schema"].(map[string]any)["name"] != "</script><script>window.injected=true</script>&" {
 		t.Fatal("embedding changed the definition's label")
 	}
-	for _, forbidden := range []string{"<script src=", "<link ", "__MODEL_JSON__"} {
+	for _, forbidden := range []string{"<script src=", "<link ", "__MODEL_JSON__", "__NATIVE_NODE_KINDS__"} {
 		if strings.Contains(page, forbidden) {
 			t.Fatalf("standalone page contains %q", forbidden)
 		}
@@ -71,18 +70,17 @@ func TestRenderEscapesEmbeddedJSON(t *testing.T) {
 
 func TestRenderRejectsInvalidModels(t *testing.T) {
 	var cases = map[string]string{
-		"invalid JSON":             "{",
-		"null":                     "null",
-		"missing arrays":           `{"schema":{"name":"test"}}`,
-		"invalid schema name":      strings.Replace(fixture, `"example"`, `12`, 1),
-		"missing endpoints":        strings.Replace(fixture, `"endpoints":[{"source_kind":"A","target_kind":"B"},{"source_kind":"B","target_kind":"User"}]`, `"other":[]`, 1),
-		"empty endpoints":          strings.Replace(fixture, `"endpoints":[{"source_kind":"A","target_kind":"B"},{"source_kind":"B","target_kind":"User"}]`, `"endpoints":[]`, 1),
-		"unknown endpoint":         strings.Replace(fixture, `"target_kind":"B"`, `"target_kind":"Unknown"`, 1),
-		"duplicate relationship":   strings.Replace(fixture, `"AlsoReaches"`, `"CanReach"`, 1),
-		"duplicate endpoint pair":  strings.Replace(fixture, `{"source_kind":"B","target_kind":"User"}`, `{ "source_kind":"A", "target_kind":"B" }`, 1),
-		"nonboolean traversal":     strings.Replace(fixture, `"is_traversable":true`, `"is_traversable":"true"`, 1),
-		"duplicate local kind":     strings.Replace(fixture, `{"name":"Isolated"}`, `{"name":"A"}`, 1),
-		"external local collision": strings.Replace(fixture, `"external_node_kinds":["User"]`, `"external_node_kinds":["A"]`, 1),
+		"invalid JSON":            "{",
+		"null":                    "null",
+		"missing arrays":          `{"schema":{"name":"test"}}`,
+		"invalid schema name":     strings.Replace(fixture, `"example"`, `12`, 1),
+		"missing endpoints":       strings.Replace(fixture, `"compatible_kinds":[{"source_kind":"PoC_A","target_kind":"PoC_B"},{"source_kind":"PoC_B","target_kind":"User"}]`, `"other":[]`, 1),
+		"empty endpoints":         strings.Replace(fixture, `"compatible_kinds":[{"source_kind":"PoC_A","target_kind":"PoC_B"},{"source_kind":"PoC_B","target_kind":"User"}]`, `"compatible_kinds":[]`, 1),
+		"unknown endpoint":        strings.Replace(fixture, `"target_kind":"PoC_B"`, `"target_kind":"Unknown"`, 1),
+		"duplicate relationship":  strings.Replace(fixture, `"PoC_AlsoReaches"`, `"PoC_CanReach"`, 1),
+		"duplicate endpoint pair": strings.Replace(fixture, `{"source_kind":"PoC_B","target_kind":"User"}`, `{ "source_kind":"PoC_A", "target_kind":"PoC_B" }`, 1),
+		"nonboolean traversal":    strings.Replace(fixture, `"is_traversable":true`, `"is_traversable":"true"`, 1),
+		"duplicate local kind":    strings.Replace(fixture, `{"name":"PoC_Isolated"}`, `{"name":"PoC_A"}`, 1),
 	}
 	for name, definition := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -101,7 +99,7 @@ func TestBrowserParserPreservesExactEndpointPairs(t *testing.T) {
 		nodePath, lookupError = exec.LookPath("node")
 		html, renderError     = modelview.Render([]byte(fixture))
 		page                  = string(html)
-		start                 = strings.Index(page, "function parseModel(definition)")
+		start                 = strings.Index(page, "const nativeNodeKinds =")
 		end                   = strings.Index(page, "const $ =")
 		script                string
 	)
@@ -118,14 +116,14 @@ func TestBrowserParserPreservesExactEndpointPairs(t *testing.T) {
 const assert = require('node:assert/strict');
 const definition = ` + fixture + `;
 const model = parseModel(definition);
-assert.deepEqual(model.nodes.map(node=>node.name), ['A','B','Isolated','User']);
+assert.deepEqual(model.nodes.map(node=>node.name), ['PoC_A','PoC_B','PoC_Isolated','User']);
 assert.equal(model.byName.get('User').external, true);
-assert.equal(model.byName.get('Isolated').external, false);
+assert.equal(model.byName.get('PoC_Isolated').external, false);
 assert.deepEqual(model.edges.map(edge=>[edge.source,edge.name,edge.target,edge.traversable]), [
- ['A','CanReach','B',true], ['B','CanReach','User',true],
- ['A','AlsoReaches','B',true], ['A','SelfSupport','A',false]
+ ['PoC_A','PoC_CanReach','PoC_B',true], ['PoC_B','PoC_CanReach','User',true],
+ ['PoC_A','PoC_AlsoReaches','PoC_B',true], ['PoC_A','PoC_SelfSupport','PoC_A',false]
 ]);
-assert.equal(model.edges.some(edge=>edge.source==='A'&&edge.target==='User'), false);
+assert.equal(model.edges.some(edge=>edge.source==='PoC_A'&&edge.target==='User'), false);
 assert.equal(model.edges.every(edge=>edge.existingEdgePolicy==='Defined by the producing query'), true);
 for (const policy of ['replace-existing', 'merge-properties', 'keep-existing']) {
  const explicit = JSON.parse(JSON.stringify(definition));
@@ -137,17 +135,17 @@ for (const policy of [null, '', false, 1, {}, [], 'unknown']) {
  invalid.relationship_kinds[0].existing_edge_policy = policy;
  assert.throws(()=>parseModel(invalid), /existing_edge_policy/);
 }
-for (const endpoints of [undefined, [], [{source_kind:'A', target_kind:'Unknown'}]]) {
+for (const endpoints of [undefined, [], [{source_kind:'PoC_A', target_kind:'Unknown'}]]) {
  const invalid = JSON.parse(JSON.stringify(definition));
- invalid.relationship_kinds[0].endpoints = endpoints;
- assert.throws(()=>parseModel(invalid), /endpoint/);
+ invalid.relationship_kinds[0].compatible_kinds = endpoints;
+ assert.throws(()=>parseModel(invalid), /compatible_kinds|unknown node kind/);
 }
 const optionalTraversal = JSON.parse(JSON.stringify(definition));
 delete optionalTraversal.relationship_kinds[0].is_traversable;
 assert.equal(parseModel(optionalTraversal).edges[0].traversable, false);
 for (const change of [
  value => value.relationship_kinds[1].name = value.relationship_kinds[0].name,
- value => value.relationship_kinds[0].endpoints.push({...value.relationship_kinds[0].endpoints[0]}),
+ value => value.relationship_kinds[0].compatible_kinds.push({...value.relationship_kinds[0].compatible_kinds[0]}),
  value => value.relationship_kinds[0].is_traversable = null,
 ]) {
  const invalid = JSON.parse(JSON.stringify(definition));
@@ -155,8 +153,23 @@ for (const change of [
  assert.throws(()=>parseModel(invalid));
 }
 const noEdges = {...definition, relationship_kinds:[]};
-assert.equal(parseModel(noEdges).nodes.length, 4);
+assert.equal(parseModel(noEdges).nodes.length, 3);
 assert.equal(parseModel(noEdges).edges.length, 0);
+const consumer = JSON.parse(JSON.stringify(definition));
+consumer.relationship_kinds[0].compatible_kinds[0].target_kind = 'PoC_Other_Node';
+const supplier = {
+ schema: {name:'other', display_name:'Other extension', namespace:'PoC_Other', version:'v1'},
+ node_kinds:[{name:'PoC_Other_Node',description:'From the defining schema'}],
+ relationship_kinds:[{name:'PoC_Other_Back', compatible_kinds:[{source_kind:'PoC_Other_Node',target_kind:'PoC_A'}]}]
+};
+assert.throws(()=>parseModel(consumer), /open the schema/);
+for (const definitions of [[consumer,supplier],[supplier,consumer]]) {
+ const combined = parseModel(definitions);
+ assert.equal(combined.byName.get('PoC_Other_Node').description, 'From the defining schema');
+ assert.equal(combined.edges.some(edge=>edge.source==='PoC_A' && edge.target==='PoC_Other_Node'), true);
+ assert.equal(combined.edges.some(edge=>edge.source==='PoC_Other_Node' && edge.target==='PoC_A'), true);
+}
+
 `
 	if output, err := exec.Command(nodePath, "-e", script).CombinedOutput(); err != nil {
 		t.Fatalf("browser parser failed: %v\n%s", err, output)
@@ -174,7 +187,7 @@ func TestRenderAcceptsOptionalTraversal(t *testing.T) {
 func TestRenderExistingEdgePolicies(t *testing.T) {
 	for _, policy := range []string{`"replace-existing"`, `"merge-properties"`, `"keep-existing"`, `null`, `""`, `false`, `12`, `[]`, `{}`, `"unknown"`} {
 		t.Run(policy, func(t *testing.T) {
-			definition := strings.Replace(fixture, `"name":"CanReach",`, `"name":"CanReach","existing_edge_policy":`+policy+`,`, 1)
+			definition := strings.Replace(fixture, `"name":"PoC_CanReach",`, `"name":"PoC_CanReach","existing_edge_policy":`+policy+`,`, 1)
 			html, err := modelview.Render([]byte(definition))
 			valid := policy == `"replace-existing"` || policy == `"merge-properties"` || policy == `"keep-existing"`
 			if valid && err != nil {
@@ -187,5 +200,20 @@ func TestRenderExistingEdgePolicies(t *testing.T) {
 				t.Fatal("viewer does not show the policy")
 			}
 		})
+	}
+}
+
+func TestRenderUsesAccompanyingSchemaForCustomKinds(t *testing.T) {
+	var (
+		consumer = strings.Replace(fixture, `"target_kind":"PoC_B"`, `"target_kind":"PoC_Other_Node"`, 1)
+		supplier = `{"schema":{"name":"other","display_name":"Other","namespace":"PoC_Other","version":"v1"},"node_kinds":[{"name":"PoC_Other_Node"}],"relationship_kinds":[{"name":"PoC_Other_Back","compatible_kinds":[{"source_kind":"PoC_Other_Node","target_kind":"PoC_A"}]}]}`
+	)
+	if _, err := modelview.Render([]byte(consumer)); err == nil || !strings.Contains(err.Error(), "include the schema") {
+		t.Fatal("missing schema not explained", err)
+	}
+	for _, definitions := range [][][]byte{{[]byte(consumer), []byte(supplier)}, {[]byte(supplier), []byte(consumer)}} {
+		if _, err := modelview.Render(definitions...); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

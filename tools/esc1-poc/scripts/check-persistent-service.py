@@ -386,7 +386,6 @@ def merge_vault_bundle(files):
             if existing is None:
                 schema[field].append(kind)
                 declared[kind["name"]] = kind
-    schema["external_node_kinds"] = sorted(set(schema["external_node_kinds"]) | set(vault_schema["external_node_kinds"]))
     # This remains one bundle: vault kinds remain in the ESC1 schema for this historical demonstration.
     merged["schema.json"] = json.dumps(schema)
     for path in (vault_directory / "extension").glob("*.cypher"):

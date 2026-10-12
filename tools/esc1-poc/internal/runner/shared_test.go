@@ -150,7 +150,7 @@ func TestRemainingProducerRefreshesAndLastRemovalClearsBeforeConsumer(t *testing
 	}
 	expected = 0
 	plan.Queries = plan.Queries[1:]
-	plan.Definitions = []extension.Definition{{RelationshipKinds: []extension.RelationshipKind{{Name: "PoC_ADCSESC1", Endpoints: plan.Schema.Relationships[0].Endpoints}}}}
+	plan.Definitions = []extension.Definition{{RelationshipKinds: []extension.RelationshipKind{{Name: "PoC_ADCSESC1", CompatibleKinds: plan.Schema.Relationships[0].Endpoints}}}}
 	plan.Schema.Relationships = nil
 	plan.RetiredRelationships = []string{"PoC_ADCSESC1"}
 	report, err := runner.Run(t.Context(), database, plan, parallelOptions(t))

@@ -42,7 +42,7 @@ def triples(definition):
          "Traversable" if edge.get("is_traversable") is True else "Nontraversable",
          edge.get("existing_edge_policy", "Defined by the producing query"))
         for edge in definition["relationship_kinds"]
-        for pair in edge["endpoints"]
+        for pair in edge["compatible_kinds"]
     )
 
 
@@ -56,7 +56,12 @@ def browser_triples(page):
 def check_full_model(page, definition):
     assert browser_triples(page) == triples(definition), f"The table changed the allowed pairs: {browser_triples(page)!r}, expected {triples(definition)!r}"
     names = {kind["name"] for kind in definition["node_kinds"]}
-    external = set(definition.get("external_node_kinds", []))
+    external = {
+        name
+        for relationship in definition["relationship_kinds"]
+        for pair in relationship["compatible_kinds"]
+        for name in (pair["source_kind"], pair["target_kind"])
+    } - names
     actual = set(page.locator("#nodes [data-kind]").evaluate_all(
         "nodes => nodes.map(node => node.dataset.kind)"
     ))
@@ -146,16 +151,15 @@ def synthetic_definition():
              "color": 'url(https://example.invalid/color)'},
             {"name": "PoC_Isolated"},
         ],
-        "external_node_kinds": ["User"],
         "relationship_kinds": [
             {"name": "PoC_First", "description": malicious, "is_traversable": True,
-             "endpoints": [{"source_kind": "PoC_Account", "target_kind": "User"}]},
+             "compatible_kinds": [{"source_kind": "PoC_Account", "target_kind": "User"}]},
             {"name": "PoC_Second", "is_traversable": True,
-             "endpoints": [{"source_kind": "PoC_Account", "target_kind": "User"}]},
+             "compatible_kinds": [{"source_kind": "PoC_Account", "target_kind": "User"}]},
             {"name": "PoC_Reverse", "is_traversable": False,
-             "endpoints": [{"source_kind": "User", "target_kind": "PoC_Account"}]},
+             "compatible_kinds": [{"source_kind": "User", "target_kind": "PoC_Account"}]},
             {"name": "PoC_Self", "is_traversable": False,
-             "endpoints": [{"source_kind": "PoC_Account", "target_kind": "PoC_Account"}]},
+             "compatible_kinds": [{"source_kind": "PoC_Account", "target_kind": "PoC_Account"}]},
         ],
     }
 
@@ -220,7 +224,7 @@ def main():
         assert page.evaluate("window.viewerInjection === undefined")
         assert page.locator("img").count() == 0, "A label was interpreted as HTML."
         invalid = copy.deepcopy(fixture)
-        invalid["relationship_kinds"][0]["endpoints"] = []
+        invalid["relationship_kinds"][0]["compatible_kinds"] = []
         invalid_path = directory / "invalid.json"
         invalid_path.write_text(json.dumps(invalid))
         page.locator("#schema-file").set_input_files(invalid_path)
@@ -250,6 +254,25 @@ def main():
         assert page.evaluate("window.viewerInjection === undefined")
         assert page.locator("img").count() == 0
         results["checks"].append({"model": "synthetic", "triples": 4, "parallel_relationships": 2, "self_loops": 1, "safe_import_and_embedding": True, "invalid_import_keeps_previous_model": True})
+        # Both schemas must be available before either reference is resolved.
+        consumer = copy.deepcopy(fixture)
+        consumer["relationship_kinds"].append({"name": "PoC_Cross", "compatible_kinds": [
+            {"source_kind": "PoC_Account", "target_kind": "PoC_Other_Node"}]})
+        supplier = {"schema": {"name": "other", "display_name": "Other", "namespace": "PoC_Other", "version": "v1"},
+                    "node_kinds": [{"name": "PoC_Other_Node"}],
+                    "relationship_kinds": [{"name": "PoC_Other_Back", "compatible_kinds": [
+                        {"source_kind": "PoC_Other_Node", "target_kind": "PoC_Account"}]}]}
+        consumer_path, supplier_path = directory / "consumer.schema.json", directory / "supplier.schema.json"
+        consumer_path.write_text(json.dumps(consumer))
+        supplier_path.write_text(json.dumps(supplier))
+        combined = {"node_kinds": consumer["node_kinds"] + supplier["node_kinds"],
+                    "relationship_kinds": consumer["relationship_kinds"] + supplier["relationship_kinds"]}
+        for paths in [[consumer_path, supplier_path], [supplier_path, consumer_path]]:
+            page.locator("#schema-file").set_input_files(paths)
+            expected_title = " + ".join(read_json(path)["schema"]["display_name"] for path in paths)
+            page.wait_for_function("title => document.querySelector('#model-title').textContent === title", arg=expected_title)
+            check_full_model(page, combined)
+        results["checks"].append({"model": "mutual-schema-references", "both_file_orders": True})
         assert not results["network_requests"], "The viewer attempted a network request."
         assert not results["browser_errors"], "The browser reported a script error."
         context.close()

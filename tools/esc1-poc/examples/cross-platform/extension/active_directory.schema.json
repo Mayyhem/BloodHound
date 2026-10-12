@@ -15,8 +15,5 @@
       "color": "#3178C6"
     }
   ],
-  "relationship_kinds": [],
-  "external_node_kinds": [
-    "User"
-  ]
+  "relationship_kinds": []
 }

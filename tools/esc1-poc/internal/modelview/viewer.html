@@ -398,10 +398,10 @@ footer {
    </div>
    <div>
     <label for="schema-file">
-     Open another local model definition
+     Open local schema files together
     </label>
     <br/>
-    <input accept=".json,application/json" id="schema-file" type="file"/>
+    <input accept=".json,application/json" id="schema-file" type="file" multiple/>
    </div>
   </header>
   <div id="error" role="alert">
@@ -524,63 +524,96 @@ footer {
   </script>
   <script>
    'use strict';
-// Keep validation separate from drawing: every displayed triple comes from one
-// explicit endpoint pair, including parallel relationships and self-loops.
-function parseModel(definition) {
-    if (!definition || typeof definition !== 'object' || !definition.schema || typeof definition.schema.name !== 'string' || !definition.schema.name) {
-        throw new Error('The definition requires schema metadata with a name.');
-    }
-    if (!Array.isArray(definition.node_kinds) || !Array.isArray(definition.relationship_kinds)) {
-        throw new Error('The definition requires node_kinds and relationship_kinds arrays.');
-    }
+// Use BloodHound's own native kinds, embedded when this offline page is built.
+const nativeNodeKinds = new Set(__NATIVE_NODE_KINDS__);
+// Read every schema before resolving references, so file order does not matter.
+// Every arrow still comes from one explicit, directed compatible_kinds pair.
+function parseModel(input) {
+    const definitions = Array.isArray(input) ? input : [input];
     const nodes = [];
     const byName = new Map();
     const edges = [];
     const relationshipNames = new Set();
+    const schemaNames = new Set();
+    const namespaces = new Set();
+    const validName = name => typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+    if (definitions.length === 0) {
+        throw new Error('Include at least one schema definition.');
+    }
     function addNode(kind, external) {
-        if (!kind || typeof kind.name !== 'string' || !kind.name || byName.has(kind.name)) {
-            throw new Error('Node kinds must have unique, nonempty names; external types must be distinct from types defined here.');
+        if (!kind || !validName(kind.name) || byName.has(kind.name)) {
+            throw new Error('Node kinds must have unique, valid names.');
         }
-        const node = {
-            ...kind, external, x: 0, y: 0
-        };
+        const node = {...kind, external, x: 0, y: 0};
         nodes.push(node);
         byName.set(node.name, node);
     }
-    definition.node_kinds.forEach(kind => addNode(kind, false));
-    if (definition.external_node_kinds !== undefined && !Array.isArray(definition.external_node_kinds)) {
-        throw new Error('external_node_kinds must be an array.');
-    }
-    (definition.external_node_kinds || []).forEach(name => addNode({
-        name, description: 'Referenced native or other extension type; not defined by this schema.'
-    }, true));
-    definition.relationship_kinds.forEach((kind, kindIndex) => {
-        if (!kind || typeof kind.name !== 'string' || !kind.name || (kind.is_traversable !== undefined && typeof kind.is_traversable !== 'boolean')) {
-            throw new Error('Every relationship kind requires a name; is_traversable must be boolean when present.');
+    definitions.forEach(definition => {
+        const schema = definition && definition.schema;
+        if (!schema || typeof schema.name !== 'string' || !schema.name.trim() ||
+            typeof schema.display_name !== 'string' || !schema.display_name.trim() ||
+            !validName(schema.namespace) || typeof schema.version !== 'string' || !schema.version.startsWith('v')) {
+            throw new Error('Each schema needs a name, display_name, namespace, and version beginning with v.');
         }
-        if (relationshipNames.has(kind.name)) {
-            throw new Error('Duplicate relationship kind "' + kind.name + '".');
+        if (schemaNames.has(schema.name) || namespaces.has(schema.namespace)) {
+            throw new Error('Schema names and namespaces must be unique.');
+        }
+        schemaNames.add(schema.name);
+        namespaces.add(schema.namespace);
+        if (Object.prototype.hasOwnProperty.call(definition, 'external_node_kinds')) {
+            throw new Error('Remove external_node_kinds; include the schemas defining referenced custom kinds instead.');
+        }
+        if (!Array.isArray(definition.node_kinds) || !Array.isArray(definition.relationship_kinds)) {
+            throw new Error('Each definition requires node_kinds and relationship_kinds arrays.');
+        }
+        definition.node_kinds.forEach(kind => {
+            if (!kind || !validName(kind.name) || !kind.name.startsWith(schema.namespace + '_') ||
+                kind.name.length === schema.namespace.length + 1 || nativeNodeKinds.has(kind.name)) {
+                throw new Error('Node kinds must use their schema namespace prefix and must not redeclare native kinds.');
+            }
+            addNode(kind, false);
+        });
+    });
+    definitions.forEach(definition => definition.relationship_kinds.forEach(kind => {
+        if (!kind || !validName(kind.name) || !kind.name.startsWith(definition.schema.namespace + '_') ||
+            kind.name.length === definition.schema.namespace.length + 1 ||
+            (kind.is_traversable !== undefined && typeof kind.is_traversable !== 'boolean')) {
+            throw new Error('Relationship kinds need their schema namespace prefix; is_traversable must be boolean when present.');
+        }
+        if (relationshipNames.has(kind.name) || byName.has(kind.name) || nativeNodeKinds.has(kind.name)) {
+            throw new Error('Duplicate declared kind "' + kind.name + '".');
         }
         relationshipNames.add(kind.name);
+        if (Object.prototype.hasOwnProperty.call(kind, 'endpoints')) {
+            throw new Error('Rename relationship endpoints to compatible_kinds, keeping each source_kind/target_kind pair.');
+        }
         const policy = Object.prototype.hasOwnProperty.call(kind, 'existing_edge_policy') ? kind.existing_edge_policy : 'Defined by the producing query';
         if (Object.prototype.hasOwnProperty.call(kind, 'existing_edge_policy') && !['replace-existing', 'merge-properties', 'keep-existing'].includes(policy)) {
             throw new Error('existing_edge_policy must be replace-existing, merge-properties, or keep-existing.');
         }
         const endpointPairs = new Set();
-        if (!Array.isArray(kind.endpoints) || kind.endpoints.length === 0) {
-            throw new Error('Relationship "' + kind.name + '" requires explicit nonempty endpoints. No endpoint pairs are inferred.');
+        if (!Array.isArray(kind.compatible_kinds) || kind.compatible_kinds.length === 0) {
+            throw new Error('Relationship "' + kind.name + '" requires explicit nonempty compatible_kinds pairs.');
         }
-        kind.endpoints.forEach((pair, pairIndex) => {
-            if (!pair || !byName.has(pair.source_kind) || !byName.has(pair.target_kind)) {
-                throw new Error('Relationship "' + kind.name + '" has an invalid or undeclared endpoint.');
+        kind.compatible_kinds.forEach(pair => {
+            if (!pair || !validName(pair.source_kind) || !validName(pair.target_kind)) {
+                throw new Error('Each compatible_kinds pair needs valid source_kind and target_kind names.');
             }
+            [pair.source_kind, pair.target_kind].forEach(name => {
+                if (!byName.has(name)) {
+                    if (!nativeNodeKinds.has(name)) {
+                        throw new Error('Relationship "' + kind.name + '" references unknown node kind "' + name + '"; open the schema that defines it together with this file.');
+                    }
+                    addNode({name, description: 'Native BloodHound kind; referenced, not defined by these schemas.'}, true);
+                }
+            });
             const pairKey = JSON.stringify([pair.source_kind, pair.target_kind]);
             if (endpointPairs.has(pairKey)) {
-                throw new Error('Relationship "' + kind.name + '" repeats an endpoint pair.');
+                throw new Error('Relationship "' + kind.name + '" repeats a compatible_kinds pair.');
             }
             endpointPairs.add(pairKey);
             edges.push({
-                id: kindIndex + ':' + pairIndex,
+                id: String(edges.length),
                 name: kind.name,
                 description: kind.description || '',
                 source: pair.source_kind,
@@ -589,14 +622,13 @@ function parseModel(definition) {
                 existingEdgePolicy: policy
             });
         });
-    });
-    return {
-        schema: definition.schema,
-        nodes,
-        byName,
-        edges,
-        relationshipCount: definition.relationship_kinds.length
+    }));
+    const schema = definitions.length === 1 ? definitions[0].schema : {
+        name: definitions.map(definition => definition.schema.name).join(' + '),
+        display_name: definitions.map(definition => definition.schema.display_name).join(' + '),
+        namespace: definitions.map(definition => definition.schema.namespace).join(', ')
     };
+    return {schema, nodes, byName, edges, relationshipCount: relationshipNames.size};
 }
 const $ = id => document.getElementById(id);
 const svg = $('model-graph');
@@ -638,8 +670,8 @@ function showError(message) {
     $('error').textContent = message;
     $('error').style.display = message ? 'block' : 'none';
 }
-function loadDefinition(definition) {
-    const nextModel = parseModel(definition);
+function loadDefinition(definitions) {
+    const nextModel = parseModel(definitions);
     model = nextModel;
     selected = null;
     // New files start with the full model, without filters from the last file.
@@ -891,7 +923,7 @@ function showDetails() {
         const externalCount = model.nodes.filter(node => node.external).length;
         text('p', localCount + ' types defined here and ' + externalCount +
             ' external references. Isolated helper, base, and run types are included.', panel);
-        text('h3', 'Explicit endpoints', panel);
+        text('h3', 'Compatible kinds (directed pairs)', panel);
         text('p', 'Each permitted pair is listed in the table below. ' +
             'No source–target combinations are inferred. Green arrows permit traversal; ' +
             'red arrows carry nontraversable relationships.', panel);
@@ -1005,16 +1037,16 @@ $('fit').addEventListener('click', fit);
 $('zoom-in').addEventListener('click', () => zoom(1.25));
 $('zoom-out').addEventListener('click', () => zoom(.8));
 $('schema-file').addEventListener('change', async (event) => {
-    const file = event.target.files[0];
-    if (!file) {
+    const files = Array.from(event.target.files);
+    if (files.length === 0) {
         return;
     }
     try {
-        const definition = JSON.parse(await file.text());
-        loadDefinition(definition);
+        const definitions = await Promise.all(files.map(async file => JSON.parse(await file.text())));
+        loadDefinition(definitions);
     }
     catch (error) {
-        showError('Unable to load ' + file.name + ': ' + error.message + ' The previous model remains visible.');
+        showError('Unable to load ' + files.map(file => file.name).join(', ') + ': ' + error.message + ' The previous model remains visible.');
     }
 });
 // Export the visible diagram with its stylesheet and arrows embedded. The

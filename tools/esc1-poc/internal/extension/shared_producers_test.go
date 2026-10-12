@@ -28,12 +28,11 @@ import (
 
 func sharedProducerDefinition() extension.Definition {
 	return extension.Definition{
-		Schema:            extension.Metadata{Name: "shared_results", DisplayName: "Shared results", Namespace: "PoC", Version: "v1"},
-		NodeKinds:         []extension.NodeKind{{Name: "PoC_Helper"}},
-		ExternalNodeKinds: []string{"User", "Domain"},
+		Schema:    extension.Metadata{Name: "shared_results", DisplayName: "Shared results", Namespace: "PoC", Version: "v1"},
+		NodeKinds: []extension.NodeKind{{Name: "PoC_Helper"}},
 		RelationshipKinds: []extension.RelationshipKind{
-			{Name: "PoC_First", Endpoints: []extension.Endpoint{{SourceKind: "User", TargetKind: "Domain"}}},
-			{Name: "PoC_Second", Endpoints: []extension.Endpoint{{SourceKind: "User", TargetKind: "Domain"}}},
+			{Name: "PoC_First", CompatibleKinds: []extension.Endpoint{{SourceKind: "User", TargetKind: "Domain"}}},
+			{Name: "PoC_Second", CompatibleKinds: []extension.Endpoint{{SourceKind: "User", TargetKind: "Domain"}}},
 		},
 	}
 }
@@ -146,7 +145,7 @@ func TestGraphDependenciesRejectCyclesAndPermitSelfReads(t *testing.T) {
 func TestAffectedExpandsSharedProducersInputsAndConsumers(t *testing.T) {
 	var (
 		queries = map[string]string{
-			"first.cypher":  connectionQuery("relationship:ChangedEvidence", "PoC_First"),
+			"first.cypher":  connectionQuery("relationship:MemberOf", "PoC_First"),
 			"second.cypher": connectionQuery("query:seed.cypher", "PoC_First"),
 			"seed.cypher":   "// depends-on: none\nRETURN 1 AS value",
 			"reader.cypher": connectionQuery("relationship:PoC_First", "PoC_Second"),
@@ -159,7 +158,7 @@ func TestAffectedExpandsSharedProducersInputsAndConsumers(t *testing.T) {
 	}
 	// A shared producer pulls in seed; refreshing seed also requires its other
 	// consumer, even if that consumer appeared earlier in the ordered plan.
-	if actual := plan.Affected(nil, []string{"ChangedEvidence"}, true); !reflect.DeepEqual(actual, queryNames(plan)) {
+	if actual := plan.Affected(nil, []string{"MemberOf"}, true); !reflect.DeepEqual(actual, queryNames(plan)) {
 		t.Fatalf("incomplete selection %v; expected %v", actual, queryNames(plan))
 	}
 	if actual := plan.ExpandSelection([]string{"reader.cypher"}); !reflect.DeepEqual(actual, queryNames(plan)) {

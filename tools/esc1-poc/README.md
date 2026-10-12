@@ -28,7 +28,8 @@ Existing settings give BloodHound the rule container's address and access secret
 ## The main safeguards and limits
 
 - The runner combines every producer’s complete answer before refreshing a relationship type within its declared endpoint scope. Existing edges in that scope participate regardless of their origin. A failed calculation before saving preserves the previous results.
-- Each producing query names its edge with a literal `kind` column. Schemas describe types and endpoints; they need no `post_processing` blocks.
+- Uploads are saved as inactive drafts. Missing schemas can be added later; the complete set must validate and be reviewed before activation.
+- Each producing query names its edge with a literal `kind` column. Schemas describe types and directed `compatible_kinds` pairs; they need no `post_processing` blocks.
 - Each query can choose whether a matching connection is replaced, has its supplied details updated, or is kept unchanged. Replacement is the default.
 - Each extension has its own schema. Several queries can produce the same relationship type; their policies must agree. All uploaded schemas share one dependency order, and queries can pass calculated rows across extension boundaries. These settings are **proposed additions to OpenGraph**, not an accepted part of its official definition.
 - Both Neo4j and PostgreSQL have laboratory test evidence. This coordinates one modified Community Edition application; other applications or direct database writers are outside its protection.

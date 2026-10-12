@@ -8,7 +8,9 @@ Prioritize ease of use and understanding for extension developers. Changes to DA
 
 Don't change the requirements for extension authors (e.g., schema.json or .cypher file definitions) based on assumptions without my approval. 
 
-Prioritize code readability over efficiency. Take opportunities to simplify code and remove unnecessary code. No features need to be retained for backwards compatibility reasons. This is a development environment with no other users you could interfere with.
+Prioritize code readability over efficiency. Take opportunities to simplify code and remove unnecessary code. No features need to be retained for backwards compatibility reasons. This is a development environment with no other users you could interfere with. 
+
+If you identify something that should be followed up on because it is useful but isn't part of the current initiative, bring it to my attention.
 
 Document how and why it works in the appropriate .md files. The documentation should be true to the code. 
 

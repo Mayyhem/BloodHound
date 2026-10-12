@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
-"""Check rule previews without writes, or test activation on an empty isolated service."""
+"""Check rule previews without writes, or test drafts and activation on an empty isolated service."""
 
 import argparse
 from datetime import datetime, timezone
@@ -69,7 +69,7 @@ def main():
             headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'},
             data=None if body is None else json.dumps(body).encode())
         with client.open(request, timeout=15) as response:
-            return json.loads(response.read((4 << 20) + 1))
+            return None if response.status == 204 else json.loads(response.read((4 << 20) + 1))
 
     def active():
         try:
@@ -134,21 +134,24 @@ def main():
         results['checks'].append('One table loads with local or bearer browser access')
         assert page.evaluate('() => localStorage.length === 0 && sessionStorage.length === 0')
         expect(page.locator('#status')).to_contain_text('updated_at')
-        if before:
-            # A real valid preview with a comment-only change; never activate in default mode.
-            upload({filename: candidate[filename] + '\n// read-only browser preview\n'}, [filename])
-            assert active() == before
-            page.locator('#cancel-preview').click()
-        else:
+        if arguments.isolated:
             upload(candidate)
-            assert active() is None, 'Preview must not activate rules.'
+            assert active() is None, 'Saving a draft must not activate rules.'
             expect(page.locator('#rule-rows > tr')).to_have_count(3)
             expect(page.locator('#rule-rows')).to_contain_text('On activation')
-            results['checks'].append('Two schemas and three rules preview without saving')
-            if arguments.isolated:
-                activate()
-            else:
-                page.locator('#cancel-preview').click()
+            results['checks'].append('Two schemas and three rules saved as a draft before activation')
+            activate()
+        else:
+            # Exercise the read-only preview API directly. The upload button now
+            # saves a draft, so the default deployed check must not click it.
+            change = {'base_revision': before['revision'] if before else '',
+                      'files': {filename: candidate[filename] + '\n// read-only browser preview\n'} if before else candidate,
+                      'overwrite': [filename] if before else []}
+            review = api('preview', 'POST', change)
+            page.evaluate('([change, review]) => showPreview(change, review)', [change, review])
+            expect(page.locator('#review')).to_be_visible()
+            assert active() == before
+            page.locator('#cancel-preview').click()
         if arguments.isolated:
             initial = active()
             assert initial['files'] == candidate

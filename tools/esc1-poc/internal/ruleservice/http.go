@@ -69,7 +69,7 @@ func NewHandlerWithAnalysis(store *Store, token string, analysis AnalysisControl
 			_, _ = io.WriteString(writer, uploadPage)
 			return
 		}
-		if request.URL.Path != "/v1/rules" && request.URL.Path != "/v1/status" && request.URL.Path != "/v1/plan" && request.URL.Path != "/v1/preview" && request.URL.Path != "/v1/analysis" {
+		if request.URL.Path != "/v1/rules" && request.URL.Path != "/v1/status" && request.URL.Path != "/v1/plan" && request.URL.Path != "/v1/preview" && request.URL.Path != "/v1/analysis" && request.URL.Path != "/v1/draft" {
 			fail(writer, http.StatusNotFound, "not found")
 			return
 		}
@@ -85,6 +85,10 @@ func NewHandlerWithAnalysis(store *Store, token string, analysis AnalysisControl
 			return
 		}
 		if request.Method == http.MethodGet {
+			if request.URL.Path == "/v1/draft" {
+				respond(writer, http.StatusOK, store.Draft())
+				return
+			}
 			if request.URL.Path == "/v1/plan" {
 				respond(writer, http.StatusOK, store.View())
 				return
@@ -111,8 +115,11 @@ func NewHandlerWithAnalysis(store *Store, token string, analysis AnalysisControl
 		}
 		// GET requests were handled above. Only these specific changes remain.
 		requiredMethod := http.MethodPost
-		if request.URL.Path == "/v1/rules" {
+		if request.URL.Path == "/v1/rules" || request.URL.Path == "/v1/draft" {
 			requiredMethod = http.MethodPut
+		}
+		if request.URL.Path == "/v1/draft" && request.Method == http.MethodDelete {
+			requiredMethod = http.MethodDelete
 		}
 		if request.URL.Path == "/v1/plan" {
 			requiredMethod = http.MethodGet
@@ -130,7 +137,7 @@ func NewHandlerWithAnalysis(store *Store, token string, analysis AnalysisControl
 			return
 		}
 		limit := int64(MaxStatusBytes)
-		if request.URL.Path == "/v1/rules" || request.URL.Path == "/v1/preview" {
+		if request.URL.Path == "/v1/rules" || request.URL.Path == "/v1/preview" || request.URL.Path == "/v1/draft" {
 			limit = MaxBundleBytes
 		}
 		contents, err := io.ReadAll(http.MaxBytesReader(writer, request.Body, limit))
@@ -159,6 +166,23 @@ func NewHandlerWithAnalysis(store *Store, token string, analysis AnalysisControl
 		var upload Change
 		if err := decodeJSON(contents, &upload); err != nil {
 			fail(writer, http.StatusBadRequest, err.Error())
+			return
+		}
+		if request.URL.Path == "/v1/draft" {
+			if request.Method == http.MethodDelete {
+				if err := store.DiscardDraft(upload.DraftRevision); err != nil {
+					changeFailure(writer, err)
+					return
+				}
+				writer.WriteHeader(http.StatusNoContent)
+				return
+			}
+			draft, err := store.SaveDraft(upload)
+			if err != nil {
+				changeFailure(writer, err)
+				return
+			}
+			respond(writer, http.StatusOK, draft)
 			return
 		}
 		if request.URL.Path == "/v1/preview" {

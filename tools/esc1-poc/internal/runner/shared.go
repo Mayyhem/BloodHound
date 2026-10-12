@@ -123,7 +123,7 @@ func retiredBinding(plan extension.Plan, name string) extension.RelationshipBind
 	for _, definition := range plan.Definitions {
 		for _, kind := range definition.RelationshipKinds {
 			if kind.Name == name {
-				binding.Endpoints = kind.Endpoints
+				binding.Endpoints = kind.CompatibleKinds
 			}
 		}
 	}

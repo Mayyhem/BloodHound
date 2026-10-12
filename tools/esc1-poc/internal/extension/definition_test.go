@@ -31,10 +31,9 @@ import (
 
 func modelDefinition() extension.Definition {
 	return extension.Definition{
-		Schema:            extension.Metadata{Name: "model_example", DisplayName: "Model example", Version: "v1.0.0", Namespace: "PoC"},
-		NodeKinds:         []extension.NodeKind{{Name: "PoC_Collected"}},
-		ExternalNodeKinds: []string{"User", "Group", "Domain", "Computer"},
-		RelationshipKinds: []extension.RelationshipKind{{Name: "PoC_Access", Endpoints: []extension.Endpoint{
+		Schema:    extension.Metadata{Name: "model_example", DisplayName: "Model example", Version: "v1.0.0", Namespace: "PoC"},
+		NodeKinds: []extension.NodeKind{{Name: "PoC_Collected"}},
+		RelationshipKinds: []extension.RelationshipKind{{Name: "PoC_Access", CompatibleKinds: []extension.Endpoint{
 			{SourceKind: "User", TargetKind: "Domain"},
 			{SourceKind: "Group", TargetKind: "Computer"},
 		}}},
@@ -47,7 +46,11 @@ func parseModel(t *testing.T, definition extension.Definition) (extension.Defini
 	if err != nil {
 		t.Fatal(err)
 	}
-	return extension.ParseDefinition(contents)
+	parsed, err := extension.ParseDefinition(contents)
+	if err != nil {
+		return extension.Definition{}, err
+	}
+	return parsed, extension.ValidateDefinitions([]extension.Definition{parsed})
 }
 
 func TestDefinitionKeepsExactPairs(t *testing.T) {
@@ -56,17 +59,17 @@ func TestDefinitionKeepsExactPairs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(definition.RelationshipKinds[0].Endpoints, original.RelationshipKinds[0].Endpoints) {
+	if !reflect.DeepEqual(definition.RelationshipKinds[0].CompatibleKinds, original.RelationshipKinds[0].CompatibleKinds) {
 		t.Fatal("reading the model changed its allowed pairs")
 	}
 	// A self relationship is a real model entry, even when source and target
 	// have the same kind. It must survive without being combined with others.
-	original.RelationshipKinds[0].Endpoints = append(original.RelationshipKinds[0].Endpoints, extension.Endpoint{SourceKind: "User", TargetKind: "User"})
+	original.RelationshipKinds[0].CompatibleKinds = append(original.RelationshipKinds[0].CompatibleKinds, extension.Endpoint{SourceKind: "User", TargetKind: "User"})
 	definition, err = parseModel(t, original)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(definition.RelationshipKinds[0].Endpoints, original.RelationshipKinds[0].Endpoints) {
+	if !reflect.DeepEqual(definition.RelationshipKinds[0].CompatibleKinds, original.RelationshipKinds[0].CompatibleKinds) {
 		t.Fatal("reading the model changed its self relationship")
 	}
 }
@@ -77,23 +80,19 @@ func TestDefinitionRejectsIncompleteOrAmbiguousPairs(t *testing.T) {
 		change  func(*extension.Definition)
 		message string
 	}{
-		{"missing pairs", func(definition *extension.Definition) { definition.RelationshipKinds[0].Endpoints = nil }, "explicit endpoints"},
+		{"missing pairs", func(definition *extension.Definition) { definition.RelationshipKinds[0].CompatibleKinds = nil }, "explicit compatible_kinds"},
 		{"duplicate pair", func(definition *extension.Definition) {
-			definition.RelationshipKinds[0].Endpoints = append(definition.RelationshipKinds[0].Endpoints, definition.RelationshipKinds[0].Endpoints[0])
+			definition.RelationshipKinds[0].CompatibleKinds = append(definition.RelationshipKinds[0].CompatibleKinds, definition.RelationshipKinds[0].CompatibleKinds[0])
 		}, "duplicate endpoint pair"},
 		{"undeclared source", func(definition *extension.Definition) {
-			definition.RelationshipKinds[0].Endpoints[0].SourceKind = "Unknown"
-		}, "must be declared"},
+			definition.RelationshipKinds[0].CompatibleKinds[0].SourceKind = "Unknown"
+		}, "unknown node kind"},
 		{"undeclared target", func(definition *extension.Definition) {
-			definition.RelationshipKinds[0].Endpoints[0].TargetKind = "Unknown"
-		}, "must be declared"},
-		{"missing target", func(definition *extension.Definition) { definition.RelationshipKinds[0].Endpoints[0].TargetKind = "" }, "must be declared"},
-		{"local and external collision", func(definition *extension.Definition) {
-			definition.ExternalNodeKinds = append(definition.ExternalNodeKinds, "PoC_Collected")
-		}, "duplicate local or external"},
-		{"duplicate external declaration", func(definition *extension.Definition) {
-			definition.ExternalNodeKinds = append(definition.ExternalNodeKinds, "User")
-		}, "duplicate local or external"},
+			definition.RelationshipKinds[0].CompatibleKinds[0].TargetKind = "Unknown"
+		}, "unknown node kind"},
+		{"missing target", func(definition *extension.Definition) {
+			definition.RelationshipKinds[0].CompatibleKinds[0].TargetKind = ""
+		}, "invalid source_kind or target_kind"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -157,13 +156,12 @@ func TestBloodHoundExportPreservesStandardSectionsAndLocalModel(t *testing.T) {
 		t.Fatal(err)
 	}
 	delete(expected, "post_processing")
-	delete(expected, "external_node_kinds")
 	for _, node := range expected["node_kinds"].([]any) {
 		delete(node.(map[string]any), "post_processing")
 	}
 	for _, edge := range expected["relationship_kinds"].([]any) {
 		delete(edge.(map[string]any), "post_processing")
-		delete(edge.(map[string]any), "endpoints")
+		delete(edge.(map[string]any), "compatible_kinds")
 		delete(edge.(map[string]any), "existing_edge_policy")
 	}
 	if !reflect.DeepEqual(actual, expected) {
@@ -179,7 +177,7 @@ func TestCollectedKindsDoNotBecomeManagedOutput(t *testing.T) {
 	definition.PostProcessing = &extension.ProcessingSettings{ReferenceCommit: strings.Repeat("a", 40)}
 	definition.NodeKinds = append(definition.NodeKinds, extension.NodeKind{Name: "PoC_Helper", PostProcessing: &extension.NodeProcessing{Query: "helper.cypher", IDPrefix: "PoC_Helper_"}})
 	definition.RelationshipKinds[0].PostProcessing = &extension.RelationshipProcessing{Query: "access.cypher"}
-	definition.RelationshipKinds = append(definition.RelationshipKinds, extension.RelationshipKind{Name: "PoC_CollectedLink", Endpoints: []extension.Endpoint{{SourceKind: "PoC_Collected", TargetKind: "User"}}})
+	definition.RelationshipKinds = append(definition.RelationshipKinds, extension.RelationshipKind{Name: "PoC_CollectedLink", CompatibleKinds: []extension.Endpoint{{SourceKind: "PoC_Collected", TargetKind: "User"}}})
 	contents, err := json.Marshal(definition)
 	if err != nil {
 		t.Fatal(err)

@@ -50,6 +50,7 @@ type Store struct {
 	active    Bundle
 	plan      extension.Plan
 	status    Status
+	draft     Draft
 }
 
 // Open restores a validated active snapshot. Corrupt state is an error; it never
@@ -92,6 +93,21 @@ func Open(directory string) (*Store, error) {
 		}
 		if err := validateStatus(store.status); err != nil {
 			return nil, err
+		}
+	}
+	contents, err = readPrivate(filepath.Join(directory, "draft.json"), MaxBundleBytes)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if err == nil {
+		if err := decodeJSON(contents, &store.draft); err != nil {
+			return nil, fmt.Errorf("read draft: %w", err)
+		}
+		if err := checkFileContents(store.draft.Files); err != nil {
+			return nil, fmt.Errorf("read draft: %w", err)
+		}
+		if store.draft.Revision != draftRevision(store.draft) {
+			return nil, fmt.Errorf("stored draft revision does not match its files")
 		}
 	}
 	return store, nil

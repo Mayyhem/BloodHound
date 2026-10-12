@@ -44,7 +44,7 @@
       "name": "PoC_Vault_ContainsAccount",
       "description": "Collected evidence that a vault contains an account.",
       "is_traversable": false,
-      "endpoints": [
+      "compatible_kinds": [
         {
           "source_kind": "PoC_Vault_Container",
           "target_kind": "PoC_Vault_Account"
@@ -55,15 +55,12 @@
       "name": "PoC_Vault_HasAccountFor",
       "description": "Calculated association with a directory user whose SID matches an account contained in this vault.",
       "is_traversable": false,
-      "endpoints": [
+      "compatible_kinds": [
         {
           "source_kind": "PoC_Vault_Container",
           "target_kind": "User"
         }
       ]
     }
-  ],
-  "external_node_kinds": [
-    "User"
   ]
 }

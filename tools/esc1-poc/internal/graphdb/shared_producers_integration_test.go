@@ -52,10 +52,10 @@ func TestSharedProducersDisableDeleteAndRollbackOnBothDatabases(t *testing.T) {
 			var files = map[string]string{
 				"schema.json": `{
 					"schema":{"name":"shared_test","display_name":"Shared outputs","version":"v1.0.0","namespace":"PoC"},
-					"node_kinds":[],"external_node_kinds":["User","Group","Domain"],
+					"node_kinds":[],
 					"relationship_kinds":[
-						{"name":"PoC_Shared","existing_edge_policy":"merge-properties","endpoints":[{"source_kind":"User","target_kind":"Domain"},{"source_kind":"Group","target_kind":"Domain"}]},
-						{"name":"PoC_SharedConsumer","existing_edge_policy":"merge-properties","endpoints":[{"source_kind":"User","target_kind":"Domain"},{"source_kind":"Group","target_kind":"Domain"}]}
+						{"name":"PoC_Shared","existing_edge_policy":"merge-properties","compatible_kinds":[{"source_kind":"User","target_kind":"Domain"},{"source_kind":"Group","target_kind":"Domain"}]},
+						{"name":"PoC_SharedConsumer","existing_edge_policy":"merge-properties","compatible_kinds":[{"source_kind":"User","target_kind":"Domain"},{"source_kind":"Group","target_kind":"Domain"}]}
 					]}`,
 				"a.cypher":        "// depends-on: node:Group\nMATCH (evidence:Group) UNWIND ['PoC_Test_User','PoC_Test_Group'] AS identifier RETURN identifier AS source, 'PoC_Test_Domain' AS target, 'PoC_Shared' AS kind, {name:'a',from_a:true} AS properties",
 				"b.cypher":        "// depends-on: node:User\nMATCH (evidence:User) RETURN evidence.objectid AS source, 'PoC_Test_Domain' AS target, 'PoC_Shared' AS kind, {name:'b',from_b:true} AS properties",

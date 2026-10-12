@@ -84,8 +84,8 @@ func bundleRevision(bundle Bundle) string {
 }
 
 func checkFiles(files map[string]string) error {
-	if len(files) == 0 || len(files) > MaxFiles {
-		return fmt.Errorf("a bundle must contain 1 to %d files", MaxFiles)
+	if err := checkFileContents(files); err != nil {
+		return err
 	}
 	var hasSchema bool
 	for name := range files {
@@ -95,6 +95,15 @@ func checkFiles(files map[string]string) error {
 	}
 	if !hasSchema {
 		return fmt.Errorf("include schema.json or a named .schema.json file and its required queries")
+	}
+	return nil
+}
+
+// Drafts use the same filenames and size limits, but may be missing schemas or
+// queries. Only a complete, validated bundle can be activated.
+func checkFileContents(files map[string]string) error {
+	if len(files) == 0 || len(files) > MaxFiles {
+		return fmt.Errorf("a bundle must contain 1 to %d files", MaxFiles)
 	}
 	for name, contents := range files {
 		if !extension.IsSchemaFile(name) && !queryName.MatchString(name) {

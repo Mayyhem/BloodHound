@@ -146,8 +146,7 @@ BloodHound registers each definition under its own schema name before any rule e
 | Standard `schema` | Name, display name, version, and namespace. |
 | Standard `node_kinds` | Object kinds and their presentation. |
 | Standard `relationship_kinds` | Connection kinds, presentation, and whether pathfinding can follow them. |
-| Proposed `external_node_kinds` | Existing kinds referenced by the extension, such as `User` or `Domain`; these declarations do not create objects. |
-| Proposed relationship `endpoints` | Exact allowed source-kind/target-kind pairs. |
+| Proposed relationship `compatible_kinds` | Exact allowed source-kind/target-kind pairs. |
 | Query `RETURN ... AS kind` | Literal relationship kind produced by this file. |
 | Query `RETURN ... AS kinds` | A literal one-element helper-kind list; its ID prefix is the kind followed by `_`. |
 | Optional query `// existing-edge-policy:` | How to update an existing matching calculated edge; all producers of that kind must agree. |
@@ -162,16 +161,16 @@ The final Cypher projection declares its output with a literal edge name as `kin
 
 Managed kinds and helper prefixes start with `PoC_`. Query filenames use `snake_case.cypher`. Loading rejects missing producers, multiple bindings to a query, duplicate kinds, malformed/unknown declarations, undeclared endpoint kinds, unused queries, missing prerequisites, undeclared parameters, and circular prerequisite dependencies.
 
-### Exact endpoint pairs
+### Compatible kinds are exact directed pairs
 
-An endpoint is one end of a connection. Each declaration permits a pair of kinds together, rather than separate lists of allowed sources and targets.
+An endpoint is one end of a connection. Each `compatible_kinds` entry permits one source-kind/target-kind pair, preserving its direction. Native node kinds come from BloodHound's graph definitions; custom node kinds come from the schemas loaded together. No separate external-kind list is needed. References are checked only after the whole schema set is read, so two schemas can name each other's types without choosing an upload order. This does not allow a circular dependency between calculations.
 
 | Example relationship | Permitted source | Permitted target |
 | --- | --- | --- |
 | `PoC_ADCSESC1` | `User` | `Domain` |
 | `PoC_ADCSESC1` | `Group` | `Domain` |
 | `PoC_ADCSESC1` | `Computer` | `Domain` |
-| `PoC_ADCSESC1` | `LocalGroup` | `Domain` |
+| `PoC_ADCSESC1` | `ADLocalGroup` | `Domain` |
 | `PoC_Vault_ContainsAccount` (collected evidence) | `PoC_Vault_Container` | `PoC_Vault_Account` |
 | `PoC_Vault_HasAccountFor` (calculated output) | `PoC_Vault_Container` | `User` |
 
@@ -201,7 +200,7 @@ Accepted files, dates, disabled settings, and retirement scopes atomically repla
 
 Storage uses private directories (`0700`) and files (`0600`). The new file is synced before rename; this is not a promise that the newest rename survives sudden power loss. Saved rules and the latest report survive a registry restart. HTTP clients disable environment proxies and do not follow redirects carrying the bearer token.
 
-The supplied Compose service publishes `127.0.0.1:18081` and explicitly enables `-local-ui-origin http://127.0.0.1:18081`. Allowed browser requests use `/ui/plan`, `/ui/rules`, `/ui/preview`, and read-only `/ui/status`; the service supplies the secret internally. It checks the exact Host and any present Origin, rejects browser cross-site requests, and requires the exact Origin and JSON for writes. `/v1/browser-mode` tells the page whether local editing is enabled. Machine endpoints retain bearer authentication. With no configured local origin, the page uses manual bearer entry without saving the token.
+The supplied Compose service publishes `127.0.0.1:18081` and explicitly enables `-local-ui-origin http://127.0.0.1:18081`. Allowed browser requests use `/ui/plan`, `/ui/rules`, `/ui/preview`, `/ui/draft`, `/ui/analysis`, and read-only `/ui/status`; the service supplies the secret internally. It checks the exact Host and any present Origin, rejects browser cross-site requests, and requires the exact Origin and JSON for writes. `/v1/browser-mode` tells the page whether local editing is enabled. Machine endpoints retain bearer authentication. With no configured local origin, the page uses manual bearer entry without saving the token.
 
 This convenience trusts the loopback host-port boundary. The container listens on its network interface, so exact Host and Origin cannot authenticate arbitrary clients on that network. Remote production access should use BloodHound login and an authenticated server proxy.
 
@@ -284,7 +283,7 @@ The `// batch-on: trusted_cas.cypher` instruction names one declared prerequisit
 
 ESC1 keeps each template/CA permission pair separate; combining unrelated permission lists could invent a shortcut. Native behavior first preserves matching direct template principals, then considers nested groups from smaller membership reach to larger. Selecting a group removes its members from further consideration while retaining earlier results. Removal must not toggle a shared member back into the result when groups overlap.
 
-Everyone and Authenticated Users have special rules: appearing directly in a permission set, or under one of its direct Group/LocalGroup principals, skips that set as a requirement. If both sides are skipped, the result is the union of their original direct sets; if one side is skipped, it is the other's original direct set. [QUERY_NOTES.md](extension/QUERY_NOTES.md) gives the exact SID suffixes, trust direction, terminal-auth-edge rules, and coverage limits.
+Everyone and Authenticated Users have special rules: appearing directly in a permission set, or under one of its direct Group/ADLocalGroup principals, skips that set as a requirement. If both sides are skipped, the result is the union of their original direct sets; if one side is skipped, it is the other's original direct set. [QUERY_NOTES.md](extension/QUERY_NOTES.md) gives the exact SID suffixes, trust direction, terminal-auth-edge rules, and coverage limits.
 
 Relevant membership and certificate/auth cycles fail the ESC1 calculation. Disconnected membership cycles do not block unrelated work. Reciprocal Domain forest trust is permitted. The rules require complete native certificate/trust evidence; they do not repair incomplete ingestion.
 
@@ -396,3 +395,9 @@ This is a single-server Community Edition experiment. It has not established Ent
 Failure preserves the previous committed extension answer when rollback is known, but that answer may be stale. Metadata preparation remains outside rollback. Helpers have no automatic deletion. Rule removal refreshes shared outputs or retires their last producer’s relationship scope only on a later successful run; uploading alone does not run rules or delete graph data. A continuously busy graph can delay admission, database locks/load can delay reads, and direct external writers can invalidate the coordination assumption.
 
 Large deployments still need exact native agreement, total runtime, runner/database memory, temporary-disk measurements, query work, transaction duration, rollback behavior, and lost-connection recovery measured together. [REVIEW.md](REVIEW.md) separates current evidence from historical measurements and preserves failed checks. Those records are the basis for assessing this experiment; they do not replace production qualification.
+
+### Inactive uploads
+
+The rule service stores one draft separately in `draft.json`. It contains uploaded file changes and the active revision against which overwrite choices were made. Draft saving checks filenames, text sizes, and JSON structure; missing definitions and other rule-validation failures are reported without losing the upload. The draft API uses `GET`, `PUT`, and `DELETE` on `/v1/draft` (or `/ui/draft` for the local page). Preview and activation use the existing endpoints with a `draft_revision` identifying the saved proposal. The worker only reads `active.json`, so drafts never calculate or publish results.
+
+Review combines the draft with the unchanged active files and uses the same complete-plan validation as activation. Activation repeats those checks and verifies both the active revision and draft revision, plus confirmation of the reviewed result. Changed active rules require downloading and resubmitting the draft for fresh overwrite choices. Changed draft files invalidate an earlier review. The browser discards an applied draft only after activation succeeds; if that cleanup fails, it reports successful activation and leaves the draft available. Draft save or discard failures do not change active rules.

@@ -165,16 +165,15 @@ func selectionServiceFiles(t *testing.T, plan extension.Plan) map[string]string 
 	var (
 		files      = map[string]string{}
 		definition = extension.Definition{
-			Schema:            extension.Metadata{Name: plan.Schema.Name, DisplayName: "Observed selective processing", Version: "v1.0.0", Namespace: "PoC"},
-			ExternalNodeKinds: []string{"User", "Group", "Domain", "Base"},
-			PostProcessing:    &extension.ProcessingSettings{ReferenceCommit: plan.Schema.ReferenceCommit},
+			Schema:         extension.Metadata{Name: plan.Schema.Name, DisplayName: "Observed selective processing", Version: "v1.0.0", Namespace: "PoC"},
+			PostProcessing: &extension.ProcessingSettings{ReferenceCommit: plan.Schema.ReferenceCommit},
 		}
 	)
 	for _, binding := range plan.Schema.Nodes {
 		definition.NodeKinds = append(definition.NodeKinds, extension.NodeKind{Name: binding.Kind, PostProcessing: &extension.NodeProcessing{Query: binding.Query, IDPrefix: binding.IDPrefix}})
 	}
 	for _, binding := range plan.Schema.Relationships {
-		definition.RelationshipKinds = append(definition.RelationshipKinds, extension.RelationshipKind{Name: binding.Kind, Endpoints: binding.Endpoints, PostProcessing: &extension.RelationshipProcessing{Query: binding.Query}})
+		definition.RelationshipKinds = append(definition.RelationshipKinds, extension.RelationshipKind{Name: binding.Kind, CompatibleKinds: binding.Endpoints, PostProcessing: &extension.RelationshipProcessing{Query: binding.Query}})
 	}
 	encoded, err := json.Marshal(definition)
 	if err != nil {

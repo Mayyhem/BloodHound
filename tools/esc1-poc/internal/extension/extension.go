@@ -219,6 +219,9 @@ func Load(directory string) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
+	if err := validateInputKinds(ordered, plan.Definitions); err != nil {
+		return Plan{}, err
+	}
 	plan.Queries = attributeQueries(ordered, plan.Definitions)
 	return plan, nil
 }

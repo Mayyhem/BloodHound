@@ -4,6 +4,28 @@ This is a proof of concept for one modified BloodHound Community Edition process
 
 Start with [README.md](README.md) for the proposal, [USAGE.md](USAGE.md) for operating instructions, and [DESIGN.md](DESIGN.md) for the rules the code follows and its failure behavior. [HANDOFF.md](HANDOFF.md) retains the dated work history, full historical commands, private log locations, and local running state.
 
+
+## Schema kind declarations and inactive drafts
+
+TODO #8 is implemented, including the user's follow-up choice to save incomplete uploads as inactive drafts. `external_node_kinds` is removed. Relationships use `compatible_kinds`, with exactly the same directed source/target combinations. Native kinds come from BloodHound's existing graph definitions; custom kinds come from the complete accompanying schema set. Declared node and relationship inputs are checked too. Missing schemas prevent activation, not draft saving. This work does not add full Cypher parsing or automatic dependency discovery; those remain under TODO #2.
+
+Two schemas can refer to one another in either upload order. Save the first as a draft, add the second, review the full proposal, and explicitly activate it. A circular requirement for newly calculated answers still fails validation. Drafts persist separately from active rules, survive restart, and never reach the analysis worker. Stale active or draft revisions cannot replace newer work. The offline viewer accepts accompanying schemas together and displays native references without an extra list.
+
+The native-kind check found an existing example error: BloodHound's local-group label is `ADLocalGroup`, not `LocalGroup`. The ESC1 schema, membership query, corresponding database fixture, and current notes were corrected together. The rename otherwise preserves endpoint pairs and their direction; no independent source/target combinations are introduced.
+
+Checks and evidence:
+
+- Full extension suite with race detection: `work/schema-kinds-final-unit.log`. Covers draft persistence, inactive incomplete uploads, both arrival orders, explicit activation, overwrite choices, stale revisions, failed draft saves, graph-input schema checks, and circular calculation rejection.
+- Both dedicated graph databases: the complete Neo4j/PostgreSQL suite passed with race detection (`work/schema-kinds-final-databases.log`, 220.528 seconds). It covers exact endpoint pairs, shared producers, properties, empty answers, removal, and failure preservation. The earlier successful run is retained in `work/schema-kinds-databases.log`.
+- BloodHound packages that use the service: `work/schema-kinds-final-root.log` covers `daemons/datapipe`, `daemons/api/toolapi`, and `services`. Static checks, including integration-tagged code: `work/schema-kinds-final-vet.log`.
+- Real-browser draft flow through disposable services: `work/schema-kinds-final-draft-browser/checks.json`. Both upload orders, process restart, active-rule preservation, explicit activation, stale-draft rejection, and discard passed. No graph service was connected and no browser errors were recorded. `scripts/check-rule-drafts.py` reproduces this check with a new output directory.
+- Offline model browser controls, exact pairs, safe rendering, and multiple mutually referencing schemas in either file order: `work/schema-kinds-model-multiple/checks.json`. No web requests or browser errors. Rule-table controls and activation confirmations: `work/schema-kinds-table.log`.
+- All four tutorial stages and three shipped examples passed the local `plan` command (`work/schema-kinds-example-plans.json`). These are file/plan checks; tutorial queries were not executed. The permanent tutorial-result tests remain in TODO #2.
+
+The first checks exposed an unused test import, the old local-group label, a remaining internal field reference, and one undeclared synthetic test input. Those were corrected; relevant intermediate logs remain under `work/schema-kinds-*`. Restricted-shell HTTP tests required a rerun with loopback networking enabled. Draft and viewer browser tests use only local temporary services or offline files.
+
+Nothing was staged, committed, or deployed. Existing live saved rules were not converted. Before deploying this schema change, convert the old saved schema fields and preserve/recompute the complete bundle's revision and history; the new service intentionally does not accept the removed schema fields. The full `just prepare-for-codereview` command remains required before the user's manual commit. See [the handoff entry](HANDOFF.md#schema-kinds-and-inactive-drafts--11-october-2026) for those commands and deployment notes.
+
 ## Shared relationship results — 11 October 2026
 
 The current implementation removes graph ownership settings, saved owners, owner properties added by the runner, and ownership checks. Several rules can produce one declared relationship type. The runner combines their complete pairs and merges supplied properties in alphabetical filename order; later filenames win overlapping keys. Every producer must agree on the existing-edge policy. Refreshing uses the declared type and endpoint pairs, including pre-existing or manually inserted edges in that scope. Helpers match by object ID and exact kind.
@@ -39,7 +61,7 @@ The one-time file checks used the existing local executable at `work/extensions-
 
 This checks file loading and plan construction using an existing build. It is not a fresh source build, a full query-language check, or evidence that the new tutorial produces the expected graph results on either database.
 
-**Still pending:** add permanent tests that extract the tutorial files from Markdown, check every stage and shipped example, and compare actual results with the documented expectations on both databases. Those tests should include disabled and missing-property users, helper identities, updating evidence on existing edges, and complete empty answers. This requires code changes and is awaiting the user's approval. Existing tests of shipped examples do not replace checks of the copied tutorial. The TODO remains open for that work.
+**Still pending:** add permanent tests that extract the tutorial files from Markdown, check every stage and shipped example, and compare actual results with the documented expectations on both databases. Those tests should include disabled and missing-property users, helper identities, updating evidence on existing edges, and complete empty answers. This requires code changes and is awaiting the user's approval. Existing tests of shipped examples do not replace checks of the copied tutorial. This work is now tracked under [TODO item 2](TODO.md#2-catch-mistakes-before-rules-are-activated); item 1's documentation work has moved to Done.
 
 ## Five ready queries at a time
 

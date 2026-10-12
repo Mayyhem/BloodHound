@@ -23,6 +23,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+
+	"github.com/specterops/bloodhound/packages/go/graphschema"
 )
 
 var schemaFilename = regexp.MustCompile(`^[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.schema\.json$`)
@@ -32,13 +35,119 @@ func IsSchemaFile(name string) bool {
 	return name == "schema.json" || schemaFilename.MatchString(name)
 }
 
+// LoadDefinitions reads the whole model without requiring query files or a
+// database. A referenced custom kind must come from a schema in this directory.
+func LoadDefinitions(directory string) ([]Definition, error) {
+	var entries, err = os.ReadDir(directory)
+	if err != nil {
+		return nil, err
+	}
+	definitions, _, err := loadDefinitions(directory, entries)
+	return definitions, err
+}
+
+// NativeNodeKinds uses the same list as BloodHound's graph setup, including AD,
+// Azure, and common kinds. The offline viewer embeds this list when it is built.
+func NativeNodeKinds() []string {
+	var names []string
+	for _, kind := range graphschema.CombinedGraphSchema("").Nodes {
+		names = append(names, kind.String())
+	}
+	sort.Strings(names)
+	return names
+}
+
+// ValidateDefinitions checks the complete set, so a reference can appear before
+// its defining schema. A relationship name never qualifies as a node kind.
+func ValidateDefinitions(definitions []Definition) error {
+	var (
+		names      = make(map[string]bool)
+		namespaces = make(map[string]bool)
+		kinds      = make(map[string]bool)
+		nodeKinds  = make(map[string]bool)
+	)
+	if len(definitions) == 0 {
+		return fmt.Errorf("include at least one schema definition")
+	}
+	for _, name := range NativeNodeKinds() {
+		nodeKinds[name] = true
+	}
+	for _, definition := range definitions {
+		if err := definition.validate(); err != nil {
+			return fmt.Errorf("schema %q: %w", definition.Schema.Name, err)
+		}
+		if names[definition.Schema.Name] {
+			return fmt.Errorf("duplicate schema name %q", definition.Schema.Name)
+		}
+		if namespaces[definition.Schema.Namespace] {
+			return fmt.Errorf("duplicate schema namespace %q", definition.Schema.Namespace)
+		}
+		names[definition.Schema.Name] = true
+		namespaces[definition.Schema.Namespace] = true
+		for _, kind := range definition.NodeKinds {
+			if kinds[kind.Name] || nodeKinds[kind.Name] {
+				return fmt.Errorf("duplicate declared kind %q", kind.Name)
+			}
+			kinds[kind.Name], nodeKinds[kind.Name] = true, true
+		}
+		for _, kind := range definition.RelationshipKinds {
+			if kinds[kind.Name] || nodeKinds[kind.Name] {
+				return fmt.Errorf("duplicate declared kind %q", kind.Name)
+			}
+			kinds[kind.Name] = true
+		}
+	}
+	for _, definition := range definitions {
+		for _, relationship := range definition.RelationshipKinds {
+			for _, pair := range relationship.CompatibleKinds {
+				for _, name := range []string{pair.SourceKind, pair.TargetKind} {
+					if !nodeKinds[name] {
+						return fmt.Errorf("schema %q relationship %q: compatible_kinds references unknown node kind %q; include the schema that defines it in node_kinds, or correct the kind name", definition.Schema.Name, relationship.Name, name)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// A graph input may come from collected data or another calculation, but its
+// kind still needs a definition. Read only the author's existing depends-on
+// declarations here; discovering undeclared inputs inside Cypher is separate work.
+func validateInputKinds(queries []Query, definitions []Definition) error {
+	var (
+		known  = make(map[Dependency]bool)
+		native = graphschema.CombinedGraphSchema("")
+	)
+	for _, kind := range native.Nodes {
+		known[Dependency{Type: "node", Name: kind.String()}] = true
+	}
+	for _, kind := range native.Edges {
+		known[Dependency{Type: "relationship", Name: kind.String()}] = true
+	}
+	for _, definition := range definitions {
+		for _, kind := range definition.NodeKinds {
+			known[Dependency{Type: "node", Name: kind.Name}] = true
+		}
+		for _, kind := range definition.RelationshipKinds {
+			known[Dependency{Type: "relationship", Name: kind.Name}] = true
+		}
+	}
+	for _, query := range queries {
+		for _, input := range query.Dependencies {
+			if input.Type != "query" && !known[input] {
+				return fmt.Errorf("%s: depends-on references unknown %s kind %q; include the schema that defines it, or correct the kind name", query.Name, input.Type, input.Name)
+			}
+		}
+	}
+	return nil
+}
+
 // os.ReadDir returns filename order, making registration and the combined plan stable.
 func loadDefinitions(directory string, entries []os.DirEntry) ([]Definition, map[string]string, error) {
 	var (
 		definitions []Definition
 		files       = make(map[string]string)
-		namespaces  = make(map[string]string)
-		kinds       = make(map[string]string)
 	)
 	for _, entry := range entries {
 		if entry.IsDir() || !IsSchemaFile(entry.Name()) {
@@ -55,28 +164,14 @@ func loadDefinitions(directory string, entries []os.DirEntry) ([]Definition, map
 		if previous, exists := files[definition.Schema.Name]; exists {
 			return nil, nil, fmt.Errorf("duplicate schema name %q in %s and %s", definition.Schema.Name, previous, entry.Name())
 		}
-		if previous, exists := namespaces[definition.Schema.Namespace]; exists {
-			return nil, nil, fmt.Errorf("duplicate schema namespace %q in %s and %s", definition.Schema.Namespace, previous, entry.Name())
-		}
-		var localKinds []string
-		for _, kind := range definition.NodeKinds {
-			localKinds = append(localKinds, kind.Name)
-		}
-		for _, kind := range definition.RelationshipKinds {
-			localKinds = append(localKinds, kind.Name)
-		}
-		for _, kind := range localKinds {
-			if previous, exists := kinds[kind]; exists && previous != entry.Name() {
-				return nil, nil, fmt.Errorf("duplicate declared kind %q in %s and %s", kind, previous, entry.Name())
-			}
-			kinds[kind] = entry.Name()
-		}
 		files[definition.Schema.Name] = entry.Name()
-		namespaces[definition.Schema.Namespace] = entry.Name()
 		definitions = append(definitions, definition)
 	}
 	if len(definitions) == 0 {
 		return nil, nil, fmt.Errorf("no schema.json or *.schema.json definitions found")
+	}
+	if err := ValidateDefinitions(definitions); err != nil {
+		return nil, nil, err
 	}
 	return definitions, files, nil
 }

@@ -39,7 +39,6 @@ type Definition struct {
 	Schema               Metadata            `json:"schema"`
 	NodeKinds            []NodeKind          `json:"node_kinds"`
 	RelationshipKinds    []RelationshipKind  `json:"relationship_kinds"`
-	ExternalNodeKinds    []string            `json:"external_node_kinds,omitempty"`
 	PostProcessing       *ProcessingSettings `json:"post_processing,omitempty"`
 	Environments         json.RawMessage     `json:"environments,omitempty"`
 	RelationshipFindings json.RawMessage     `json:"relationship_findings,omitempty"`
@@ -105,7 +104,7 @@ type RelationshipKind struct {
 	Description        string                  `json:"description,omitempty"`
 	IsTraversable      *bool                   `json:"is_traversable,omitempty"`
 	Info               json.RawMessage         `json:"info,omitempty"`
-	Endpoints          []Endpoint              `json:"endpoints,omitempty"`
+	CompatibleKinds    []Endpoint              `json:"compatible_kinds,omitempty"`
 	PostProcessing     *RelationshipProcessing `json:"post_processing,omitempty"`
 }
 
@@ -137,9 +136,15 @@ func LoadDefinition(directory string) (Definition, error) {
 	if err != nil {
 		return Definition{}, err
 	}
-	return ParseDefinition(contents)
+	definition, err := ParseDefinition(contents)
+	if err != nil {
+		return Definition{}, err
+	}
+	return definition, ValidateDefinitions([]Definition{definition})
 }
 
+// ParseDefinition checks one file's shape. References to other kinds are checked
+// by ValidateDefinitions once all of the accompanying schemas have been read.
 func ParseDefinition(contents []byte) (Definition, error) {
 	var (
 		definition Definition
@@ -181,15 +186,6 @@ func (s Definition) validate() error {
 		}
 		declared[kind.Name] = true
 	}
-	for _, kind := range s.ExternalNodeKinds {
-		if !identifier.MatchString(kind) {
-			return fmt.Errorf("invalid external endpoint kind %q", kind)
-		}
-		if declared[kind] {
-			return fmt.Errorf("duplicate local or external node kind %q", kind)
-		}
-		declared[kind] = true
-	}
 	for _, kind := range s.RelationshipKinds {
 		if !identifier.MatchString(kind.Name) || !strings.HasPrefix(kind.Name, prefix) || len(kind.Name) == len(prefix) {
 			return fmt.Errorf("relationship kind %q must have the schema namespace prefix %s", kind.Name, prefix)
@@ -201,13 +197,13 @@ func (s Definition) validate() error {
 		if kind.ExistingEdgePolicy != "" && !kind.ExistingEdgePolicy.valid() {
 			return fmt.Errorf("relationship %q has an invalid existing_edge_policy", kind.Name)
 		}
-		if len(kind.Endpoints) == 0 {
-			return fmt.Errorf("relationship %q needs explicit endpoints", kind.Name)
+		if len(kind.CompatibleKinds) == 0 {
+			return fmt.Errorf("relationship %q needs explicit compatible_kinds pairs", kind.Name)
 		}
 		seen := make(map[Endpoint]bool)
-		for _, endpoint := range kind.Endpoints {
-			if !declared[endpoint.SourceKind] || !declared[endpoint.TargetKind] {
-				return fmt.Errorf("%s endpoint kinds must be declared in node_kinds or external_node_kinds: %s -> %s", kind.Name, endpoint.SourceKind, endpoint.TargetKind)
+		for _, endpoint := range kind.CompatibleKinds {
+			if !identifier.MatchString(endpoint.SourceKind) || !identifier.MatchString(endpoint.TargetKind) {
+				return fmt.Errorf("%s compatible_kinds has invalid source_kind or target_kind names: %q -> %q", kind.Name, endpoint.SourceKind, endpoint.TargetKind)
 			}
 			if seen[endpoint] {
 				return fmt.Errorf("%s has duplicate endpoint pair %s -> %s", kind.Name, endpoint.SourceKind, endpoint.TargetKind)
@@ -222,7 +218,6 @@ func (s Definition) validate() error {
 // display the kinds, but does not understand these endpoint rules or run queries.
 // Copy the slices before editing, so exporting cannot change the local model.
 func (s Definition) BloodHoundJSON() ([]byte, error) {
-	s.ExternalNodeKinds = nil
 	s.PostProcessing = nil
 	s.NodeKinds = append([]NodeKind{}, s.NodeKinds...)
 	s.RelationshipKinds = append([]RelationshipKind{}, s.RelationshipKinds...)
@@ -231,7 +226,7 @@ func (s Definition) BloodHoundJSON() ([]byte, error) {
 	}
 	for index := range s.RelationshipKinds {
 		s.RelationshipKinds[index].ExistingEdgePolicy = ""
-		s.RelationshipKinds[index].Endpoints = nil
+		s.RelationshipKinds[index].CompatibleKinds = nil
 		s.RelationshipKinds[index].PostProcessing = nil
 	}
 	return json.Marshal(s)
@@ -258,7 +253,7 @@ func (s Definition) processingSchema() (Schema, error) {
 			policy = kind.producerPolicy
 		}
 		for _, query := range kind.producingQueries() {
-			result.Relationships = append(result.Relationships, RelationshipBinding{Kind: kind.Name, Query: query, Endpoints: kind.Endpoints, ExistingEdgePolicy: policy})
+			result.Relationships = append(result.Relationships, RelationshipBinding{Kind: kind.Name, Query: query, Endpoints: kind.CompatibleKinds, ExistingEdgePolicy: policy})
 		}
 	}
 	return result, nil

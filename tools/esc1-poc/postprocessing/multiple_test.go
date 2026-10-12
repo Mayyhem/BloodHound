@@ -82,7 +82,7 @@ func registeredSchemaName(t *testing.T, payload []byte) string {
 	if err := json.Unmarshal(payload, &definition); err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{"post_processing", "existing_edge_policy", "external_node_kinds", "external_relationship_kinds", "endpoints"} {
+	for _, field := range []string{"post_processing", "existing_edge_policy", "external_node_kinds", "external_relationship_kinds", "compatible_kinds"} {
 		if strings.Contains(string(payload), `"`+field+`"`) {
 			t.Fatal("proposal fields leaked into native schema", field)
 		}

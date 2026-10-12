@@ -92,6 +92,11 @@ func NewBrowserHandler(authenticated http.Handler, token, localOrigin string) (h
 				machinePath = "/v1/rules"
 				write = request.Method == http.MethodPut
 			}
+		case "/ui/draft":
+			if request.Method == http.MethodGet || request.Method == http.MethodPut || request.Method == http.MethodDelete {
+				machinePath = "/v1/draft"
+				write = request.Method != http.MethodGet
+			}
 		case "/ui/preview":
 			if request.Method == http.MethodPost {
 				machinePath = "/v1/preview"

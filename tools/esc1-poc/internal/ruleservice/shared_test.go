@@ -41,7 +41,7 @@ func sharedRelationshipFiles(t *testing.T) map[string]string {
 	for _, kind := range []string{"PoC_Vault_ReadEdge", "PoC_Vault_DirectEdge", "PoC_Vault_Independent"} {
 		schema["relationship_kinds"] = append(schema["relationship_kinds"].([]any), map[string]any{
 			"name":      kind,
-			"endpoints": []any{map[string]any{"source_kind": "PoC_Vault_Container", "target_kind": "User"}},
+			"compatible_kinds": []any{map[string]any{"source_kind": "PoC_Vault_Container", "target_kind": "User"}},
 		})
 	}
 	contents, err := json.Marshal(schema)
