@@ -89,11 +89,10 @@ func TestMultipleSchemasDisableAndRemovalOnBothDatabases(t *testing.T) {
 				files = crossPlatformFiles(t)
 				token = "multiple-integration-token-01234567890123456789"
 			)
-			// These example owners differ from the ESC1 fixture's owner. Remove
-			// only their known helper objects and run records after this test.
+			// Remove only these examples' known helper objects and run records.
 			t.Cleanup(func() {
 				if err := backend.native.WriteTransaction(context.Background(), func(transaction graph.Transaction) error {
-					return transaction.Nodes().Filter(query.In(query.NodeProperty("poc_owner"), []string{"extension/active_directory", "extension/active_directory/PoC_AD_User", "extension/cyberark/PoC_CyberArk_AccountSummary", "rules-service/v1"})).Delete()
+					return transaction.Nodes().Filter(query.Kind(query.Node(), graph.StringKind("PoC_AD_User"), graph.StringKind("PoC_CyberArk_AccountSummary"), graph.StringKind("PoC_Run"))).Delete()
 				}); err != nil {
 					t.Error(err)
 				}
@@ -158,9 +157,9 @@ func TestMultipleSchemasDisableAndRemovalOnBothDatabases(t *testing.T) {
 			if !reflect.DeepEqual(adBefore, before[1]) {
 				t.Fatal("adding CyberArk changed existing AD helper IDs or properties")
 			}
-			owners := read(t, backend.database, "MATCH (source)-[edge:PoC_CyberArk_AccountFor]->(target) RETURN edge.poc_owner AS owner, source.objectid AS source, target.objectid AS target", nil)
-			if !reflect.DeepEqual(owners, runner.Rows{{"owner": "extension/cyberark/PoC_CyberArk_AccountFor", "source": "PoC_Test_CyberArkAccount", "target": "PoC_Test_User"}}) {
-				t.Fatalf("cross-platform connection has wrong owner or endpoints: %v", owners)
+			connections := read(t, backend.database, "MATCH (source)-[edge:PoC_CyberArk_AccountFor]->(target) RETURN source.objectid AS source, target.objectid AS target", nil)
+			if !reflect.DeepEqual(connections, runner.Rows{{"source": "PoC_Test_CyberArkAccount", "target": "PoC_Test_User"}}) {
+				t.Fatalf("cross-platform connection has wrong endpoints: %v", connections)
 			}
 			plan = change(ruleservice.Change{Disable: []string{"ad_users.cypher"}})
 			setAccountUser(t, backend.native, "missing-user")
@@ -198,8 +197,8 @@ func TestMultipleSchemasDisableAndRemovalOnBothDatabases(t *testing.T) {
 			plan = change(ruleservice.Change{Disable: []string{"ad_users.cypher"}})
 			before = crossPlatformSnapshot(t, backend.database)
 			plan = change(ruleservice.Change{Remove: []string{"ad_users.cypher"}})
-			if plan.RetiredOwners["PoC_CyberArk_AccountFor"] != "extension/cyberark" {
-				t.Fatalf("removed output lost its original owner: %v", plan.RetiredOwners)
+			if len(plan.RetiredRelationships) != 1 || plan.RetiredRelationships[0] != "PoC_CyberArk_AccountFor" {
+				t.Fatalf("removed output was not scheduled for cleanup: %v", plan.RetiredRelationships)
 			}
 			report, err = runner.Run(t.Context(), &selectionRecordFailureDatabase{Database: backend.database}, plan, options())
 			if err == nil || report.Committed || report.Removed != 1 {

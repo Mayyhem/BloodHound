@@ -27,7 +27,7 @@ import (
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/ruleservice"
 )
 
-func TestLegacyBundleMigratesWithoutChangingOwnership(t *testing.T) {
+func TestLegacyOutputSettingsCanBeReplacedByQueryDeclarations(t *testing.T) {
 	var (
 		directory  = t.TempDir()
 		modern     = files(t)
@@ -37,7 +37,7 @@ func TestLegacyBundleMigratesWithoutChangingOwnership(t *testing.T) {
 	if err := json.Unmarshal([]byte(legacy["schema.json"]), &definition); err != nil {
 		t.Fatal(err)
 	}
-	definition.PostProcessing = &extension.ProcessingSettings{Owner: "original-vault/v1", ReferenceCommit: extension.BuildReferenceCommit}
+	definition.PostProcessing = &extension.ProcessingSettings{ReferenceCommit: extension.BuildReferenceCommit}
 	for index := range definition.NodeKinds {
 		if definition.NodeKinds[index].Name == "PoC_Vault_Helper" {
 			definition.NodeKinds[index].PostProcessing = &extension.NodeProcessing{Query: "vault_helpers.cypher", IDPrefix: "PoC_Vault_Helper_"}
@@ -60,12 +60,9 @@ func TestLegacyBundleMigratesWithoutChangingOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	initial, err := store.Update(legacy)
+	_, err = store.Update(legacy)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if len(initial.Owners) != 0 {
-		t.Fatal("legacy snapshot format changed")
 	}
 	store, err = ruleservice.Open(directory)
 	if err != nil {
@@ -75,8 +72,8 @@ func TestLegacyBundleMigratesWithoutChangingOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if migrated.Owners["vault_poc"] != "original-vault/v1" || strings.Contains(migrated.Files["schema.json"], "post_processing") {
-		t.Fatal("migration lost owner or rewrote schema", migrated.Owners)
+	if strings.Contains(migrated.Files["schema.json"], "post_processing") {
+		t.Fatal("replacement rewrote schema", migrated.Files["schema.json"])
 	}
 	store, err = ruleservice.Open(directory)
 	if err != nil {
@@ -90,20 +87,12 @@ func TestLegacyBundleMigratesWithoutChangingOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plan.Schema.Owner != "original-vault/v1" || plan.Schema.Nodes[0].Owner != "original-vault/v1" || plan.Schema.Relationships[0].Owner != "original-vault/v1" {
-		t.Fatal("worker lost migrated identities", plan.Schema)
-	}
-	active.Owners["vault_poc"] = "tampered"
-	if _, err := ruleservice.ValidateBundle(active); err == nil {
-		t.Fatal("owner was not covered by digest")
-	}
-	active, err = store.Active()
-	if err != nil || active.Owners["vault_poc"] != "original-vault/v1" {
-		t.Fatal("caller mutated saved ownership", err)
+	if len(plan.Schema.Nodes) != 1 || len(plan.Schema.Relationships) != 1 {
+		t.Fatal("worker lost output declarations", plan.Schema)
 	}
 	removed := applyChange(t, store, ruleservice.Change{BaseRevision: active.Revision, Remove: []string{"account_users.cypher"}})
-	if removed.RetiredOwners["PoC_Vault_HasAccountFor"] != "original-vault/v1" {
-		t.Fatal("retirement lost original owner")
+	if len(removed.RetiredRelationships) != 1 || removed.RetiredRelationships[0] != "PoC_Vault_HasAccountFor" {
+		t.Fatal("last producer removal was not recorded", removed)
 	}
 }
 

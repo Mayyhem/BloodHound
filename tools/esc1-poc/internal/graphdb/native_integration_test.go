@@ -166,8 +166,8 @@ func TestNativeExistingEdgePoliciesOnBothDatabases(t *testing.T) {
 							t.Fatalf("properties %T", row["properties"])
 						}
 						previous := before[index]
-						if properties["poc_owner"] != plan.Schema.Owner+"/PoC_ADCSESC1" {
-							t.Fatalf("policy changed ownership: %v", properties)
+						if _, found := properties["poc_owner"]; found {
+							t.Fatalf("publication added an unexpected property: %v", properties)
 						}
 						if policy != extension.KeepExisting && (properties["count"] != int64(2) || !reflect.DeepEqual(properties["tags"], []any{"changed"}) || !reflect.DeepEqual(properties["empty"], []any{})) {
 							t.Fatalf("array/integral numeric patch: %#v", properties)
@@ -313,7 +313,7 @@ func TestNativeLatePublicationFailureRestoresPropertiesAndIDs(t *testing.T) {
 				// A scoped trigger fails only this fixture's final run-marker write,
 				// after its relationship batches have changed within the transaction.
 				statements := []string{
-					`CREATE FUNCTION public.poc_native_fail_marker() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.properties ->> 'poc_owner' = 'esc1-poc/integration-test' THEN RAISE EXCEPTION 'late native marker failure'; END IF; RETURN NEW; END $$`,
+					`CREATE FUNCTION public.poc_native_fail_marker() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF EXISTS (SELECT 1 FROM kind WHERE id = ANY(NEW.kind_ids) AND name = 'PoC_Run') THEN RAISE EXCEPTION 'late native marker failure'; END IF; RETURN NEW; END $$`,
 					`CREATE TRIGGER poc_native_fail_marker BEFORE INSERT OR UPDATE ON public.node FOR EACH ROW EXECUTE FUNCTION public.poc_native_fail_marker()`,
 				}
 				for _, source := range statements {

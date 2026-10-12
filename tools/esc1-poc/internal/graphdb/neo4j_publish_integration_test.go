@@ -42,13 +42,16 @@ func TestNeo4jIndexedBulkPublication(t *testing.T) {
 		t.Fatal("accepted missing endpoint")
 	}
 	publisher := transaction.(runner.Publisher)
-	if err = publisher.PutNode(t.Context(), "POCTestNode", map[string]any{"objectid": "PoC_Test_BulkHelper", "poc_owner": "test/POCTestNode", "name": "first"}); err != nil {
+	if err = publisher.PutNode(t.Context(), "POCTestNode", map[string]any{"objectid": "PoC_Test_BulkHelper", "name": "first"}); err != nil {
 		t.Fatal(err)
 	}
-	if err = publisher.PutNode(t.Context(), "POCTestNode", map[string]any{"objectid": "PoC_Test_BulkHelper", "poc_owner": "test/POCTestNode", "name": "second"}); err != nil {
+	if err = publisher.PutNode(t.Context(), "POCTestNode", map[string]any{"objectid": "PoC_Test_BulkHelper", "name": "second"}); err != nil {
 		t.Fatal(err)
 	}
-	if count, err := publisher.CreateRelationships(t.Context(), "PoC_Test_BulkRelationship", "test/PoC_Test_BulkRelationship", []runner.Relationship{{Source: "PoC_Test_User", Target: "PoC_Test_Domain"}}); err != nil || count != 1 {
+	if err = publisher.PutNode(t.Context(), "User", map[string]any{"objectid": "PoC_Test_BulkHelper", "name": "wrong type"}); err == nil {
+		t.Fatal("helper write reused an object ID belonging to another type")
+	}
+	if count, err := publisher.CreateRelationships(t.Context(), "PoC_Test_BulkRelationship", []runner.Relationship{{Source: "PoC_Test_User", Target: "PoC_Test_Domain"}}); err != nil || count != 1 {
 		t.Fatalf("bulk create %d: %v", count, err)
 	}
 	rows, err := transaction.Read(t.Context(), "MATCH ()-[edge:PoC_Test_BulkRelationship]->() RETURN id(edge) AS id", nil)
@@ -56,11 +59,11 @@ func TestNeo4jIndexedBulkPublication(t *testing.T) {
 		t.Fatalf("bulk relationships %v: %v", rows, err)
 	}
 	identifier := rows[0]["id"].(int64)
-	if count, err := publisher.DeleteRelationships(t.Context(), "PoC_Test_BulkRelationship", "foreign", []int64{identifier}); err != nil || count != 0 {
-		t.Fatalf("foreign delete %d: %v", count, err)
+	if count, err := publisher.DeleteRelationships(t.Context(), "PoC_Test_BulkRelationship", []int64{identifier + 1000000}); err != nil || count != 0 {
+		t.Fatalf("missing ID delete %d: %v", count, err)
 	}
-	if count, err := publisher.DeleteRelationships(t.Context(), "PoC_Test_BulkRelationship", "test/PoC_Test_BulkRelationship", []int64{identifier}); err != nil || count != 1 {
-		t.Fatalf("owned delete %d: %v", count, err)
+	if count, err := publisher.DeleteRelationships(t.Context(), "PoC_Test_BulkRelationship", []int64{identifier}); err != nil || count != 1 {
+		t.Fatalf("delete %d: %v", count, err)
 	}
 	if _, err = transaction.Write(t.Context(), "MATCH (node:User {objectid: 'PoC_Test_User'}) SET node:Group", nil); err != nil {
 		t.Fatal(err)

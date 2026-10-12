@@ -357,8 +357,8 @@ func (s *postgresTransaction) PutNode(ctx context.Context, kind string, properti
 		_, err = s.transaction.CreateNode(graph.AsProperties(properties), graph.StringKind(kind))
 		return err
 	}
-	if len(nodes) != 1 || len(nodes[0].Kinds) != 1 || nodes[0].Kinds[0].String() != kind || nodes[0].Properties.Map["poc_owner"] != properties["poc_owner"] {
-		return fmt.Errorf("helper identity or ownership changed during publication")
+	if len(nodes) != 1 || len(nodes[0].Kinds) != 1 || nodes[0].Kinds[0].String() != kind {
+		return fmt.Errorf("helper identity changed during publication")
 	}
 	for key := range nodes[0].Properties.Map {
 		if _, found := properties[key]; !found {
@@ -369,7 +369,7 @@ func (s *postgresTransaction) PutNode(ctx context.Context, kind string, properti
 	return s.transaction.UpdateNode(nodes[0])
 }
 
-func (s *postgresTransaction) CreateRelationships(ctx context.Context, kind, owner string, relationships []runner.Relationship) (int, error) {
+func (s *postgresTransaction) CreateRelationships(ctx context.Context, kind string, relationships []runner.Relationship) (int, error) {
 	var (
 		identifiers = make([]string, 0, 2*len(relationships))
 		endpointIDs = make(map[string]graph.ID, 2*len(relationships))
@@ -382,10 +382,7 @@ func (s *postgresTransaction) CreateRelationships(ctx context.Context, kind, own
 		return 0, nil
 	}
 	for index, relationship := range relationships {
-		properties, err := relationshipCreationProperties(owner, relationship.Properties)
-		if err != nil {
-			return 0, err
-		}
+		properties := relationshipCreationProperties(relationship.Properties)
 		creations[index].Properties = graph.AsProperties(properties)
 		identifiers = append(identifiers, relationship.Source, relationship.Target)
 	}
@@ -415,12 +412,12 @@ func (s *postgresTransaction) CreateRelationships(ctx context.Context, kind, own
 	return int(count), err
 }
 
-func (s *postgresTransaction) UpdateRelationships(ctx context.Context, kind, owner string, updates []runner.RelationshipUpdate) (int, error) {
+func (s *postgresTransaction) UpdateRelationships(ctx context.Context, kind string, updates []runner.RelationshipUpdate) (int, error) {
 	var patches = make([]pg.RelationshipPropertyUpdate, len(updates))
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
-	if err := validateRelationshipUpdates(owner, updates); err != nil {
+	if err := validateRelationshipUpdates(updates); err != nil {
 		return 0, err
 	}
 	if len(updates) == 0 {
@@ -438,11 +435,13 @@ func (s *postgresTransaction) UpdateRelationships(ctx context.Context, kind, own
 		}
 		patches[index].Properties = properties
 	}
-	count, err := s.transaction.UpdateRelationshipProperties(ctx, graph.StringKind(kind), graph.AsProperties(map[string]any{"poc_owner": owner}), patches)
+	// An empty JSON object matches every property map. A nil map would be
+	// encoded as null and would match no relationships.
+	count, err := s.transaction.UpdateRelationshipProperties(ctx, graph.StringKind(kind), graph.AsProperties(map[string]any{}), patches)
 	return int(count), err
 }
 
-func (s *postgresTransaction) DeleteRelationships(ctx context.Context, kind, owner string, ids []int64) (int, error) {
+func (s *postgresTransaction) DeleteRelationships(ctx context.Context, kind string, ids []int64) (int, error) {
 	var graphIDs = make([]graph.ID, len(ids))
 	if err := ctx.Err(); err != nil {
 		return 0, err
@@ -456,7 +455,8 @@ func (s *postgresTransaction) DeleteRelationships(ctx context.Context, kind, own
 	if len(graphIDs) == 0 {
 		return 0, nil
 	}
-	count, err := s.transaction.DeleteRelationshipIDs(ctx, graph.StringKind(kind), graph.AsProperties(map[string]any{"poc_owner": owner}), graphIDs)
+	// Supply an empty JSON object so only the kind and IDs restrict deletion.
+	count, err := s.transaction.DeleteRelationshipIDs(ctx, graph.StringKind(kind), graph.AsProperties(map[string]any{}), graphIDs)
 	return int(count), err
 }
 

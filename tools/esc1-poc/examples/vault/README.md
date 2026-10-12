@@ -1,12 +1,20 @@
 # Vault accounts joined to directory users
 
-This synthetic example adds a second extension beside ESC1. A collector supplies a vault and its accounts through OpenGraph. The calculation connects that vault to an existing AD user when a contained account’s `user_sid` matches the user’s `objectid`. The result is an owned `PoC_Vault_HasAccountFor` relationship from `VAULT-DEMO` to baseline Alice.
+This synthetic example adds a second extension beside ESC1. A collector supplies a vault and its accounts through OpenGraph. The calculation connects that vault to an existing AD user when a contained account’s `user_sid` matches the user’s `objectid`. The result is a calculated `PoC_Vault_HasAccountFor` relationship from `VAULT-DEMO` to baseline Alice.
 
 The relationship records that the vault contains an account for the user. It does not establish credential access or an attack path, so it is not traversable. The rule uses the collected account identifier and containment relationship; it makes no exposure judgment and does not filter on the directory user’s enabled state.
 
-For the current setup that runs rules after BloodHound’s analysis, start with the [usage guide](../../USAGE.md). Its upload page accepts separate schemas together. To add vault beside ESC1, save the vault definition locally as `vault.schema.json` before selecting it, so it does not overwrite ESC1’s `schema.json`. All filenames are shared across the bundle; each extension retains its own schema name and owner. The command-based demonstration below stops the dedicated BloodHound application.
+For the current setup that runs rules after BloodHound’s analysis, start with the [usage guide](../../USAGE.md). Its upload page accepts separate schemas together. To add vault beside ESC1, save the vault definition locally as `vault.schema.json` before selecting it, so it does not overwrite ESC1’s `schema.json`. All filenames are shared across the bundle; each extension retains its own schema name. The command-based demonstration below stops the dedicated BloodHound application.
 
-Upload all three files (using the distinct schema filename above when another `schema.json` is active): [extension/schema.json](extension/schema.json), [vault_helpers.cypher](extension/vault_helpers.cypher), and [account_users.cypher](extension/account_users.cypher). The schema name is `vault_poc`. The platform assigns its owner; `account_users.cypher` declares `'PoC_Vault_HasAccountFor' AS kind` and requests `keep-existing`. The schema contains only type descriptions and endpoint rules. This extension has its own written expectations; it does not compare results with native ESC1.
+Upload all three files (using the distinct schema filename above when another `schema.json` is active): [extension/schema.json](extension/schema.json), [vault_helpers.cypher](extension/vault_helpers.cypher), and [account_users.cypher](extension/account_users.cypher). The schema name is `vault_poc`. `account_users.cypher` declares `'PoC_Vault_HasAccountFor' AS kind` and requests `keep-existing`. The schema contains only type descriptions and endpoint rules. This extension has its own written expectations; it does not compare results with native ESC1.
+
+| File | What the author supplies |
+| --- | --- |
+| Schema | The vault kinds, display settings, permitted endpoint pairs, and non-traversable relationships. No processing blocks or reference commit. |
+| `vault_helpers.cypher` | Dependencies and one helper row per vault: `id`, literal `['PoC_Vault_Helper'] AS kinds`, and `properties`. The ID begins with `PoC_Vault_Helper_`. |
+| `account_users.cypher` | Its helper prerequisite and graph dependencies, the `keep-existing` policy, and distinct `source`, `target`, and literal `kind` columns. |
+
+BloodHound supplies the helper answers as `$vault_helpers`, checks the complete result, and saves calculated objects and relationships. Testing the final query alone in the normal query interface does not supply those prerequisite rows. See [the developer walkthrough](../../DEVELOPERS.md#continue-with-the-same-example) for smaller examples of shared answers, helpers, and relationship properties.
 
 The account remains a custom `PoC_Vault_Account`, with source kind `PoC_Vault_Base`. Alice remains the native `User` loaded from [the existing AD baseline](../../testdata/baseline/users.json). Neither collected vault objects nor generated helpers receive native `Base` or `User` labels. Account IDs such as `VAULT-ACCOUNT-1` differ from directory SIDs: `user_sid` supplies the join without merging these separate identities.
 
@@ -23,9 +31,9 @@ Upload the existing `tools/esc1-poc/testdata/baseline/` AD files and the vault f
 
 [expected.json](expected.json) contains exact source/target pairs outside the upload directory. Every account refers to the artificial SID `S-1-5-21-111111111-222222222-333333333-1001`; there are no real credentials or private directory data.
 
-The demonstrations cover both arrival orders, multiple matching accounts, repeat runs, and preservation after failure. If vault data arrives first, there is no user connection until Alice arrives. With directory data first, the next calculation after the vault upload creates the association. Adding the second account keeps one relationship and updates the helper’s account count from one to two. A repeat keeps the existing relationship identity.
+The demonstration scripts are intended to check both arrival orders, multiple matching accounts, repeat runs, and preservation after failure. The expected behavior is: if vault data arrives first, there is no user connection until Alice arrives; with directory data first, the next calculation after the vault upload creates the association. Adding the second account keeps one relationship and updates the helper’s account count from one to two. A repeat keeps the existing relationship identity. Read the recorded checks in [REVIEW.md](../../REVIEW.md) before treating a script or a historical report as proof for the current rule.
 
-Omitting an account or containment edge from an upload is not evidence that it was deleted. Ingestion can merge data. This example does not model vault remediation or solve stale collected evidence. The shared engine still removes owned calculated relationships when the complete answer over actual stored facts no longer includes them.
+Omitting an account or containment edge from an upload is not evidence that it was deleted. Ingestion can merge data. This example does not model vault remediation or solve stale collected evidence. The shared engine still removes in-scope calculated relationships when the complete answer over actual stored facts no longer includes them.
 
 ## Input and publication contracts
 
@@ -45,6 +53,6 @@ docker compose -f compose.yaml down
 docker compose -f compose.yaml up -d
 ```
 
-The script stops the dedicated application and runs uploads against temporary labs. It exercises OpenGraph JSON, an OpenGraph ZIP, a mixed OpenGraph/classic ZIP, both arrival orders, exact connections, unchanged connection identities, and multiple matching accounts. It also checks that a malformed upload and a failed final query preserve the saved experimental state. Native ESC1 comparison runs alongside the vault extension without changing its owned objects.
+The script stops the dedicated application and runs uploads against temporary labs. It exercises OpenGraph JSON, an OpenGraph ZIP, a mixed OpenGraph/classic ZIP, both arrival orders, exact connections, unchanged connection identities, and multiple matching accounts. It also checks that a malformed upload and a failed final query preserve the saved experimental state. Native ESC1 comparison runs alongside the vault extension without changing its calculated objects.
 
 Each order gets fresh database files; the script retains them under ignored `work/opengraph-*/` after stopping those temporary containers. [opengraph-results.json](../../evidence/opengraph-results.json) and the [browser screenshot](../../evidence/bloodhound-opengraph.png) preserve earlier runs of a different vault rule. Those historical checks and images do not validate the current `PoC_Vault_HasAccountFor` rule. Consult [REVIEW.md](../../REVIEW.md) for the recorded checks and their scope.

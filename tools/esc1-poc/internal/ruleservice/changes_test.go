@@ -246,6 +246,7 @@ func TestRetirementHistorySurvivesRestartAndReintroduction(t *testing.T) {
 		t.Fatal(removed)
 	}
 	removed.RetiredRelationships[0] = "caller mutation"
+	removed.RetiredEndpoints["PoC_Vault_HasAccountFor"][0].TargetKind = "caller mutation"
 	restored, err := ruleservice.Open(directory)
 	if err != nil {
 		t.Fatal(err)
@@ -254,18 +255,26 @@ func TestRetirementHistorySurvivesRestartAndReintroduction(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(active.RetiredRelationships, []string{"PoC_Vault_HasAccountFor"}) {
 		t.Fatal("history lost or aliased", err, active)
 	}
+	if endpoints := active.RetiredEndpoints["PoC_Vault_HasAccountFor"]; len(endpoints) != 1 || endpoints[0].SourceKind != "PoC_Vault_Container" || endpoints[0].TargetKind != "User" {
+		t.Fatal("saved cleanup endpoints were lost or changed by a caller", endpoints)
+	}
 	changed, err := restored.Update(map[string]string{"vault_helpers.cypher": active.Files["vault_helpers.cypher"] + "\n// update"})
 	if err != nil || !reflect.DeepEqual(changed.RetiredRelationships, active.RetiredRelationships) {
 		t.Fatal("update forgot retirement", err, changed)
 	}
 	reintroduced, err := restored.Update(original)
-	if err != nil || len(reintroduced.RetiredRelationships) != 0 {
+	if err != nil || len(reintroduced.RetiredRelationships) != 0 || len(reintroduced.RetiredEndpoints) != 0 {
 		t.Fatal("active kind still retired", err, reintroduced)
 	}
 	tampered := changed
 	tampered.RetiredRelationships = nil
 	if _, err := ruleservice.ValidateBundle(tampered); err == nil {
 		t.Fatal("history tampering preserved digest")
+	}
+	tampered = changed
+	tampered.RetiredEndpoints["PoC_Vault_HasAccountFor"][0].TargetKind = "Computer"
+	if _, err := ruleservice.ValidateBundle(tampered); err == nil {
+		t.Fatal("changing cleanup endpoints must invalidate the digest")
 	}
 }
 
@@ -307,7 +316,7 @@ func TestHTTPRequiresPreviewAndReplacementChoice(t *testing.T) {
 	}
 }
 
-func TestRemovalCascadesThroughOutputKindsAndEndpoints(t *testing.T) {
+func TestRemovalKeepsGraphReadersAndEndpointConsumers(t *testing.T) {
 	var (
 		store    = open(t)
 		original = files(t)
@@ -339,16 +348,16 @@ func TestRemovalCascadesThroughOutputKindsAndEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := []string{"account_users.cypher", "edge_reader.cypher", "endpoint.cypher", "node_reader.cypher", "vault_helpers.cypher"}
+	expected := []string{"account_users.cypher", "vault_helpers.cypher"}
 	if !reflect.DeepEqual(preview.Removed, expected) {
-		t.Fatal("output consumer survived removal", preview.Removed)
+		t.Fatal("deletion should cascade only through required query rows", preview.Removed)
 	}
-	if !reflect.DeepEqual(preview.RetiredRelationships, []string{"PoC_Vault_HasAccountFor", "PoC_Vault_HelperEdge", "PoC_Vault_ReadEdge", "PoC_Vault_ReadHelper"}) {
+	if !reflect.DeepEqual(preview.RetiredRelationships, []string{"PoC_Vault_HasAccountFor"}) {
 		t.Fatal("retirements missing or unsorted", preview.RetiredRelationships)
 	}
 }
 
-func TestRemovingProducerRejectsRemainingReader(t *testing.T) {
+func TestRemovingLastProducerAllowsRemainingReader(t *testing.T) {
 	var store = open(t)
 	initial, err := store.Update(files(t))
 	if err != nil {
@@ -359,12 +368,12 @@ func TestRemovingProducerRejectsRemainingReader(t *testing.T) {
 		t.Fatal("removal rewrote the display schema")
 	}
 	reader := "// depends-on: relationship:PoC_Vault_HasAccountFor\nMATCH ()-[edge:PoC_Vault_HasAccountFor]->() RETURN 'PoC_Vault_Helper_1' AS id, ['PoC_Vault_Helper'] AS kinds, {} AS properties"
-	if _, err := store.Update(map[string]string{"vault_helpers.cypher": reader}); err == nil {
-		t.Fatal("accepted reader of retired output")
+	withReader, err := store.Update(map[string]string{"vault_helpers.cypher": reader})
+	if err != nil {
+		t.Fatal("reader should remain valid after the last producer is removed", err)
 	}
-	active, err := store.Active()
-	if err != nil || active.Revision != updated.Revision {
-		t.Fatal("invalid reader changed active", err)
+	if !reflect.DeepEqual(withReader.RetiredRelationships, updated.RetiredRelationships) {
+		t.Fatal("reader should not cancel cleanup", withReader)
 	}
 }
 

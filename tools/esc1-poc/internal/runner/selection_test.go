@@ -58,14 +58,15 @@ func (s *selectionDatabase) Begin(ctx context.Context) (runner.Transaction, erro
 
 func (s *selectionTransaction) Read(ctx context.Context, query string, parameters map[string]any) (runner.Rows, error) {
 	var rows runner.Rows
+	query, scope := splitRelationshipScope(query)
 	if strings.HasPrefix(query, "MATCH (source)-[edge:PoC_") {
 		s.database.reads = append(s.database.reads, recordedRead{query: query, parameters: cloneProperties(parameters)})
 		for _, edge := range s.staged.Edges {
 			if strings.HasPrefix(query, "MATCH (source)-[edge:"+edge.Kind+"]->(target) RETURN id(edge)") {
-				rows = append(rows, map[string]any{"id": edge.ID, "owner": edge.Owner, "source": edge.Pair.Source, "target": edge.Pair.Target, "properties": cloneProperties(edge.Properties)})
+				rows = append(rows, map[string]any{"id": edge.ID, "source": edge.Pair.Source, "target": edge.Pair.Target, "properties": cloneProperties(edge.Properties)})
 			}
 		}
-		return rows, nil
+		return s.filterScope(rows, scope), nil
 	}
 	return s.fakeTransaction.Read(ctx, query, parameters)
 }
@@ -81,7 +82,7 @@ func (s *selectionTransaction) PutNode(_ context.Context, kind string, propertie
 	return nil
 }
 
-func (s *selectionTransaction) CreateRelationships(_ context.Context, kind, owner string, relationships []runner.Relationship) (int, error) {
+func (s *selectionTransaction) CreateRelationships(_ context.Context, kind string, relationships []runner.Relationship) (int, error) {
 	var count int
 	for _, relationship := range relationships {
 		if len(s.matchingNodes(relationship.Source)) != 1 || len(s.matchingNodes(relationship.Target)) != 1 {
@@ -89,17 +90,17 @@ func (s *selectionTransaction) CreateRelationships(_ context.Context, kind, owne
 		}
 		s.staged.NextID++
 		s.database.relationshipWrites++
-		s.staged.Edges = append(s.staged.Edges, fakeEdge{ID: s.staged.NextID, Kind: kind, Owner: owner, Pair: runner.Pair{Source: relationship.Source, Target: relationship.Target}, Properties: cloneProperties(relationship.Properties)})
+		s.staged.Edges = append(s.staged.Edges, fakeEdge{ID: s.staged.NextID, Kind: kind, Pair: runner.Pair{Source: relationship.Source, Target: relationship.Target}, Properties: cloneProperties(relationship.Properties)})
 		count++
 	}
 	return count, nil
 }
 
-func (s *selectionTransaction) UpdateRelationships(_ context.Context, kind, owner string, updates []runner.RelationshipUpdate) (int, error) {
+func (s *selectionTransaction) UpdateRelationships(_ context.Context, kind string, updates []runner.RelationshipUpdate) (int, error) {
 	var count int
 	for _, update := range updates {
 		for index, edge := range s.staged.Edges {
-			if edge.Kind == kind && edge.Owner == owner && edge.ID == update.ID {
+			if edge.Kind == kind && edge.ID == update.ID {
 				properties := cloneProperties(edge.Properties)
 				for key, value := range update.Properties {
 					if value == nil {
@@ -117,11 +118,11 @@ func (s *selectionTransaction) UpdateRelationships(_ context.Context, kind, owne
 	return count, nil
 }
 
-func (s *selectionTransaction) DeleteRelationships(_ context.Context, kind, owner string, identifiers []int64) (int, error) {
+func (s *selectionTransaction) DeleteRelationships(_ context.Context, kind string, identifiers []int64) (int, error) {
 	var count int
 	for _, identifier := range identifiers {
 		for index, edge := range s.staged.Edges {
-			if edge.Kind == kind && edge.Owner == owner && edge.ID == identifier {
+			if edge.Kind == kind && edge.ID == identifier {
 				s.staged.Edges = append(s.staged.Edges[:index], s.staged.Edges[index+1:]...)
 				s.database.relationshipWrites++
 				count++
@@ -224,7 +225,7 @@ func TestSelectiveReplacementPreservesSkippedOutputsAndFullPlanHash(t *testing.T
 func TestSelectiveEmptyResultRemovesOnlySelectedOwnedEdges(t *testing.T) {
 	var database, plan = independentSelectionFixture()
 	runSelection(t, database, plan, runner.Changes{})
-	var foreign = fakeEdge{ID: 17, Kind: "PoC_Independent", Owner: "another-owner", Pair: runner.Pair{Source: "USER", Target: "DOMAIN"}, Properties: map[string]any{"note": "foreign"}}
+	var foreign = fakeEdge{ID: 17, Kind: "PoC_Independent", Pair: runner.Pair{Source: "USER", Target: "DOMAIN"}, Properties: map[string]any{"note": "foreign"}}
 	database.graph.Edges = append(database.graph.Edges, foreign)
 	var skipped = selectionOutputBytes(t, *database.graph, "PoC_Independent")
 	database.answers[relationshipQuery] = nil
@@ -242,7 +243,7 @@ func TestSelectiveEmptyResultRemovesOnlySelectedOwnedEdges(t *testing.T) {
 func TestSelectiveLateFailureRollsBackHelpersEdgesAndRunRecord(t *testing.T) {
 	var database, plan = independentSelectionFixture()
 	runSelection(t, database, plan, runner.Changes{})
-	database.graph.Edges = append(database.graph.Edges, fakeEdge{ID: 18, Kind: "PoC_Independent", Owner: "another-owner", Pair: runner.Pair{Source: "USER", Target: "DOMAIN"}, Properties: map[string]any{"note": "foreign"}})
+	database.graph.Edges = append(database.graph.Edges, fakeEdge{ID: 18, Kind: "PoC_Independent", Pair: runner.Pair{Source: "USER", Target: "DOMAIN"}, Properties: map[string]any{"note": "foreign"}})
 	var (
 		before       = cloneGraph(*database.graph)
 		helperWrites = database.helperWrites

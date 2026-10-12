@@ -33,7 +33,7 @@
     {
       "name": "PoC_Vault_Helper",
       "display_name": "Vault processing helper",
-      "description": "An owned summary of the collected vault, published atomically with calculated account identity relationships.",
+      "description": "A calculated summary of the collected vault, published atomically with calculated account identity relationships.",
       "is_display_kind": true,
       "icon": "flask",
       "color": "#5965D8"

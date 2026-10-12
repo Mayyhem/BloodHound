@@ -25,11 +25,10 @@ import (
 )
 
 // Scan the helper ID prefix once, then compare two sorted files. The scan must
-// include other node kinds too: finding an ID on a native or differently owned
-// node is a conflict, not permission to create another node with the same ID.
+// include other node kinds too: finding an ID on a node with a different type is a conflict, not permission to create another node with the same ID.
 // We never delete helpers that no longer appear in the desired file, because
 // another calculation may still need them.
-func publishHelperAnswers(ctx context.Context, transaction Transaction, owner string, binding extension.NodeBinding, desired *answerFile, report *Report) error {
+func publishHelperAnswers(ctx context.Context, transaction Transaction, binding extension.NodeBinding, desired *answerFile, report *Report) error {
 	if desired.rows == 0 {
 		// Even an empty answer must pass its completeness/fingerprint checks.
 		return desired.each(ctx, func(map[string]any) error { return nil })
@@ -97,7 +96,7 @@ func publishHelperAnswers(ctx context.Context, transaction Transaction, owner st
 		if current != nil && current["id"] == identifier {
 			matching = current
 		}
-		changed, err := publishHelper(ctx, transaction, owner, binding, row, matching, desired.space.limits.ParameterBytes)
+		changed, err := publishHelper(ctx, transaction, binding, row, matching, desired.space.limits.ParameterBytes)
 		if err != nil {
 			return err
 		}

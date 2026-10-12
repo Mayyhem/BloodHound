@@ -117,7 +117,7 @@ func TestLoadDefaultExtension(t *testing.T) {
 	if !reflect.DeepEqual(actualOrder, expectedOrder) {
 		t.Fatalf("plan order %v; expected %v", actualOrder, expectedOrder)
 	}
-	if plan.Schema.Name != "esc1_poc" || plan.Schema.Owner != "extension/esc1_poc" || plan.Schema.ReferenceCommit != "2cb6dbd37738ffe31e34e1729b3638f3887a93e9" {
+	if plan.Schema.Name != "esc1_poc" || plan.Schema.ReferenceCommit != "2cb6dbd37738ffe31e34e1729b3638f3887a93e9" {
 		t.Fatalf("unexpected shipped schema identity: %+v", plan.Schema)
 	}
 	if len(plan.Schema.Nodes) != 1 || plan.Schema.Nodes[0].Kind != "PoC_DomainHelper" || plan.Schema.Nodes[0].Query != "domain_helpers.cypher" {

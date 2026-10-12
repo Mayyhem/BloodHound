@@ -74,14 +74,14 @@ func (s *batchedTransaction) PutNode(ctx context.Context, kind string, propertie
 	}
 	return nil
 }
-func (s *batchedTransaction) CreateRelationships(ctx context.Context, kind, owner string, relationships []runner.Relationship) (int, error) {
+func (s *batchedTransaction) CreateRelationships(ctx context.Context, kind string, relationships []runner.Relationship) (int, error) {
 	s.owner.createBatches++
 	if s.owner.createBatches == s.owner.failCreate {
 		return 0, fmt.Errorf("injected late create failure")
 	}
 	count := 0
 	for _, relationship := range relationships {
-		rows, err := s.Write(ctx, createRelationshipQuery, map[string]any{"source": relationship.Source, "target": relationship.Target, "owner": owner, "properties": relationship.Properties})
+		rows, err := s.Write(ctx, createRelationshipQuery, map[string]any{"source": relationship.Source, "target": relationship.Target, "properties": relationship.Properties})
 		if err != nil {
 			return count, err
 		}
@@ -89,10 +89,10 @@ func (s *batchedTransaction) CreateRelationships(ctx context.Context, kind, owne
 	}
 	return count, nil
 }
-func (s *batchedTransaction) UpdateRelationships(ctx context.Context, kind, owner string, updates []runner.RelationshipUpdate) (int, error) {
+func (s *batchedTransaction) UpdateRelationships(ctx context.Context, kind string, updates []runner.RelationshipUpdate) (int, error) {
 	var count int
 	for _, update := range updates {
-		rows, err := s.Write(ctx, updateRelationshipQuery, map[string]any{"id": update.ID, "owner": owner, "properties": update.Properties})
+		rows, err := s.Write(ctx, updateRelationshipQuery, map[string]any{"id": update.ID, "properties": update.Properties})
 		if err != nil {
 			return count, err
 		}
@@ -100,14 +100,14 @@ func (s *batchedTransaction) UpdateRelationships(ctx context.Context, kind, owne
 	}
 	return count, nil
 }
-func (s *batchedTransaction) DeleteRelationships(ctx context.Context, kind, owner string, identifiers []int64) (int, error) {
+func (s *batchedTransaction) DeleteRelationships(ctx context.Context, kind string, identifiers []int64) (int, error) {
 	s.owner.deleteBatches++
 	if s.owner.deleteBatches == s.owner.failDelete {
 		return 0, fmt.Errorf("injected late delete failure")
 	}
 	count := 0
 	for _, identifier := range identifiers {
-		rows, err := s.Write(ctx, deleteRelationshipQuery, map[string]any{"id": identifier, "owner": owner})
+		rows, err := s.Write(ctx, deleteRelationshipQuery, map[string]any{"id": identifier})
 		if err != nil {
 			return count, err
 		}
@@ -269,7 +269,7 @@ func TestPublishedComparisonKeepsExactCountsWithoutExamples(t *testing.T) {
 		limits   = runner.DefaultLimits()
 	)
 	limits.ReportPairs = 0
-	database.answers["MATCH (source)-[edge:PoC_ADCSESC1]->(target) WHERE edge.poc_owner = $owner RETURN DISTINCT source.objectid AS source, target.objectid AS target"] = runner.Rows{
+	database.answers["MATCH (source)-[edge:PoC_ADCSESC1]->(target) RETURN DISTINCT source.objectid AS source, target.objectid AS target"] = runner.Rows{
 		{"source": "EXTRA", "target": "DOMAIN"},
 		{"source": "EXTRA", "target": "DOMAIN"},
 	}
@@ -279,7 +279,7 @@ func TestPublishedComparisonKeepsExactCountsWithoutExamples(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer transaction.Rollback(t.Context())
-	comparison, err := runner.ComparePublished(t.Context(), transaction, "experiment", t.TempDir(), limits)
+	comparison, err := runner.ComparePublished(t.Context(), transaction, t.TempDir(), limits)
 	if err != nil || comparison.MissingCount != 1 || comparison.ExtraCount != 1 || !comparison.Truncated || len(comparison.Missing) != 0 || len(comparison.Extra) != 0 {
 		t.Fatalf("comparison lost an unsampled mismatch: %+v error=%v", comparison, err)
 	}

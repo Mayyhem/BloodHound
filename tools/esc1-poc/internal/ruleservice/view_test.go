@@ -36,7 +36,7 @@ func TestBuildViewEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(view.Threads) != 0 || string(contents) != `{"revision":"","name":"","owner":"","threads":[],"queries":[],"extensions":[]}` {
+	if len(view.Threads) != 0 || string(contents) != `{"revision":"","name":"","threads":[],"queries":[],"extensions":[]}` {
 		t.Fatalf("empty plan should have an empty array: %s", contents)
 	}
 }
@@ -100,7 +100,7 @@ func TestBuildViewJoinsManagedProducersAndPreservesPublicationDetails(t *testing
 	var (
 		text = "// depends-on: none\nRETURN '<script>alert(1)</script>' AS note\n"
 		plan = extension.Plan{
-			Schema: extension.Schema{Name: "test", Owner: "owner", Nodes: []extension.NodeBinding{{Kind: "PoC_Helper", Query: "helper.cypher", IDPrefix: "PoC_Helper_"}}, Relationships: []extension.RelationshipBinding{
+			Schema: extension.Schema{Name: "test", Nodes: []extension.NodeBinding{{Kind: "PoC_Helper", Query: "helper.cypher", IDPrefix: "PoC_Helper_"}}, Relationships: []extension.RelationshipBinding{
 				{Kind: "PoC_Default", Query: "consumer.cypher", Endpoints: []extension.Endpoint{{SourceKind: "PoC_Helper", TargetKind: "User"}}},
 				{Kind: "PoC_Preserved", Query: "consumer.cypher", ExistingEdgePolicy: extension.KeepExisting},
 			}},
@@ -114,7 +114,7 @@ func TestBuildViewJoinsManagedProducersAndPreservesPublicationDetails(t *testing
 	if len(view.Threads) != 1 {
 		t.Fatalf("managed producer separated from consumer: %+v", view)
 	}
-	if query := view.Threads[0].Queries[0]; query.Text != text || query.Order != 1 || query.Stage != 1 || len(query.Prerequisites) != 0 {
+	if query := view.Threads[0].Queries[0]; query.Text != text || query.Order != 1 || query.Stage != 2 || len(query.Prerequisites) != 0 {
 		t.Fatalf("full text or actual scheduling changed: %+v", query)
 	}
 	if output := view.Threads[0].Queries[1].Outputs[0]; output.IDPrefix != "PoC_Helper_" || output.Type != "node" {
@@ -175,5 +175,24 @@ func TestBuildViewIncludesExtensionsAndPausedRules(t *testing.T) {
 	}
 	if query := view.Queries[1]; query.Stage != 2 || query.Order != 2 || query.Enabled || query.AddedAt != "" || query.DisabledReason == "" {
 		t.Fatalf("paused dependent lost its place in the full plan: %+v", query)
+	}
+}
+
+func TestBuildViewShowsPropertyPrecedenceIndependentlyOfQueryOrder(t *testing.T) {
+	var (
+		plan = extension.Plan{
+			Schema: extension.Schema{Relationships: []extension.RelationshipBinding{
+				{Kind: "PoC_Shared", Query: "z_first.cypher"},
+				{Kind: "PoC_Shared", Query: "a_later.cypher"},
+			}},
+			Queries: []extension.Query{
+				{Name: "z_first.cypher"},
+				{Name: "a_later.cypher", Dependencies: []extension.Dependency{{Type: "query", Name: "z_first.cypher"}}},
+			},
+		}
+		view = ruleservice.BuildView(ruleservice.Bundle{}, plan)
+	)
+	if !reflect.DeepEqual(view.Queries[0].Outputs[0].Producers, []string{"a_later.cypher", "z_first.cypher"}) {
+		t.Fatal("property precedence must follow filenames, not execution order", view.Queries[0].Outputs)
 	}
 }

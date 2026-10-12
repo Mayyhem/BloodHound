@@ -88,7 +88,6 @@ func TestHelperPrefixMatchingCollisionsRollBack(t *testing.T) {
 		owner string
 	}{
 		{name: "wrong kind", kinds: []string{"User"}, owner: "test-owner/PoC_Helper"},
-		{name: "foreign owner", kinds: []string{"PoC_Helper"}, owner: "another-owner"},
 	} {
 		t.Run(collision.name, func(t *testing.T) {
 			var database = fixtureDatabase()
@@ -98,7 +97,7 @@ func TestHelperPrefixMatchingCollisionsRollBack(t *testing.T) {
 			}
 			database.graph.Nodes = append(database.graph.Nodes, fakeNode{ID: "PoC_Helper_z", Kinds: collision.kinds, Properties: map[string]any{"objectid": "PoC_Helper_z", "poc_owner": collision.owner, "name": "original"}})
 			before := cloneGraph(*database.graph)
-			assertRollback(t, database, before, fixturePlan(), completeBatch(), "belongs to a native or differently owned node")
+			assertRollback(t, database, before, fixturePlan(), completeBatch(), "already identifies a different node kind")
 			assertHelperPrefixReads(t, database.reads, 1)
 			if database.helperWrites != 1 {
 				t.Fatal("collision did not exercise rollback after an earlier helper write")

@@ -18,53 +18,49 @@ SPDX-License-Identifier: Apache-2.0
 package graphdb
 
 import (
-	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
 	"reflect"
 	"testing"
+
+	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
 )
 
-func TestRelationshipCreationPropertiesSeparateOwnerAndRemoveNulls(t *testing.T) {
+func TestRelationshipCreationPropertiesRemoveNullsWithoutChangingInput(t *testing.T) {
 	var (
-		properties = map[string]any{"integer": int64(9007199254740993), "decimal": 1.25, "remove": nil}
-		expected   = map[string]any{"integer": int64(9007199254740993), "decimal": 1.25, "poc_owner": "owner"}
+		properties = map[string]any{"integer": int64(9007199254740993), "decimal": 1.25, "remove": nil, "poc_owner": "ordinary property"}
+		expected   = map[string]any{"integer": int64(9007199254740993), "decimal": 1.25, "poc_owner": "ordinary property"}
+		copied     = relationshipCreationProperties(properties)
 	)
-	copied, err := relationshipCreationProperties("owner", properties)
-	if err != nil || !reflect.DeepEqual(copied, expected) {
-		t.Fatalf("copied properties %#v: %v", copied, err)
-	}
-	if _, found := properties["poc_owner"]; found {
-		t.Fatal("creation mutated the query's property map")
+	if !reflect.DeepEqual(copied, expected) {
+		t.Fatalf("copied properties %#v", copied)
 	}
 	if _, found := properties["remove"]; !found {
 		t.Fatal("creation removed a key from the query's map")
 	}
-	if _, err := relationshipCreationProperties("", nil); err == nil {
-		t.Fatal("created without owner")
+	copied["integer"] = int64(1)
+	if properties["integer"] != int64(9007199254740993) {
+		t.Fatal("creation reused the query's property map")
 	}
-	if _, err := relationshipCreationProperties("owner", map[string]any{"poc_owner": "owner"}); err == nil {
-		t.Fatal("accepted reserved ownership property")
+	if empty := relationshipCreationProperties(nil); len(empty) != 0 {
+		t.Fatalf("creation invented properties: %v", empty)
 	}
 }
 
-func TestRelationshipUpdateValidationRejectsUnsafePatch(t *testing.T) {
+func TestRelationshipUpdateValidationRejectsInvalidIDs(t *testing.T) {
 	var cases = []struct {
-		name, owner string
-		updates     []runner.RelationshipUpdate
+		name    string
+		updates []runner.RelationshipUpdate
 	}{
-		{"no owner", "", nil},
-		{"negative ID", "owner", []runner.RelationshipUpdate{{ID: -1}}},
-		{"duplicate ID", "owner", []runner.RelationshipUpdate{{ID: 1}, {ID: 1}}},
-		{"change owner", "owner", []runner.RelationshipUpdate{{ID: 1, Properties: map[string]any{"poc_owner": "other"}}}},
-		{"remove owner", "owner", []runner.RelationshipUpdate{{ID: 1, Properties: map[string]any{"poc_owner": nil}}}},
+		{"negative ID", []runner.RelationshipUpdate{{ID: -1}}},
+		{"duplicate ID", []runner.RelationshipUpdate{{ID: 1}, {ID: 1}}},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if err := validateRelationshipUpdates(testCase.owner, testCase.updates); err == nil {
-				t.Fatal("unsafe update accepted")
+			if err := validateRelationshipUpdates(testCase.updates); err == nil {
+				t.Fatal("invalid update accepted")
 			}
 		})
 	}
-	if err := validateRelationshipUpdates("owner", []runner.RelationshipUpdate{{ID: 0, Properties: map[string]any{"remove": nil}}, {ID: 2}}); err != nil {
+	if err := validateRelationshipUpdates([]runner.RelationshipUpdate{{ID: 0, Properties: map[string]any{"remove": nil, "poc_owner": "ordinary property"}}, {ID: 2, Properties: map[string]any{"poc_owner": nil}}}); err != nil {
 		t.Fatalf("valid patch rejected: %v", err)
 	}
 }

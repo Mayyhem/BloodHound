@@ -83,19 +83,13 @@ func validateEndpoints(ctx context.Context, transaction Transaction, binding ext
 	return nil
 }
 
-// A producer identity is independent of its filename. Renaming esc1.cypher
-// and updating the schema does not abandon the relationships it already owns.
-func producer(owner, kind string) string {
-	return owner + "/" + kind
-}
-
 // publishHelper receives the current node found by the shared helper scan.
 // It never looks up an unlabelled object ID once per helper: on Neo4j that
 // would repeatedly scan the whole graph. The caller checks duplicate IDs.
-func publishHelper(ctx context.Context, transaction Transaction, owner string, binding extension.NodeBinding, row, existing map[string]any, parameterLimit int64) (int, error) {
+func publishHelper(ctx context.Context, transaction Transaction, binding extension.NodeBinding, row, existing map[string]any, parameterLimit int64) (int, error) {
 	var (
 		identifier, valid = row["id"].(string)
-		stored            = map[string]any{"objectid": identifier, "poc_owner": producer(owner, binding.Kind)}
+		stored            = map[string]any{"objectid": identifier}
 	)
 	if !valid || !strings.HasPrefix(identifier, binding.IDPrefix) || len(identifier) == len(binding.IDPrefix) {
 		return 0, fmt.Errorf("helper id must begin with %q and include an identifier", binding.IDPrefix)
@@ -107,10 +101,10 @@ func publishHelper(ctx context.Context, transaction Transaction, owner string, b
 	if !valid {
 		return 0, fmt.Errorf("helper properties must be a map")
 	}
-	// Copy author properties so assigning runner-owned fields cannot change
+	// Copy author properties so assigning the object ID cannot change
 	// the intermediate answers that another query may still need.
 	for key, value := range properties {
-		if key == "objectid" || key == "poc_owner" || key == "" {
+		if key == "objectid" || key == "" {
 			return 0, fmt.Errorf("helper property %q is reserved or empty", key)
 		}
 		if err := validateProperty(value); err != nil {
@@ -124,8 +118,8 @@ func publishHelper(ctx context.Context, transaction Transaction, owner string, b
 	}
 	if existing != nil {
 		previous, valid := existing["properties"].(map[string]any)
-		if !valid || previous["poc_owner"] != stored["poc_owner"] || !onlyKind(existing["kinds"], binding.Kind) {
-			return 0, fmt.Errorf("helper id %q belongs to a native or differently owned node", identifier)
+		if !valid || !onlyKind(existing["kinds"], binding.Kind) {
+			return 0, fmt.Errorf("helper id %q already identifies a different node kind", identifier)
 		}
 		previousJSON, _ := json.Marshal(previous)
 		storedJSON, _ := json.Marshal(stored)

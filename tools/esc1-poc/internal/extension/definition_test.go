@@ -111,7 +111,7 @@ func TestBloodHoundExportPreservesStandardSectionsAndLocalModel(t *testing.T) {
 		definition = modelDefinition()
 		falseValue = false
 	)
-	definition.PostProcessing = &extension.ProcessingSettings{Owner: "example-owner", ReferenceCommit: strings.Repeat("a", 40)}
+	definition.PostProcessing = &extension.ProcessingSettings{ReferenceCommit: strings.Repeat("a", 40)}
 	definition.NodeKinds[0].PostProcessing = &extension.NodeProcessing{Query: "helper.cypher", IDPrefix: "PoC_Collected_"}
 	definition.NodeKinds[0].DisplayName = "Collected item"
 	definition.NodeKinds[0].Description = "An ordinary collected item."
@@ -176,7 +176,7 @@ func TestCollectedKindsDoNotBecomeManagedOutput(t *testing.T) {
 		definition = modelDefinition()
 		directory  = t.TempDir()
 	)
-	definition.PostProcessing = &extension.ProcessingSettings{Owner: "example-owner", ReferenceCommit: strings.Repeat("a", 40)}
+	definition.PostProcessing = &extension.ProcessingSettings{ReferenceCommit: strings.Repeat("a", 40)}
 	definition.NodeKinds = append(definition.NodeKinds, extension.NodeKind{Name: "PoC_Helper", PostProcessing: &extension.NodeProcessing{Query: "helper.cypher", IDPrefix: "PoC_Helper_"}})
 	definition.RelationshipKinds[0].PostProcessing = &extension.RelationshipProcessing{Query: "access.cypher"}
 	definition.RelationshipKinds = append(definition.RelationshipKinds, extension.RelationshipKind{Name: "PoC_CollectedLink", Endpoints: []extension.Endpoint{{SourceKind: "PoC_Collected", TargetKind: "User"}}})

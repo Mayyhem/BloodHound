@@ -9,7 +9,7 @@
     {
       "name": "PoC_AD_User",
       "display_name": "Directory user helper",
-      "description": "Owned summary of a native directory user for this synthetic example.",
+      "description": "Calculated summary of a native directory user for this synthetic example.",
       "is_display_kind": true,
       "icon": "user",
       "color": "#3178C6"

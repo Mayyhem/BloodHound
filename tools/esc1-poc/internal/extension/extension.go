@@ -32,43 +32,25 @@ import (
 // It is kept in memory; extension authors maintain their schema files.
 type Schema struct {
 	Name            string `json:"name"`
-	Owner           string `json:"owner"`
 	ReferenceCommit string `json:"reference_commit"`
 	// Only the ESC1 example has a built-in BloodHound answer to compare with.
-	// Other extensions still use the same identity, ownership, and rollback rules.
+	// Other extensions still use the same identity and rollback rules.
 	CompareNativeESC1 bool                  `json:"compare_native_esc1,omitempty"`
 	Nodes             []NodeBinding         `json:"nodes"`
 	Relationships     []RelationshipBinding `json:"relationships"`
 }
 
 type NodeBinding struct {
-	Owner    string `json:"owner,omitempty"`
 	Kind     string `json:"kind"`
 	Query    string `json:"query"`
 	IDPrefix string `json:"id_prefix"`
 }
 
 type RelationshipBinding struct {
-	Owner              string             `json:"owner,omitempty"`
 	ExistingEdgePolicy ExistingEdgePolicy `json:"existing_edge_policy,omitempty"`
 	Kind               string             `json:"kind"`
 	Query              string             `json:"query"`
 	Endpoints          []Endpoint         `json:"endpoints"`
-}
-
-// EffectiveOwner preserves the owner of a binding when several extensions run together.
-func (s NodeBinding) EffectiveOwner(fallback string) string {
-	if s.Owner != "" {
-		return s.Owner
-	}
-	return fallback
-}
-
-func (s RelationshipBinding) EffectiveOwner(fallback string) string {
-	if s.Owner != "" {
-		return s.Owner
-	}
-	return fallback
 }
 
 // EffectiveExistingEdgePolicy gives omitted settings their publication default.
@@ -100,8 +82,8 @@ type Query struct {
 type Plan struct {
 	// Removed rules still need their old connections cleared on the next
 	// successful run. This list comes from the saved rule history, not Cypher.
-	RetiredRelationships []string          `json:"retired_relationships,omitempty"`
-	RetiredOwners        map[string]string `json:"retired_owners,omitempty"`
+	RetiredRelationships []string              `json:"retired_relationships,omitempty"`
+	RetiredEndpoints     map[string][]Endpoint `json:"retired_endpoints,omitempty"`
 	Definitions          []Definition
 	SchemaFiles          map[string]string
 	Schema               Schema
@@ -137,7 +119,7 @@ func Load(directory string) (Plan, error) {
 	for index := range plan.Definitions {
 		definition := &plan.Definitions[index]
 		if definition.PostProcessing == nil {
-			definition.PostProcessing = &ProcessingSettings{Owner: "extension/" + definition.Schema.Name, ReferenceCommit: BuildReferenceCommit}
+			definition.PostProcessing = &ProcessingSettings{ReferenceCommit: BuildReferenceCommit}
 		}
 	}
 	for _, entry := range entries {
@@ -203,7 +185,6 @@ func Load(directory string) (Plan, error) {
 			plan.Schema = schema
 		} else {
 			plan.Schema.Name = "registered_extensions"
-			plan.Schema.Owner = "rules-service/v1"
 			plan.Schema.CompareNativeESC1 = plan.Schema.CompareNativeESC1 || schema.CompareNativeESC1
 			plan.Schema.Nodes = append(plan.Schema.Nodes, schema.Nodes...)
 			plan.Schema.Relationships = append(plan.Schema.Relationships, schema.Relationships...)
@@ -333,22 +314,23 @@ func dependencyContinuation(comment string) bool {
 
 func validateSchema(schema Schema, queries map[string]Query) error {
 	var (
-		kinds               = make(map[string]bool)
+		kinds               = make(map[string]string)
+		policies            = make(map[string]ExistingEdgePolicy)
 		bindings            = make(map[string]bool)
 		prefixes            = make(map[string]bool)
 		hasESC1Relationship bool
 	)
-	if strings.TrimSpace(schema.Name) == "" || strings.TrimSpace(schema.Owner) == "" {
-		return fmt.Errorf("schema name and owner must be nonblank")
+	if strings.TrimSpace(schema.Name) == "" {
+		return fmt.Errorf("schema name must be nonblank")
 	}
 	if !referenceCommit.MatchString(schema.ReferenceCommit) {
 		return fmt.Errorf("reference_commit must contain 40 hexadecimal characters")
 	}
-	bind := func(kind, filename string) error {
+	bind := func(kind, filename, outputType string) error {
 		if !publishedIdentifier.MatchString(kind) {
 			return fmt.Errorf("published kind %q must start with PoC_ and be an identifier", kind)
 		}
-		if kinds[kind] {
+		if previous := kinds[kind]; previous != "" && (previous != "relationship" || outputType != "relationship") {
 			return fmt.Errorf("duplicate published kind %q", kind)
 		}
 		if bindings[filename] {
@@ -357,12 +339,12 @@ func validateSchema(schema Schema, queries map[string]Query) error {
 		if _, exists := queries[filename]; !exists {
 			return fmt.Errorf("binding for %q refers to missing query %q", kind, filename)
 		}
-		kinds[kind] = true
+		kinds[kind] = outputType
 		bindings[filename] = true
 		return nil
 	}
 	for _, binding := range schema.Nodes {
-		if err := bind(binding.Kind, binding.Query); err != nil {
+		if err := bind(binding.Kind, binding.Query, "node"); err != nil {
 			return err
 		}
 		if !publishedIdentifier.MatchString(binding.IDPrefix) {
@@ -377,10 +359,14 @@ func validateSchema(schema Schema, queries map[string]Query) error {
 		if !binding.EffectiveExistingEdgePolicy().valid() {
 			return fmt.Errorf("relationship %q has an invalid existing_edge_policy", binding.Kind)
 		}
+		if previous := policies[binding.Kind]; previous != "" && previous != binding.EffectiveExistingEdgePolicy() {
+			return fmt.Errorf("producers for %s must agree on existing-edge-policy", binding.Kind)
+		}
+		policies[binding.Kind] = binding.EffectiveExistingEdgePolicy()
 		if binding.Kind == "PoC_ADCSESC1" {
 			hasESC1Relationship = true
 		}
-		if err := bind(binding.Kind, binding.Query); err != nil {
+		if err := bind(binding.Kind, binding.Query, "relationship"); err != nil {
 			return err
 		}
 		if len(binding.Endpoints) == 0 {
@@ -400,6 +386,8 @@ func orderQueries(queries map[string]Query, schema Schema) ([]Query, error) {
 		ordered []Query
 		state   = make(map[string]int)
 		used    = make(map[string]bool)
+		plan    = Plan{Schema: schema}
+		path    []string
 	)
 	for name, query := range queries {
 		names = append(names, name)
@@ -417,6 +405,9 @@ func orderQueries(queries map[string]Query, schema Schema) ([]Query, error) {
 			used[dependency.Name] = true
 			declaredParameters[strings.TrimSuffix(dependency.Name, ".cypher")] = true
 		}
+		for _, prerequisite := range plan.Prerequisites(query) {
+			used[prerequisite] = true
+		}
 		for _, match := range queryParameter.FindAllStringSubmatch(parameterText(query.Text), -1) {
 			if !declaredParameters[match[1]] {
 				return nil, fmt.Errorf("%s: parameter $%s needs a declared query prerequisite", name, match[1])
@@ -433,24 +424,19 @@ func orderQueries(queries map[string]Query, schema Schema) ([]Query, error) {
 	var visit func(string) error
 	visit = func(name string) error {
 		if state[name] == 1 {
-			return fmt.Errorf("query dependency cycle at %s", name)
+			return fmt.Errorf("query dependency cycle (including produced graph kinds): %s", strings.Join(append(path, name), " -> "))
 		}
 		if state[name] == 2 {
 			return nil
 		}
 		state[name] = 1
-		var prerequisites []string
-		for _, dependency := range queries[name].Dependencies {
-			if dependency.Type == "query" {
-				prerequisites = append(prerequisites, dependency.Name)
-			}
-		}
-		sort.Strings(prerequisites)
-		for _, prerequisite := range prerequisites {
+		path = append(path, name)
+		for _, prerequisite := range plan.Prerequisites(queries[name]) {
 			if err := visit(prerequisite); err != nil {
 				return err
 			}
 		}
+		path = path[:len(path)-1]
 		state[name] = 2
 		ordered = append(ordered, queries[name])
 		return nil
@@ -535,20 +521,104 @@ func (s Plan) Affected(changedNodes, changedRelationships []string, coverageKnow
 			}
 		}
 	}
-	// Walk backwards so a prerequisite's own prerequisites are also selected.
-	for index := len(s.Queries) - 1; index >= 0; index-- {
-		query := s.Queries[index]
-		if !affected[query.Name] {
-			continue
+
+	for _, query := range s.Queries {
+		if affected[query.Name] {
+			result = append(result, query.Name)
 		}
-		for _, dependency := range query.Dependencies {
-			if dependency.Type == "query" {
-				affected[dependency.Name] = true
+	}
+	return s.ExpandSelection(result)
+}
+
+// Prerequisites includes returned rows and calculated graph kinds. Graph readers
+// wait for every producer so they see the complete refreshed relationship set.
+// Reading a rule's own relationship type uses the previous graph state. It does
+// not wait for itself or its peers: their combined new answer needs this rule too.
+func (s Plan) Prerequisites(query Query) []string {
+	var (
+		result                []string
+		seen                  = make(map[string]bool)
+		producedRelationships = make(map[string]bool)
+	)
+	for _, binding := range s.Schema.Relationships {
+		if binding.Query == query.Name {
+			producedRelationships[binding.Kind] = true
+		}
+	}
+	add := func(name string, graphInput bool) {
+		if !seen[name] && (!graphInput || name != query.Name) {
+			seen[name] = true
+			result = append(result, name)
+		}
+	}
+	for _, dependency := range query.Dependencies {
+		switch dependency.Type {
+		case "query":
+			add(dependency.Name, false)
+		case "node":
+			for _, binding := range s.Schema.Nodes {
+				if binding.Kind == dependency.Name {
+					add(binding.Query, true)
+				}
+			}
+		case "relationship":
+			if producedRelationships[dependency.Name] {
+				continue
+			}
+			for _, binding := range s.Schema.Relationships {
+				if binding.Kind == dependency.Name {
+					add(binding.Query, true)
+				}
+			}
+		}
+	}
+	sort.Strings(result)
+	return result
+}
+
+// ExpandSelection keeps every refreshed relationship type complete. Selecting
+// one producer includes its peers, all needed inputs, and all consumers. Repeat
+// until nothing changes: adding an input can itself affect another output.
+func (s Plan) ExpandSelection(names []string) []string {
+	var (
+		selected = make(map[string]bool)
+		result   []string
+		changed  = true
+	)
+	for _, name := range names {
+		selected[name] = true
+	}
+	for changed {
+		changed = false
+		include := func(name string) {
+			if !selected[name] {
+				selected[name] = true
+				changed = true
+			}
+		}
+		for _, binding := range s.Schema.Relationships {
+			if !selected[binding.Query] {
+				continue
+			}
+			for _, peer := range s.Schema.Relationships {
+				if peer.Kind == binding.Kind {
+					include(peer.Query)
+				}
+			}
+		}
+		for _, query := range s.Queries {
+			for _, prerequisite := range s.Prerequisites(query) {
+				if selected[query.Name] {
+					include(prerequisite)
+				}
+				if selected[prerequisite] {
+					include(query.Name)
+				}
 			}
 		}
 	}
 	for _, query := range s.Queries {
-		if affected[query.Name] {
+		if selected[query.Name] {
 			result = append(result, query.Name)
 		}
 	}

@@ -263,7 +263,7 @@ def main():
             assert 'PoC_CyberArk_AccountFor' in remaining['retired_relationships']
             refreshed()
             expect(page.locator('#rule-rows > tr')).to_have_count(1)
-            results['checks'].append('Trash cancellation leaves state unchanged; confirmed cascade retires owned connections and preserves independent rule')
+            results['checks'].append('Trash cancellation leaves state unchanged; confirmed cascade retires calculated connections and preserves independent rule')
         else:
             assert active() == before, 'Read-only verification must leave saved state unchanged.'
             results['checks'].append('Valid preview discarded without changing saved state')

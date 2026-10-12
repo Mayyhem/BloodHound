@@ -63,7 +63,7 @@ func crossPlatformViews(view ruleservice.PlanView) map[string]ruleservice.QueryV
 	return result
 }
 
-func TestCrossPlatformSchemasUseOneDependencyPlanAndKeepOwners(t *testing.T) {
+func TestCrossPlatformSchemasUseOneDependencyPlan(t *testing.T) {
 	var store = open(t)
 	bundle, err := store.Update(crossPlatformFiles(t))
 	if err != nil {
@@ -76,18 +76,8 @@ func TestCrossPlatformSchemasUseOneDependencyPlanAndKeepOwners(t *testing.T) {
 	if len(plan.Definitions) != 2 || len(plan.Schema.Nodes) != 2 || len(plan.Schema.Relationships) != 1 || len(plan.Queries) != 3 {
 		t.Fatal("schemas were not combined", plan)
 	}
-	for _, binding := range plan.Schema.Nodes {
-		expectedOwner := "extension/cyberark"
-		if binding.Kind == "PoC_AD_User" {
-			expectedOwner = "extension/active_directory"
-		}
-		if binding.EffectiveOwner(plan.Schema.Owner) != expectedOwner {
-			t.Fatal("node owner was flattened", binding)
-		}
-	}
-	relationship := plan.Schema.Relationships[0]
-	if relationship.Kind != "PoC_CyberArk_AccountFor" || relationship.EffectiveOwner(plan.Schema.Owner) != "extension/cyberark" {
-		t.Fatal("relationship owner was flattened", relationship)
+	if plan.Schema.Relationships[0].Kind != "PoC_CyberArk_AccountFor" {
+		t.Fatal("relationship declaration was lost", plan.Schema.Relationships)
 	}
 	view := store.View()
 	if len(view.Extensions) != 2 || view.Extensions[0].Name != "active_directory" || view.Extensions[0].DisplayName != "Active Directory" || view.Extensions[1].Name != "cyberark" || view.Extensions[1].DisplayName != "CyberArk" {
@@ -176,7 +166,7 @@ func TestDisablingCrossSchemaPrerequisitePreservesRulesAndReenablesConsumer(t *t
 	}
 }
 
-func TestCrossSchemaRemovalCascadesAndRetainsRelationshipOwner(t *testing.T) {
+func TestCrossSchemaRemovalCascadesAndRetainsRelationshipDefinition(t *testing.T) {
 	var store = open(t)
 	initial, err := store.Update(crossPlatformFiles(t))
 	if err != nil {
@@ -194,12 +184,12 @@ func TestCrossSchemaRemovalCascadesAndRetainsRelationshipOwner(t *testing.T) {
 	if len(removed.Files) != 3 || removed.Files["active_directory.schema.json"] == "" || removed.Files["cyberark.schema.json"] == "" || removed.Files["cyberark_accounts.cypher"] == "" {
 		t.Fatal("removal lost unrelated schema or account helper", removed.Files)
 	}
-	if !reflect.DeepEqual(removed.RetiredRelationships, []string{"PoC_CyberArk_AccountFor"}) || removed.RetiredOwners["PoC_CyberArk_AccountFor"] != "extension/cyberark" {
-		t.Fatal("retirement lost owner", removed)
+	if !reflect.DeepEqual(removed.RetiredRelationships, []string{"PoC_CyberArk_AccountFor"}) {
+		t.Fatal("last producer removal was not recorded", removed)
 	}
 	plan, err := ruleservice.ValidateBundle(removed)
-	if err != nil || len(plan.Queries) != 1 || plan.Queries[0].Name != "cyberark_accounts.cypher" || plan.RetiredOwners["PoC_CyberArk_AccountFor"] != "extension/cyberark" {
-		t.Fatal("worker plan lost retirement owner or independent rule", err, plan)
+	if err != nil || len(plan.Queries) != 1 || plan.Queries[0].Name != "cyberark_accounts.cypher" {
+		t.Fatal("worker plan lost independent rule", err, plan)
 	}
 }
 
@@ -242,7 +232,7 @@ func TestCrossSchemaMetadataSurvivesRestartAndCallerMutation(t *testing.T) {
 		t.Fatal(err)
 	}
 	actual, err = restored.Active()
-	if err != nil || !reflect.DeepEqual(actual, removed) || actual.RetiredOwners["PoC_CyberArk_AccountFor"] != "extension/cyberark" {
+	if err != nil || !reflect.DeepEqual(actual, removed) {
 		t.Fatal("restart lost retirement metadata", err, actual)
 	}
 }
@@ -283,7 +273,7 @@ func TestClientFetchValidatesDisabledAndRetiredCrossSchemaBundles(t *testing.T) 
 	}
 	for index, corrupted := range []ruleservice.Bundle{
 		{Revision: disabled.Revision, Files: disabled.Files, AddedAt: disabled.AddedAt, Disabled: []string{"cyberark_accounts.cypher"}},
-		{Revision: retired.Revision, Files: retired.Files, AddedAt: retired.AddedAt, RetiredRelationships: retired.RetiredRelationships, RetiredOwners: map[string]string{"PoC_CyberArk_AccountFor": "extension/active_directory"}},
+		{Revision: retired.Revision, Files: retired.Files, AddedAt: retired.AddedAt, RetiredRelationships: []string{"PoC_CyberArk_Other"}},
 		{Revision: disabled.Revision, Files: disabled.Files, AddedAt: map[string]time.Time{"missing.cypher": time.Now().UTC()}, Disabled: disabled.Disabled},
 	} {
 		contents, err := json.Marshal(corrupted)

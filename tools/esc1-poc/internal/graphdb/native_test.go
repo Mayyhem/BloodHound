@@ -98,7 +98,7 @@ func nativeTestOptions(t *testing.T) runner.Options {
 	return runner.Options{BatchID: "native-test", IngestionComplete: true, WritersPaused: true, TemporaryDirectory: t.TempDir()}
 }
 func nativeTestPlan() extension.Plan {
-	return extension.Plan{Schema: extension.Schema{Name: "native", Owner: "native-test"}}
+	return extension.Plan{Schema: extension.Schema{Name: "native"}}
 }
 
 func TestNativeCallbackReportsActualCommitFailure(t *testing.T) {

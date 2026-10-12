@@ -308,7 +308,7 @@ func (s *answerFile) each(ctx context.Context, consume func(map[string]any) erro
 func (s *answerFile) batches(ctx context.Context, extraBytesPerRow int64, consume func(Rows) error) error {
 	var rows = Rows{}
 	// Leave room for parameter names and the surrounding map/list. Publishers
-	// also reserve per-row room for ownership and database-generated IDs.
+	// also reserve per-row room for database-generated IDs.
 	const envelopeBytes int64 = 64
 	var bytes = envelopeBytes
 	flush := func() error {

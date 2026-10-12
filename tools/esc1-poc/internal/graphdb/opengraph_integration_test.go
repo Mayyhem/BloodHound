@@ -45,7 +45,7 @@ func TestOpenGraphPublication(t *testing.T) {
 		t.Fatalf("vault connections: %+v", first.Desired)
 	}
 	if after := vaultInputSnapshot(t, database); after != inputsBefore {
-		t.Fatal("publication changed collected input, native answers, or another owner's connection")
+		t.Fatal("publication changed collected input, native answers, or an unrelated connection")
 	}
 	edges := read(t, database, "MATCH ()-[edge:PoC_Vault_HasAccountFor]->() RETURN id(edge) AS id, properties(edge) AS properties", nil)
 	second, err := runner.Run(t.Context(), database, plan, options())
@@ -76,9 +76,9 @@ func TestOpenGraphPublication(t *testing.T) {
 	if err != nil || removed.Removed != 1 || removed.Skipped || len(removed.Queries) != 2 {
 		t.Fatalf("confirmed OpenGraph relationship removal: %+v, %v", removed, err)
 	}
-	// Collector objects and the other owner's connection still belong to them.
-	if rows := read(t, database, "MATCH (vault:PoC_Vault_Container)-[edge:PoC_OtherResult]->(:User) RETURN edge.poc_owner AS owner", nil); !reflect.DeepEqual(rows, runner.Rows{{"owner": "another-extension"}}) {
-		t.Fatalf("another owner's result changed: %v", rows)
+	// Collector objects and connections of unrelated types are outside the refreshed scope.
+	if rows := read(t, database, "MATCH (vault:PoC_Vault_Container)-[edge:PoC_OtherResult]->(:User) RETURN edge.note AS note", nil); !reflect.DeepEqual(rows, runner.Rows{{"note": "unrelated result"}}) {
+		t.Fatalf("an unrelated result changed: %v", rows)
 	}
 
 	// Restore the containment edge deleted from this test database.
@@ -101,7 +101,7 @@ func TestOpenGraphPublication(t *testing.T) {
 }
 
 func TestOpenGraphFailuresPreservePublishedGraph(t *testing.T) {
-	for _, failure := range []string{"final_query", "wrong_endpoint", "foreign_owner", "incomplete_upload"} {
+	for _, failure := range []string{"final_query", "wrong_endpoint", "incomplete_upload"} {
 		t.Run(failure, func(t *testing.T) {
 			var (
 				database, plan = setupVault(t)
@@ -113,9 +113,6 @@ func TestOpenGraphFailuresPreservePublishedGraph(t *testing.T) {
 			}
 			// A new name will stage a helper update before the final failure.
 			write(t, database, "MATCH (vault:PoC_Vault_Container) SET vault.name = 'CHANGED VAULT'", nil)
-			if failure == "foreign_owner" {
-				write(t, database, "MATCH ()-[edge:PoC_Vault_HasAccountFor]->() SET edge.poc_owner = 'someone-else'", nil)
-			}
 			if failure == "incomplete_upload" {
 				runOptions.IngestionComplete = false
 			}
@@ -170,9 +167,6 @@ func setupVault(t *testing.T) (*graphdb.Database, extension.Plan) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Reuse the test's existing cleanup owner; production examples have distinct
-	// owners and saved run identities. Every collected test node is marked too.
-	useIntegrationOwner(&plan)
 	write(t, database, `MATCH (principal:User), (domain:Domain)
         SET principal.enabled = true
         CREATE (principal)-[:ADCSESC1]->(domain),
@@ -180,7 +174,7 @@ func setupVault(t *testing.T) (*graphdb.Database, extension.Plan) {
         (first:PoC_Vault_Account:PoC_Vault_Base {objectid:'VAULT-ACCOUNT-1', user_sid:'PoC_Test_User', poc_fixture:true}),
         (second:PoC_Vault_Account:PoC_Vault_Base {objectid:'VAULT-ACCOUNT-2', user_sid:'PoC_Test_User', poc_fixture:true}),
         (vault)-[:PoC_Vault_ContainsAccount]->(first), (vault)-[:PoC_Vault_ContainsAccount]->(second),
-        (vault)-[:PoC_OtherResult {poc_owner:'another-extension'}]->(principal)`, nil)
+        (vault)-[:PoC_OtherResult {note:'unrelated result'}]->(principal)`, nil)
 	return database, plan
 }
 

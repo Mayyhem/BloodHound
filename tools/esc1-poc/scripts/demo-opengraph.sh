@@ -89,7 +89,7 @@ for order in vault-first directory-first; do
     python3 "$checker" compare "$POC_DATA_DIR/repeated-graph.json" "$POC_DATA_DIR/two-supports-graph.json" relationships
     completed_job=$(python3 "$checker" job "$POC_DATA_DIR/two-supports.json")
 
-    # Both schemas remain installed. ESC1 uses its own native comparison and owner.
+    # Both schemas remain installed. ESC1 uses its own native comparison and output kind.
     ./esc1-poc run -job-id "$completed_job" > "$POC_DATA_DIR/esc1.json"
     python3 "$checker" snapshot "$POC_DATA_DIR/esc1-graph.json"
     python3 "$checker" native "$POC_DATA_DIR/esc1.json"

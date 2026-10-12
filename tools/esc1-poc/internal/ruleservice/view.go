@@ -31,7 +31,6 @@ import (
 type PlanView struct {
 	Revision   string          `json:"revision"`
 	Name       string          `json:"name"`
-	Owner      string          `json:"owner"`
 	Threads    []ThreadView    `json:"threads"`
 	Queries    []QueryView     `json:"queries"`
 	Extensions []ExtensionView `json:"extensions"`
@@ -61,6 +60,7 @@ type PrerequisiteView struct {
 type OutputView struct {
 	Type               string                       `json:"type"`
 	Kind               string                       `json:"kind"`
+	Producers          []string                     `json:"producers,omitempty"`
 	IDPrefix           string                       `json:"id_prefix,omitempty"`
 	Endpoints          []extension.Endpoint         `json:"endpoints,omitempty"`
 	ExistingEdgePolicy extension.ExistingEdgePolicy `json:"existing_edge_policy,omitempty"`
@@ -94,13 +94,14 @@ type QueryView struct {
 // and managed producers join groups without inventing scheduling edges.
 func BuildView(bundle Bundle, plan extension.Plan) PlanView {
 	var (
-		view          = PlanView{Revision: bundle.Revision, Name: plan.Schema.Name, Owner: plan.Schema.Owner, Threads: []ThreadView{}, Queries: []QueryView{}, Extensions: []ExtensionView{}}
+		view          = PlanView{Revision: bundle.Revision, Name: plan.Schema.Name, Threads: []ThreadView{}, Queries: []QueryView{}, Extensions: []ExtensionView{}}
 		queries       = make([]QueryView, len(plan.Queries))
 		indexes       = make(map[string]int)
 		parents       = make([]int, len(plan.Queries))
 		kindUsers     = make(map[InputView][]int)
 		inputUsers    = make(map[InputView][]int)
 		outputs       = make(map[string][]OutputView)
+		producers     = make(map[string][]string)
 		threadIndexes = make(map[int]int)
 	)
 	for _, definition := range plan.Definitions {
@@ -110,8 +111,20 @@ func BuildView(bundle Bundle, plan extension.Plan) PlanView {
 	for _, binding := range plan.Schema.Nodes {
 		outputs[binding.Query] = append(outputs[binding.Query], OutputView{Type: "node", Kind: binding.Kind, IDPrefix: binding.IDPrefix})
 	}
+	// Filenames set property precedence independently of completion order.
+	// Later filenames win when producers supply different values for one key.
+	for _, query := range plan.Queries {
+		for _, binding := range plan.Schema.Relationships {
+			if binding.Query == query.Name {
+				producers[binding.Kind] = append(producers[binding.Kind], query.Name)
+			}
+		}
+	}
+	for kind := range producers {
+		sort.Strings(producers[kind])
+	}
 	for _, binding := range plan.Schema.Relationships {
-		outputs[binding.Query] = append(outputs[binding.Query], OutputView{Type: "relationship", Kind: binding.Kind, Endpoints: append([]extension.Endpoint(nil), binding.Endpoints...), ExistingEdgePolicy: binding.EffectiveExistingEdgePolicy()})
+		outputs[binding.Query] = append(outputs[binding.Query], OutputView{Type: "relationship", Kind: binding.Kind, Producers: append([]string(nil), producers[binding.Kind]...), Endpoints: append([]extension.Endpoint(nil), binding.Endpoints...), ExistingEdgePolicy: binding.EffectiveExistingEdgePolicy()})
 	}
 	for index, query := range plan.Queries {
 		var (
@@ -164,7 +177,12 @@ func BuildView(bundle Bundle, plan extension.Plan) PlanView {
 			if dependencyIndex, exists := indexes[prerequisite.Name]; exists {
 				joinGroups(parents, index, dependencyIndex)
 				queries[dependencyIndex].Dependents = append(queries[dependencyIndex].Dependents, queries[index].Name)
-				// Loaded plans put prerequisites first, as the runner requires.
+			}
+		}
+		// A graph reader also waits for every producer of the type it reads.
+		// Keep those waits out of Prerequisites, which lists row parameters.
+		for _, prerequisite := range plan.Prerequisites(plan.Queries[index]) {
+			if dependencyIndex, exists := indexes[prerequisite]; exists {
 				if stage := queries[dependencyIndex].Stage + 1; stage > queries[index].Stage {
 					queries[index].Stage = stage
 				}

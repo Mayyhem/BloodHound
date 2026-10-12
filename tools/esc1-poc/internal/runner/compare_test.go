@@ -94,7 +94,7 @@ func TestComparePublishedDeadlines(t *testing.T) {
 				// A fallback keeps a broken deadline implementation from hanging tests.
 				ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 				defer cancel()
-				_, err := ComparePublished(ctx, transaction, "experiment", directory, limits)
+				_, err := ComparePublished(ctx, transaction, directory, limits)
 				if !errors.Is(err, context.DeadlineExceeded) {
 					t.Fatalf("expected comparison deadline error: %v", err)
 				}

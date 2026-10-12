@@ -64,7 +64,6 @@ func TestNativeComparisonRequiresESC1RelationshipProducer(t *testing.T) {
 				queries = map[string]string{"result.cypher": "// depends-on: none\nRETURN 'user' AS source, 'domain' AS target"}
 			)
 			schema.Name = "native comparison test"
-			schema.Owner = "comparison-test/v1"
 			schema.ReferenceCommit = strings.Repeat("a", 40)
 			var _, err = extension.Load(writeExtension(t, schema, queries))
 			if testCase.valid {

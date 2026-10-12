@@ -16,7 +16,7 @@ We will change one part at a time and compare it with a frozen copy of the curre
 | `batch-on` — tell the runner which input it may split | The complete query, without a manual batching instruction | Read and save answers in manageable pieces; split calculations only when doing so preserves the complete answer | Never change a result because related input rows landed in different pieces |
 | `group-overlap` — combine the two permission requirements for ESC1 | Clearly separated Cypher steps explaining who qualifies and when a group represents its members | Execute common set operations efficiently and reuse membership calculations | Preserve BloodHound's actual group and user edges, including its special cases and ordering |
 
-The author still owns the security meaning of the rule. The engine owns execution order, reusable calculations, resource limits, output ownership, and safe saving. Declaring dependencies and outputs follows the format agreed in the other conversation; this plan does not introduce another author-facing language or schema file.
+The author still owns the security meaning of the rule. The engine owns execution order, reusable calculations, resource limits, shared result combination, and safe saving. Declaring dependencies and outputs follows the format agreed in the other conversation; this plan does not introduce another author-facing language or schema file.
 
 ## Step 1 Preserve a trustworthy starting point
 
@@ -137,11 +137,11 @@ If a complete Cypher rewrite becomes harder to read or materially slower, keep t
 
 ## Step 6 Keep saving and scheduling safe
 
-Keep the existing ownership and saving behavior unchanged during the first comparison. Cypher rules remain read-only; the common engine checks and saves their results.
+Keep the existing scope and saving behavior unchanged during the first comparison. Cypher rules remain read-only; the common engine checks and saves their results.
 
 - Keep the same coordinated view of the graph throughout prerequisite reads, shared calculations, and saving. Other graph changes still wait under the existing application protection. Do not combine answers read from different versions of the input.
 - Finish all required calculations and validate their complete answers before removing obsolete connections.
-- Preserve the chosen existing-edge policy, output properties, helper identities, and foreign-owned data.
+- Preserve the chosen existing-edge policy, output properties, helper identities, and data outside the declared output scope.
 - Keep helper changes, relationship changes, and the successful-run record in the same all-or-nothing save.
 - A timeout, missing input, invalid answer, exhausted allowance, or damaged temporary file must not turn a partial answer into deletions.
 - If the database may have saved changes but its reply was lost, preserve the existing uncertain-outcome handling; do not report a confirmed rollback or blindly retry.
@@ -232,7 +232,7 @@ At every stop, record the last verified object and relationship counts, graph sh
 | Ordinary unchanged automatic run | Whether the engine correctly skips unaffected work; this is not a calculation speedup |
 | One changed domain or permission | Complete affected answers, with unrelated outputs preserved |
 | Remove one of several supporting reasons | Keep the edge while another valid reason exists |
-| Remove the final reason or change eligibility | Remove only the newly unsupported owned results |
+| Remove the final reason or change eligibility | Remove only the newly unsupported in-scope results |
 | Late failure or interrupted save | Preservation or correctly reported uncertainty, never a claimed successful partial result |
 | Analysis while people search | Search success, response times, and how long other graph changes wait |
 
@@ -250,7 +250,7 @@ Start with identical existing limits. If today's 32 MiB prerequisite allowance o
 | Highest application and database memory use, plus combined container/host usage | Avoid moving a memory problem from Go into the database and calling it solved |
 | CPU use, database reads, rows exchanged, and temporary disk use | Explain wasted work and likely hardware requirements |
 | Membership reuse, query count, and repeated route work | Establish whether the intended engine improvements are actually used |
-| Saved output count, properties, owners, and helper state | Verify correctness beyond matching totals |
+| Saved output count, properties, endpoint scopes, and helper state | Verify correctness beyond matching totals |
 | Database change-log growth and time spent saving or rolling back | Expose the cost of one large all-or-nothing save |
 | Search response times and graph-write waiting time | Measure the effect on normal BloodHound use |
 | Failures and the first limiting resource | Show the actual supported capacity boundary |
@@ -267,7 +267,7 @@ List the required workloads before timing them, and judge each one separately; a
 
 | Area | Required result |
 | --- | --- |
-| Correctness | No unexplained extra or missing edges, property differences, ownership changes, or damage to unrelated graph data |
+| Correctness | No unexplained extra or missing edges, property differences, unexpected scope changes, or damage to unrelated graph data |
 | Failure handling | Every tested incomplete calculation preserves previous saved output; uncertain saves are identified correctly |
 | Author simplicity | Shipped revised ESC1 rules need no reachability or batching comment; group-overlap is removed only when its meaning is readable in ordinary queries |
 | Existing BloodHound behavior | Normal query, analysis, ingestion, and saving tests continue to pass on both backends; new engine shortcuts leave unsupported query shapes alone |
@@ -293,7 +293,7 @@ Collect enough search samples to support the latency measure and publish the sam
 
 For engineers locating the work: query definitions live in [extension](extension/); current special-instruction handling is in [internal/extension/reach.go](internal/extension/reach.go); execution and shared calculations are in [internal/runner](internal/runner/); database-specific execution is in [internal/graphdb](internal/graphdb/). DAWGS changes belong in its existing language-reading and PostgreSQL translation code, with their corresponding shared query tests. Follow [DAWGS's repository instructions](../DAWGS/AGENTS.md) and the [pilot review guide](REVIEW.md) when selecting the full checks. Keep data-loading, comparison, and measurement tools separate from the engine so the tests can catch engine mistakes.
 
-I will own the architecture, ownership and saving rules, comparison strategy, native-result disagreements, and final review. Focused Cypher prototypes, straightforward Go work, individual tests, dataset tooling, and documentation can be delegated to **Sol 6.1 Medium**, with clear file ownership so parallel agents do not overwrite one another.
+I will own the architecture, scope and saving rules, comparison strategy, native-result disagreements, and final review. Focused Cypher prototypes, straightforward Go work, individual tests, dataset tooling, and documentation can be delegated to **Sol 6.1 Medium**, with clear file ownership so parallel agents do not overwrite one another.
 
 Keep the old version available in the experiment snapshots while comparing. Once the new version passes, remove unused directive parsing and duplicated implementations rather than carrying permanent compatibility paths. Do not remove code merely because it has been moved out of the author's view; useful shared engine work should remain shared and well commented.
 
@@ -306,7 +306,7 @@ The final review package should contain readable old/new rules, reproducible dat
 | [ESC1 query notes](extension/QUERY_NOTES.md) | Current eligibility, trust, membership, ordering, and cycle boundaries |
 | [Reachability tests](internal/runner/reach_test.go) | Shared descendants, cycle behavior, cancellation, and reference traversal |
 | [Group selection tests](internal/runner/overlap_test.go) | Exact special-group, shortcut, overlap, and ordering examples |
-| [Batch tests](internal/runner/batch_test.go) and [edge-policy tests](internal/runner/edge_policy_test.go) | Complete-answer handling and preservation of owned results |
+| [Batch tests](internal/runner/batch_test.go) and [edge-policy tests](internal/runner/edge_policy_test.go) | Complete-answer handling and preservation of saved results |
 | [Neo4j ESC1 cases](internal/graphdb/neo4j_integration_test.go) and [PostgreSQL ESC1 cases](internal/graphdb/postgres_esc1_integration_test.go) | Real database checks and comparison with native answers |
 | [Native integration tests](internal/graphdb/native_integration_test.go) | Application database connections, publication, rollback, and readers during work |
 | [Native group selection](../../packages/go/analysis/ad/ad.go) and [native tests](../../packages/go/analysis/ad/post_integration_test.go) | Independent native expectations and ordering questions |

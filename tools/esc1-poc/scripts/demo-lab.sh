@@ -56,5 +56,5 @@ assert second["relationships_added"] == second["relationships_removed"] == desir
 assert second["relationships_unchanged"] == 0
 assert first["desired_counts"] == second["desired_counts"]
 assert first["desired_relationships"] == second["desired_relationships"]
-print(f"Lab comparison matched {first['desired_counts']['PoC_ADCSESC1']} native pairs; the repeated run replaced the owned edges and kept the same desired pairs. Detailed reports: {root}")
+print(f"Lab comparison matched {first['desired_counts']['PoC_ADCSESC1']} native pairs; the repeated run replaced the calculated edges and kept the same desired pairs. Detailed reports: {root}")
 CHECK

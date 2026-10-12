@@ -56,14 +56,14 @@ func (s *selectionRecordFailureTransaction) PutNode(ctx context.Context, kind st
 	}
 	return s.publisher.PutNode(ctx, kind, properties)
 }
-func (s *selectionRecordFailureTransaction) CreateRelationships(ctx context.Context, kind, owner string, relationships []runner.Relationship) (int, error) {
-	return s.publisher.CreateRelationships(ctx, kind, owner, relationships)
+func (s *selectionRecordFailureTransaction) CreateRelationships(ctx context.Context, kind string, relationships []runner.Relationship) (int, error) {
+	return s.publisher.CreateRelationships(ctx, kind, relationships)
 }
-func (s *selectionRecordFailureTransaction) UpdateRelationships(ctx context.Context, kind, owner string, updates []runner.RelationshipUpdate) (int, error) {
-	return s.publisher.UpdateRelationships(ctx, kind, owner, updates)
+func (s *selectionRecordFailureTransaction) UpdateRelationships(ctx context.Context, kind string, updates []runner.RelationshipUpdate) (int, error) {
+	return s.publisher.UpdateRelationships(ctx, kind, updates)
 }
-func (s *selectionRecordFailureTransaction) DeleteRelationships(ctx context.Context, kind, owner string, identifiers []int64) (int, error) {
-	return s.publisher.DeleteRelationships(ctx, kind, owner, identifiers)
+func (s *selectionRecordFailureTransaction) DeleteRelationships(ctx context.Context, kind string, identifiers []int64) (int, error) {
+	return s.publisher.DeleteRelationships(ctx, kind, identifiers)
 }
 
 func setSelectionEvidence(t *testing.T, database *graph.DatabaseSwitch, enabled bool, name string) {
@@ -167,7 +167,7 @@ func selectionServiceFiles(t *testing.T, plan extension.Plan) map[string]string 
 		definition = extension.Definition{
 			Schema:            extension.Metadata{Name: plan.Schema.Name, DisplayName: "Observed selective processing", Version: "v1.0.0", Namespace: "PoC"},
 			ExternalNodeKinds: []string{"User", "Group", "Domain", "Base"},
-			PostProcessing:    &extension.ProcessingSettings{Owner: plan.Schema.Owner, ReferenceCommit: plan.Schema.ReferenceCommit},
+			PostProcessing:    &extension.ProcessingSettings{ReferenceCommit: plan.Schema.ReferenceCommit},
 		}
 	)
 	for _, binding := range plan.Schema.Nodes {

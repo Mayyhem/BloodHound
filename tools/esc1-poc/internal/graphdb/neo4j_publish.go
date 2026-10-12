@@ -36,6 +36,21 @@ func (s *transaction) PutNode(ctx context.Context, kind string, properties map[s
 	if !valid || identifier == "" {
 		return fmt.Errorf("helper objectid is required")
 	}
+	// Object IDs identify graph objects across all types. Reusing a helper is
+	// allowed only when its ID identifies one object of the expected type.
+	existing, err := s.execute(ctx, "MATCH (item {objectid: $identifier}) RETURN labels(item) AS kinds", map[string]any{"identifier": identifier})
+	if err != nil {
+		return err
+	}
+	if len(existing) > 1 {
+		return fmt.Errorf("helper identity changed during publication")
+	}
+	if len(existing) == 1 {
+		kinds, valid := existing[0]["kinds"].([]any)
+		if !valid || len(kinds) != 1 || kinds[0] != kind {
+			return fmt.Errorf("helper identity changed during publication")
+		}
+	}
 	rows, err := s.execute(ctx, "MERGE (node:"+quotedKind(kind)+" {objectid: $identifier}) SET node = $properties RETURN id(node) AS id", map[string]any{"identifier": identifier, "properties": properties})
 	if err != nil {
 		return err
@@ -96,7 +111,7 @@ func (s *transaction) EndpointKinds(ctx context.Context, identifiers []string) (
 	return kinds, nil
 }
 
-func (s *transaction) CreateRelationships(ctx context.Context, kind, owner string, relationships []runner.Relationship) (int, error) {
+func (s *transaction) CreateRelationships(ctx context.Context, kind string, relationships []runner.Relationship) (int, error) {
 	var (
 		identifiers = make([]string, 0, 2*len(relationships))
 		creations   = make([]map[string]any, len(relationships))
@@ -109,10 +124,7 @@ func (s *transaction) CreateRelationships(ctx context.Context, kind, owner strin
 		return 0, nil
 	}
 	for index, relationship := range relationships {
-		properties, err := relationshipCreationProperties(owner, relationship.Properties)
-		if err != nil {
-			return 0, err
-		}
+		properties := relationshipCreationProperties(relationship.Properties)
 		creations[index] = map[string]any{"properties": properties}
 		identifiers = append(identifiers, relationship.Source, relationship.Target)
 		if _, found := s.endpointIDs[relationship.Source]; !found {
@@ -138,12 +150,12 @@ func (s *transaction) CreateRelationships(ctx context.Context, kind, owner strin
 	return len(rows), nil
 }
 
-func (s *transaction) UpdateRelationships(ctx context.Context, kind, owner string, updates []runner.RelationshipUpdate) (int, error) {
+func (s *transaction) UpdateRelationships(ctx context.Context, kind string, updates []runner.RelationshipUpdate) (int, error) {
 	var patches = make([]map[string]any, len(updates))
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
-	if err := validateRelationshipUpdates(owner, updates); err != nil {
+	if err := validateRelationshipUpdates(updates); err != nil {
 		return 0, err
 	}
 	if len(updates) == 0 {
@@ -156,18 +168,18 @@ func (s *transaction) UpdateRelationships(ctx context.Context, kind, owner strin
 		}
 		patches[index] = map[string]any{"id": update.ID, "properties": properties}
 	}
-	rows, err := s.execute(ctx, "UNWIND $rows AS row MATCH ()-[edge:"+quotedKind(kind)+"]->() WHERE id(edge) = row.id AND edge.poc_owner = $owner SET edge += row.properties RETURN id(edge) AS id", map[string]any{"rows": patches, "owner": owner})
+	rows, err := s.execute(ctx, "UNWIND $rows AS row MATCH ()-[edge:"+quotedKind(kind)+"]->() WHERE id(edge) = row.id SET edge += row.properties RETURN id(edge) AS id", map[string]any{"rows": patches})
 	if err != nil {
 		return 0, err
 	}
 	return len(rows), nil
 }
 
-func (s *transaction) DeleteRelationships(ctx context.Context, kind, owner string, ids []int64) (int, error) {
+func (s *transaction) DeleteRelationships(ctx context.Context, kind string, ids []int64) (int, error) {
 	if len(ids) == 0 {
 		return 0, nil
 	}
-	rows, err := s.execute(ctx, "UNWIND $ids AS identifier MATCH ()-[edge:"+quotedKind(kind)+"]->() WHERE id(edge) = identifier AND edge.poc_owner = $owner WITH edge, id(edge) AS old_id DELETE edge RETURN old_id", map[string]any{"ids": ids, "owner": owner})
+	rows, err := s.execute(ctx, "UNWIND $ids AS identifier MATCH ()-[edge:"+quotedKind(kind)+"]->() WHERE id(edge) = identifier WITH edge, id(edge) AS old_id DELETE edge RETURN old_id", map[string]any{"ids": ids})
 	if err != nil {
 		return 0, err
 	}

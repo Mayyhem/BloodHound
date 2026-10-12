@@ -86,8 +86,8 @@ func TestExistingEdgePoliciesOnBothDatabases(t *testing.T) {
 							t.Fatalf("properties %T", row["properties"])
 						}
 						previous := before[index]
-						if properties["poc_owner"] != plan.Schema.Owner+"/PoC_ADCSESC1" {
-							t.Fatalf("policy changed ownership: %v", properties)
+						if _, found := properties["poc_owner"]; found {
+							t.Fatalf("publication added an unexpected property: %v", properties)
 						}
 						if policy != extension.KeepExisting && (properties["count"] != int64(2) || !reflect.DeepEqual(properties["tags"], []any{"changed"}) || !reflect.DeepEqual(properties["empty"], []any{})) {
 							t.Fatalf("array/integral numeric patch: %#v", properties)
@@ -156,21 +156,22 @@ func (s *updateGuardFailureDatabase) Begin(ctx context.Context) (runner.Transact
 func (s *updateGuardFailureTransaction) PutNode(ctx context.Context, kind string, properties map[string]any) error {
 	return s.publisher.PutNode(ctx, kind, properties)
 }
-func (s *updateGuardFailureTransaction) CreateRelationships(ctx context.Context, kind, owner string, relationships []runner.Relationship) (int, error) {
-	return s.publisher.CreateRelationships(ctx, kind, owner, relationships)
+func (s *updateGuardFailureTransaction) CreateRelationships(ctx context.Context, kind string, relationships []runner.Relationship) (int, error) {
+	return s.publisher.CreateRelationships(ctx, kind, relationships)
 }
-func (s *updateGuardFailureTransaction) DeleteRelationships(ctx context.Context, kind, owner string, ids []int64) (int, error) {
-	return s.publisher.DeleteRelationships(ctx, kind, owner, ids)
+func (s *updateGuardFailureTransaction) DeleteRelationships(ctx context.Context, kind string, ids []int64) (int, error) {
+	return s.publisher.DeleteRelationships(ctx, kind, ids)
 }
 func (s *updateGuardFailureTransaction) EndpointKinds(ctx context.Context, identifiers []string) (map[string][]string, error) {
 	return s.Transaction.(runner.EndpointReader).EndpointKinds(ctx, identifiers)
 }
-func (s *updateGuardFailureTransaction) UpdateRelationships(ctx context.Context, kind, owner string, updates []runner.RelationshipUpdate) (int, error) {
+func (s *updateGuardFailureTransaction) UpdateRelationships(ctx context.Context, kind string, updates []runner.RelationshipUpdate) (int, error) {
 	s.calls++
 	if s.calls == 2 {
-		owner = "foreign-owner"
+		// Simulate a row that no longer matches the selected relationship type.
+		return 0, nil
 	}
-	return s.publisher.UpdateRelationships(ctx, kind, owner, updates)
+	return s.publisher.UpdateRelationships(ctx, kind, updates)
 }
 
 func TestLatePropertyBatchGuardFailureRollsBackBothDatabases(t *testing.T) {

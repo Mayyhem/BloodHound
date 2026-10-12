@@ -128,7 +128,7 @@ func TestPostgresAtomicPublicationAndStreaming(t *testing.T) {
 			return
 		}
 		defer pool.Close()
-		if _, err = pool.Exec(context.Background(), "DELETE FROM edge WHERE properties ->> 'poc_owner' = 'test/POCTestRelationship'; DELETE FROM node WHERE properties ->> 'poc_owner' = 'test/POCTestNode'"); err != nil {
+		if _, err = pool.Exec(context.Background(), "DELETE FROM edge WHERE kind_id IN (SELECT id FROM kind WHERE name = 'POCTestRelationship'); DELETE FROM node WHERE properties ->> 'objectid' IN ('source', 'target')"); err != nil {
 			t.Error(err)
 		}
 	})
@@ -138,11 +138,14 @@ func TestPostgresAtomicPublicationAndStreaming(t *testing.T) {
 	}
 	publisher := transaction.(runner.Publisher)
 	for _, identifier := range []string{"source", "target"} {
-		if err = publisher.PutNode(ctx, "POCTestNode", map[string]any{"objectid": identifier, "poc_owner": "test/POCTestNode", "name": identifier}); err != nil {
+		if err = publisher.PutNode(ctx, "POCTestNode", map[string]any{"objectid": identifier, "name": identifier}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if count, err := publisher.CreateRelationships(ctx, "POCTestRelationship", "test/POCTestRelationship", []runner.Relationship{{Source: "source", Target: "target"}}); err != nil || count != 1 {
+	if err = publisher.PutNode(ctx, "User", map[string]any{"objectid": "source", "name": "wrong type"}); err == nil {
+		t.Fatal("helper write reused an object ID belonging to another type")
+	}
+	if count, err := publisher.CreateRelationships(ctx, "POCTestRelationship", []runner.Relationship{{Source: "source", Target: "target"}}); err != nil || count != 1 {
 		t.Fatalf("create count %d: %v", count, err)
 	}
 	if err = transaction.Commit(ctx); err != nil {
@@ -154,7 +157,7 @@ func TestPostgresAtomicPublicationAndStreaming(t *testing.T) {
 	}
 	defer transaction.Rollback(ctx)
 	publisher = transaction.(runner.Publisher)
-	if err = publisher.PutNode(ctx, "POCTestNode", map[string]any{"objectid": "source", "poc_owner": "test/POCTestNode", "name": "changed"}); err != nil {
+	if err = publisher.PutNode(ctx, "POCTestNode", map[string]any{"objectid": "source", "name": "changed"}); err != nil {
 		t.Fatal(err)
 	}
 	rows, err := transaction.Read(ctx, "MATCH ()-[edge:POCTestRelationship]->() RETURN id(edge) AS id", nil)
@@ -165,11 +168,11 @@ func TestPostgresAtomicPublicationAndStreaming(t *testing.T) {
 	if !valid {
 		t.Fatalf("unnormalized ID %T", rows[0]["id"])
 	}
-	if count, err := publisher.DeleteRelationships(ctx, "POCTestRelationship", "foreign", []int64{identifier}); err != nil || count != 0 {
-		t.Fatalf("foreign owner delete %d: %v", count, err)
+	if count, err := publisher.DeleteRelationships(ctx, "POCTestRelationship", []int64{identifier + 1000000}); err != nil || count != 0 {
+		t.Fatalf("missing ID delete %d: %v", count, err)
 	}
-	if count, err := publisher.DeleteRelationships(ctx, "POCTestRelationship", "test/POCTestRelationship", []int64{identifier}); err != nil || count != 1 {
-		t.Fatalf("owned delete %d: %v", count, err)
+	if count, err := publisher.DeleteRelationships(ctx, "POCTestRelationship", []int64{identifier}); err != nil || count != 1 {
+		t.Fatalf("delete %d: %v", count, err)
 	}
 	if err = transaction.(runner.StreamingTransaction).Stream(ctx, "MATCH (n:POCTestNode) RETURN n.objectid AS objectid", nil, func(map[string]any) error { return callbackError }); !errors.Is(err, callbackError) {
 		t.Fatalf("stream error %v", err)

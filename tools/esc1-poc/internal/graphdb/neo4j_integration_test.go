@@ -230,11 +230,10 @@ func setup(t *testing.T) (*graphdb.Database, extension.Plan) {
 	// These small database fixtures use written expectations. Uploaded live
 	// demonstrations separately check BloodHound's calculated ESC1 answers.
 	plan.Schema.CompareNativeESC1 = false
-	useIntegrationOwner(&plan)
 	t.Cleanup(func() {
-		// Delete only this test's marked input nodes and explicitly owned output.
+		// Delete only this test's marked inputs and known output kinds.
 		// Never use the repository's whole-graph erasure helper here.
-		write(t, database, "MATCH (node) WHERE node.poc_fixture = true OR node.poc_owner = 'esc1-poc/integration-test' OR node.poc_owner STARTS WITH 'esc1-poc/integration-test/' DETACH DELETE node", nil)
+		write(t, database, "MATCH (node) WHERE node.poc_fixture = true OR node:PoC_Run OR node:PoC_DomainHelper OR node:PoC_Vault_Helper OR node:PoC_SelectionHelper OR node:PoC_SelectionIndependentHelper DETACH DELETE node", nil)
 	})
 	write(t, database, `CREATE
 		(domain:Base:Domain {objectid:'PoC_Test_Domain', name:'TEST DOMAIN', poc_fixture:true}),
@@ -251,18 +250,6 @@ func setup(t *testing.T) (*graphdb.Database, extension.Plan) {
 		(group)-[:Enroll]->(template), (principal)-[:Enroll]->(ca),
 		(principal)-[:MemberOf]->(group)`, nil)
 	return database, plan
-}
-
-// Loaded plans carry each output's original extension owner. Tests that choose
-// a cleanup owner must change both the run record and the output bindings.
-func useIntegrationOwner(plan *extension.Plan) {
-	plan.Schema.Owner = "esc1-poc/integration-test"
-	for index := range plan.Schema.Nodes {
-		plan.Schema.Nodes[index].Owner = plan.Schema.Owner
-	}
-	for index := range plan.Schema.Relationships {
-		plan.Schema.Relationships[index].Owner = plan.Schema.Owner
-	}
 }
 
 func read(t *testing.T, database runner.Database, query string, parameters map[string]any) runner.Rows {

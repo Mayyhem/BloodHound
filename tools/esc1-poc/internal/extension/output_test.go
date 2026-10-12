@@ -113,14 +113,18 @@ func TestLoadBindsCypherOutputsWithoutSchemaProcessing(t *testing.T) {
 	if binding.Query != "renamed.cypher" || binding.Kind != "PoC_ESC1" || binding.ExistingEdgePolicy != extension.KeepExisting || plan.Queries[0].OutputKind != "PoC_ESC1" {
 		t.Fatalf("wrong inferred output: %+v", plan)
 	}
-	if plan.Schema.Owner != "extension/ESC1 experiment" || plan.Schema.ReferenceCommit != extension.BuildReferenceCommit {
+	if plan.Schema.ReferenceCommit != extension.BuildReferenceCommit {
 		t.Fatalf("missing platform defaults: %+v", plan.Schema)
 	}
 	if err := os.WriteFile(filepath.Join(directory, "second.cypher"), []byte(query), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := extension.Load(directory); err == nil || !strings.Contains(err.Error(), "multiple producers") {
-		t.Fatal("duplicate producer accepted", err)
+	plan, err = extension.Load(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Schema.Relationships) != 2 || plan.Schema.Relationships[1].Query != "second.cypher" {
+		t.Fatalf("missing shared producer: %+v", plan.Schema.Relationships)
 	}
 }
 

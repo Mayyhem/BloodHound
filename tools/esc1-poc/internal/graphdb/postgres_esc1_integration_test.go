@@ -104,9 +104,9 @@ func postgresESC1Database(t *testing.T) (*graphdb.PostgresDatabase, *pg.Driver) 
 	}
 	t.Cleanup(func() {
 		cleanupContext := context.Background()
-		// Remove relationships incident to this test's marked inputs or owned outputs
+		// Remove relationships incident to this test's marked inputs or known output kinds
 		// before removing those nodes. No unrelated database objects are erased.
-		predicate := "properties ->> 'poc_fixture' = 'true' OR properties ->> 'poc_owner' = 'esc1-poc/integration-test' OR properties ->> 'poc_owner' LIKE 'esc1-poc/integration-test/%'"
+		predicate := "properties ->> 'poc_fixture' = 'true' OR EXISTS (SELECT 1 FROM kind WHERE id = ANY(node.kind_ids) AND name IN ('PoC_Run', 'PoC_DomainHelper', 'PoC_Vault_Helper', 'PoC_SelectionHelper', 'PoC_SelectionIndependentHelper'))"
 		if _, err := pool.Exec(cleanupContext, "DELETE FROM edge WHERE start_id IN (SELECT id FROM node WHERE "+predicate+") OR end_id IN (SELECT id FROM node WHERE "+predicate+")"); err != nil {
 			t.Error(err)
 		}

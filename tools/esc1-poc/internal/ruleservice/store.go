@@ -107,8 +107,7 @@ func (s *Store) Active() (Bundle, error) {
 }
 
 func cloneBundle(bundle Bundle) Bundle {
-	copied := Bundle{Revision: bundle.Revision, Files: make(map[string]string, len(bundle.Files)), RetiredRelationships: append([]string(nil), bundle.RetiredRelationships...), RetiredOwners: copyOwners(bundle.RetiredOwners), Disabled: append([]string(nil), bundle.Disabled...), AddedAt: map[string]time.Time{}}
-	copied.Owners = copyOwners(bundle.Owners)
+	copied := Bundle{Revision: bundle.Revision, Files: make(map[string]string, len(bundle.Files)), RetiredRelationships: append([]string(nil), bundle.RetiredRelationships...), RetiredEndpoints: copyEndpoints(bundle.RetiredEndpoints), Disabled: append([]string(nil), bundle.Disabled...), AddedAt: map[string]time.Time{}}
 	for name, added := range bundle.AddedAt {
 		copied.AddedAt[name] = added
 	}

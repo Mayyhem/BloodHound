@@ -41,8 +41,8 @@ func checkedRelationship(row map[string]any) (map[string]any, error) {
 			return nil, fmt.Errorf("relationship properties must be a map, not null")
 		}
 		for key, value := range values {
-			if strings.TrimSpace(key) == "" || key == "poc_owner" {
-				return nil, fmt.Errorf("relationship properties cannot use an empty name or the reserved poc_owner name")
+			if strings.TrimSpace(key) == "" {
+				return nil, fmt.Errorf("relationship properties cannot use an empty name")
 			}
 			if value == nil {
 				// For merging, null explicitly removes a key. For a new or

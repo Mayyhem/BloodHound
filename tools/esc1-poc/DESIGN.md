@@ -9,7 +9,7 @@ This guide explains the current design and its limits. Extension authors should 
 - [Important design decisions](#important-design-decisions)
 - [What changed in BloodHound](#what-changed-in-bloodhound)
 - [A native BloodHound page](#a-native-bloodhound-page)
-- [Schema and exact endpoint pairs](#schemas-describe-the-model-and-calculations)
+- [Schema and exact endpoint pairs](#schemas-describe-types-cypher-declares-calculations)
 - [Writing query files](#authoring-query-files)
 - [Existing-edge policies](#what-happens-to-an-existing-edge)
 - [Saving results, helpers, and recovery](#saving-results-and-recovering-from-failure)
@@ -47,9 +47,9 @@ This guide explains the current design and its limits. Extension authors should 
 | The information could change halfway through a calculation. | Make other graph changes wait during BloodHound's analysis and the rules that follow it. | The rules need consistent information to produce a trustworthy answer. | This BloodHound application controls when graph changes can begin. Searches remain available. |
 | Unrelated changes could repeat every extension calculation. | Select queries using the changed object and connection types. | Avoid unrelated work while keeping each selected answer complete. | Run affected queries, their consumers, and needed prerequisites once; leave skipped outputs alone. Unknown coverage or changed rules requires a full run of enabled rules. |
 | Uploading changed rules could mix old and new instructions. | Keep the same copy throughout a calculation and its retries. | Every attempt needs a consistent set of instructions. | Uploads are checked and stored for later calculations. They do not change work that has already fetched its files. |
-| An extension could overwrite someone else's connections. | Change only results that belong to the extension. | The program needs to know which results it may change. | Each calculated connection records its owner. The program stops if that ownership is missing or unclear. |
+| Several rules can produce the same connection. | Combine their complete answers before updating the graph. | Refresh every producer of the selected relationship type together. | One edge represents the source, target, and type. Remove it only when no producer still returns it. Existing edges within the declared endpoint scope participate regardless of who created them. |
 | Losing one reason for a connection could remove it even when another reason remains. | Finish the complete calculation before removing old answers. | A half-finished answer must not replace the last good one. | Check every supporting reason, then save the helper objects, connections, and success record together. |
-| Old and new results may give a connection different details. | Let the author choose through a query's `// existing-edge-policy:` comment. | Authors do not need a separate list of details they are allowed to change. | Replace the connection, update only supplied details, or keep it unchanged. Replacement is the default. All choices remove owned connections that are no longer justified. |
+| Old and new results may give a connection different details. | Let the author choose through a query's `// existing-edge-policy:` comment. | Authors do not need a separate list of details they are allowed to change. | Replace the connection, update only supplied details, or keep it unchanged. Replacement is the default. All choices remove connections no longer justified by the combined answer. |
 | Following every route could take too long or use too much memory. | Reuse shared answers, keep large lists in temporary files, and work in smaller pieces. | Avoid repeated work and stop excessive calculations while preserving earlier results. | Limit time, memory estimates, disk use, and the number of questions running together. Remove temporary answers when no longer needed. Large-graph testing is still required. |
 | Rules should work with Neo4j and PostgreSQL. | Keep both choices and share the calculation code. | The same rules should produce the same answers on both. | Focused changes to DAWGS provide the database support; shared Go code performs the more involved calculations. |
 | Equal counts could hide connections between the wrong objects. | Check exactly which objects are connected. | A matching number alone does not prove correctness. | Compare ESC1 with BloodHound's own answers and written expectations. Keep failures in the evidence alongside passing checks. |
@@ -135,9 +135,9 @@ The existing post-processing URL and token configuration already provides the up
 
 ## Schemas describe types; Cypher declares calculations
 
-Each extension has an authoritative schema beside its query files. `schema.json` remains supported, and named files such as `active_directory.schema.json` allow several schemas in one directory and saved bundle. The examples are [ESC1](extension/schema.json), [vault](examples/vault/extension/schema.json), and [the separately owned Active Directory and CyberArk schemas](examples/cross-platform/README.md). Choose unique filenames across the entire bundle, including the query files. Query names and their parameter names are global.
+Each extension has an authoritative schema beside its query files. `schema.json` remains supported, and named files such as `active_directory.schema.json` allow several schemas in one directory and saved bundle. The examples are [ESC1](extension/schema.json), [vault](examples/vault/extension/schema.json), and [the separate Active Directory and CyberArk schemas](examples/cross-platform/README.md). Choose unique filenames across the entire bundle, including the query files. Query names and their parameter names are global.
 
-The loader validates each definition, combines its declarations with the others, and orders all queries together. Schema names, namespaces, declared kinds, managed helper prefixes, and query output bindings must remain unambiguous across extensions. Shared graph references can point to another schema’s kinds when declared as external kinds. A binding retains its own extension owner; combining schemas never gives one extension ownership of another’s results.
+The loader validates each definition, combines its declarations with the others, and orders all queries together. Schema names, namespaces, declared kinds, managed helper prefixes, and query output bindings must remain unambiguous across extensions. Shared graph references can point to another schema’s kinds when declared as external kinds. Each kind has one schema declaration. Several relationship queries may return that kind; the combined plan retains every producing query. Helpers still have one producing query per kind.
 
 BloodHound registers each definition under its own schema name before any rule executes. The service caches the complete list only after every registration succeeds. A failure partway through prevents calculation and leaves the list uncached, so an eligible retry registers all definitions again.
 
@@ -146,19 +146,19 @@ BloodHound registers each definition under its own schema name before any rule e
 | Standard `schema` | Name, display name, version, and namespace. |
 | Standard `node_kinds` | Object kinds and their presentation. |
 | Standard `relationship_kinds` | Connection kinds, presentation, and whether pathfinding can follow them. |
-| Proposed `external_node_kinds` | Existing kinds referenced by the extension, such as `User` or `Domain`; these are not newly owned kinds. |
+| Proposed `external_node_kinds` | Existing kinds referenced by the extension, such as `User` or `Domain`; these declarations do not create objects. |
 | Proposed relationship `endpoints` | Exact allowed source-kind/target-kind pairs. |
 | Query `RETURN ... AS kind` | Literal relationship kind produced by this file. |
 | Query `RETURN ... AS kinds` | A literal one-element helper-kind list; its ID prefix is the kind followed by `_`. |
-| Optional query `// existing-edge-policy:` | How to update an already owned matching calculated edge. |
+| Optional query `// existing-edge-policy:` | How to update an existing matching calculated edge; all producers of that kind must agree. |
 
 The custom schema fields and query conventions are proposals implemented by this experiment, **not accepted official OpenGraph processing features**. Before registration through BloodHound's existing extension service, the code strips them in memory. Each extension uses the same authoritative definition for calculation and presentation. Registration provides names and presentation; it does not install these files as saved queries or calculate their answers.
 
 The definition reader/export preserves standard `environments`, `relationship_findings`, `queries`, and `pz_rules`, but the standalone `schema` command's upload helper rejects those top-level sections rather than silently dropping them. That helper supports the standard sections used by these examples, not every valid OpenGraph definition. Persistent native registration uses a different path through BloodHound's existing service.
 
-The platform supplies ownership and the reference build. New owners are derived from the stable schema name and persisted by the registry. The experiment retains its native-agreement gate for `PoC_ADCSESC1`; other output kinds do not require a native equivalent. Legacy processing blocks remain readable, and registry migration preserves their original owners in saved metadata. See [the developer guide](DEVELOPERS.md#updating-older-bundles) for migration limits.
+The platform supplies the reference build. The experiment retains its native-agreement gate for `PoC_ADCSESC1`; other output kinds do not require a native equivalent. There are no owner settings or ownership checks for relationships, helpers, or the success record. See [the developer guide](DEVELOPERS.md#updating-older-bundles) for updating older files.
 
-The final Cypher projection declares its output with a literal edge name as `kind`, or a literal helper `kinds` list. Parsing uses the Cypher lexer and return-projection parser, excluding comments, strings, and nested returns. Dynamic names and multiple producers are rejected. Output is therefore known even for zero rows, so empty-answer cleanup needs no duplicated schema binding. Rows are checked against the declared name before publication. The optional update policy belongs to the query. Display-only schemas do not acquire managed output merely by declaring a kind.
+The final Cypher projection declares its output with a literal edge name as `kind`, or a literal helper `kinds` list. Parsing uses the Cypher lexer and return-projection parser, excluding comments, strings, and nested returns. Dynamic output names are rejected. Several relationship producers are allowed when their update policies agree; helper kinds retain one producer. Output is therefore known even for zero rows, so empty-answer cleanup needs no duplicated schema binding. Rows are checked against the declared name before publication. The optional update policy belongs to the query. Display-only schemas do not acquire managed output merely by declaring a kind.
 
 Managed kinds and helper prefixes start with `PoC_`. Query filenames use `snake_case.cypher`. Loading rejects missing producers, multiple bindings to a query, duplicate kinds, malformed/unknown declarations, undeclared endpoint kinds, unused queries, missing prerequisites, undeclared parameters, and circular prerequisite dependencies.
 
@@ -181,9 +181,9 @@ Each source and target object ID must resolve to exactly one node. The graph ide
 
 ### Persistent upload rules
 
-The registry stores several schemas and their separately owned outputs in one active bundle. A change can replace files, add extensions and producers, remove rules, or reassign a kind to another query under the same owner. Existing schema names, filenames, owners, and namespaces remain stable. The complete updated bundle must still satisfy dependency, output, ownership, and helper-prefix validation.
+The registry stores several schemas and their calculated outputs in one active bundle. A change can replace files, add extensions and producers, remove rules, or move an output to another query. Existing schema names and filenames remain stable. The complete updated bundle must satisfy dependency, output, policy-agreement, and helper-prefix validation.
 
-The page presents one table, sorted initially by calculation order. Users can sort by name, stage, date added, or extension, filter by extension, select visible rows, and expand each rule for its full query and declared inputs, outputs, prerequisites, and dependents. Stage 1 has no earlier query to wait for. Later stages follow the deepest chain of explicit query prerequisites: a rule needing a stage 2 answer is in stage 3. Stages describe ordering, not a promise of simultaneous execution. Display sorting and filtering do not affect the runner’s order.
+The page presents one table, sorted initially by calculation order. Users can sort by name, stage, date added, or extension, filter by extension, select visible rows, and expand each rule for its full query and declared inputs, outputs, prerequisites, and dependents. Stage 1 has no earlier query to wait for. Later stages follow the deepest chain of query prerequisites and declared calculated graph inputs: a rule needing a stage 2 answer is in stage 3. Stages describe ordering, not a promise of simultaneous execution. Display sorting and filtering do not affect the runner’s order.
 
 **Up to five ready queries can run together.** Each query starts after its own required earlier queries have succeeded. When its answers are checked, another ready query can use the free place immediately; an unrelated slow query does not hold up the whole group. Shared earlier calculations run once, and their answer files stay available until every reader finishes. The report lists queries in the order their answers were accepted, which can differ between runs.
 
@@ -193,11 +193,11 @@ For every changed existing file, the author explicitly chooses whether to overwr
 
 Activation records the date added for new query files. This date survives overwrites, disabling, enabling, and restarts. Earlier saved files without a date stay unknown; the page displays **Not recorded**. A new file in a preview displays **On activation**. Dates are excluded from the revision calculation so recording the actual activation time does not change the reviewed candidate’s revision. Dates must refer to existing query files. Deleting a query removes its date; adding it again records a new activation.
 
-Deleting a query also deletes dependent rules across schemas and prunes prerequisites unused by surviving producers. The confirmation shows the complete affected file list. Modern schemas remain unchanged; legacy calculation declarations are detached while kind names and presentation remain. Removed relationship kinds and their original owners stay in the bundle’s retirement history, including across later edits and restarts. A successful subsequent rule run scans those kinds, checks every edge’s owner, and removes owned retired results atomically with new results and the success record. Foreign or missing ownership fails the run. Activation makes no graph changes; failure preserves the previous committed graph answer. Helpers are never automatically deleted, including when their producer is removed.
+Deleting a query also deletes rules that explicitly require its returned rows, continuing through their query dependents across schemas. Unused supporting queries are pruned. Graph readers and other producers of the same type remain. The preview distinguishes deleted files from outputs to refresh. At the next successful run, the remaining producers rebuild their combined answer, then graph readers use those refreshed edges. Deleting the last producer records the relationship type and endpoint scope for cleanup; a reader can validly see an empty result. Schema kind names and presentation remain. Retirement history survives later edits and restarts. Cleanup, new results, and the success record save together. Activation makes no graph changes, and failure preserves the previous committed graph answer. Helpers are never automatically deleted, including when their producer is removed.
 
-Disabling is saved separately from deletion. It keeps query files, calculation bindings, activation dates, and existing graph objects. The plan marks the explicitly disabled query and pauses consumers that need its query rows, managed kinds, or managed endpoint kinds. This propagation crosses schemas. The runner excludes paused queries and their outputs from calculation and cleanup, so other enabled rules can run without removing the disabled rules’ previous connections. Enabling removes an explicit disabled setting; consumers become eligible when no remaining dependency or explicit setting pauses them. Existing results may become stale while disabled.
+Disabling is saved separately from deletion. It keeps query files, calculation bindings, activation dates, and existing graph objects. The plan marks the explicitly disabled query, pauses every producer sharing its relationship output, and pauses consumers that need those query rows, calculated graph kinds, or helper endpoint kinds. This propagation continues across schemas and through further consumers. Refreshing only the other producers could otherwise remove the disabled rule’s previous connections. The runner excludes paused queries and their outputs from calculation and cleanup, so other enabled rules can run without removing the disabled rules’ previous connections. Enabling removes an explicit disabled setting; consumers become eligible when no remaining dependency or explicit setting pauses them. Existing results may become stale while disabled.
 
-Accepted files, dates, disabled settings, and retirement ownership atomically replace `active.json`. Files, saved owners, disabled settings, and retirement metadata determine the bundle revision. Limits are 32 files, 1 MiB per file, and 4 MiB per bundle. Duplicate JSON keys and unknown request fields are rejected. Filenames, schema shape, dependencies, and forbidden writes are checked before activation; database-specific syntax and returned row shapes are checked during execution. An accepted change can consequently fail when run without replacing the last good graph results. The worker validates the complete downloaded bundle, including its revision and saved metadata, before using it.
+Accepted files, dates, disabled settings, and retirement scopes atomically replace `active.json`. Files, disabled settings, and retirement metadata determine the bundle revision. Limits are 32 files, 1 MiB per file, and 4 MiB per bundle. Duplicate JSON keys and unknown request fields are rejected. Filenames, schema shape, dependencies, and forbidden writes are checked before activation; database-specific syntax and returned row shapes are checked during execution. An accepted change can consequently fail when run without replacing the last good graph results. The worker validates the complete downloaded bundle, including its revision and saved metadata, before using it.
 
 Storage uses private directories (`0700`) and files (`0600`). The new file is synced before rename; this is not a promise that the newest rename survives sudden power loss. Saved rules and the latest report survive a registry restart. HTTP clients disable environment proxies and do not follow redirects carrying the bearer token.
 
@@ -226,7 +226,7 @@ Declare every object and connection kind the query reads, including those used o
 
 Prerequisites can cross schema boundaries. In the synthetic example, `cyberark_links.cypher` declares `query:ad_users.cypher` and reads `$ad_users`, including each helper row’s `properties.user_sid`. This receives the current run’s complete answer, rather than requiring the helper to replace a collected object. The dependency is the filename, not a schema name.
 
-Declaring a managed relationship kind as a graph input does not make the graph contain its freshly calculated edges during that run. Relationship publication happens after the calculations finish. A consumer needing a producer’s fresh answer must declare its query prerequisite and use the returned row parameter. Helper staging has separate visibility rules inside the final transaction, described below; it does not change the relationship publication order.
+Declaring a calculated relationship kind as a graph input makes the query wait for every producer of that type. The runner combines and stages their complete result inside the final transaction before the reader runs. Declared helper graph inputs likewise wait for their producer. Reads after staging run in that same transaction; other users see the changes only after the complete run commits. Explicit query prerequisites still pass returned rows as parameters. A rule reading its own output type reads the previous graph state and does not wait for peer producers of that type; its answer is itself needed to finish their combined new result. Other dependencies that form a cycle between different producers are rejected.
 
 | Query role | Required answer |
 | --- | --- |
@@ -234,9 +234,9 @@ Declaring a managed relationship kind as a graph input does not make the graph c
 | Relationship producer | Nonempty string `source` and `target` object IDs, literal `kind`, and optional `properties` map. |
 | Helper producer | Exactly `id`, `kinds`, and `properties`; `kinds` contains only the declared helper kind. |
 | Reachability seed query | Node metadata `id`, `graph_id`, and `kinds`, as shown in the reach examples. |
-| Group-overlap seed query | Separate `left` and `right` direct-principal lists a `target`, and literal `kind`, as in [esc1.cypher](extension/esc1.cypher). The shared step emits source/target pairs. |
+| Group-overlap seed query | Separate `left` and `right` direct-principal lists, a `target`, and literal `kind`, as in [esc1.cypher](extension/esc1.cypher). The shared step emits source/target pairs and preserves `kind`. |
 
-Identical relationship pairs collapse only when their requested property maps agree. Conflicting maps fail the run; query arrival order never chooses a winner. Authors must combine properties from different supporting facts into one agreed answer.
+Within one query, repeated relationship pairs must have identical property maps; conflicting rows fail. Across queries producing the same type, the runner combines pairs and merges supplied properties in alphabetical filename order. Later filenames win overlapping keys, including explicit null removals. Query completion timing never chooses the result. All producers must choose the same existing-edge policy; omission means `replace-existing`.
 
 All authored queries are read-only. The loader checks forbidden writes, and the adapters check query form before execution. The persistent native adapters parse each read query and reject writes on either backend. The standalone Neo4j adapter instead inspects the planned statement type in a separate read session: running `EXPLAIN` inside a Neo4j 4.4 publication transaction can prevent later writes. PostgreSQL also translates its supported query forms. Comments and filenames alone cannot establish read-only behavior. Only the runner's publication code writes results.
 
@@ -244,35 +244,29 @@ All authored queries are read-only. The loader checks forbidden writes, and the 
 
 Relationship `properties` may be omitted, meaning an empty map, but the column itself cannot be `null`. Values can be strings, booleans, signed 64-bit whole numbers, finite fractional numbers, or lists of one simple type. Lists cannot contain nulls, nested lists, or maps. Empty property names and nested property maps are rejected. Whole-valued decimals such as `2.0` become integers; out-of-range whole numbers fail. Exact large integers are not converted to floating point. Numeric lists must be all whole or all fractional values.
 
-For relationships, a property value of `null` removes that key when merging and leaves it absent when creating or replacing. Helper properties do not accept `null`; they must be simple values or lists of one simple type, without nested maps/lists. Authors cannot overwrite the runner's `objectid` or `poc_owner` helper fields, or put `poc_owner` in an edge property map. Even `keep-existing` validates requested properties before any cleanup is allowed.
+For relationships, a property value of `null` removes that key when merging and leaves it absent when creating or replacing. Helper properties do not accept `null`; they must be simple values or lists of one simple type, without nested maps/lists. Authors cannot overwrite the helper’s `objectid` field. A property named `poc_owner` has no special meaning. Even `keep-existing` validates requested properties before any cleanup is allowed.
 
 ### What happens to an existing edge
 
-Ownership is recorded as `poc_owner`, using the producing extension’s owner and kind, for example `extension/esc1_poc/PoC_ADCSESC1`. A match has the same managed kind, source ID, target ID, and expected owner.
+A match has the same relationship type, source object ID, and target object ID. The runner refreshes that type within the schema’s allowed source/target kind pairs. Existing edges within this scope participate regardless of their origin or properties, including manually inserted edges. No contribution or owner list is stored on the edge.
 
-| Query `existing-edge-policy` | Matching owned edge | New desired edge |
+| Query `existing-edge-policy` | Matching edge | New desired edge |
 | --- | --- | --- |
 | `replace-existing` (default) | Delete and recreate with the requested properties. Discard old ordinary properties even if the new map is empty. The database edge ID changes. | Create with requested non-null properties. |
 | `merge-properties` | Keep its ID; update supplied keys, delete keys supplied as `null`, and preserve unmentioned properties. Skip unchanged writes. | Create with requested non-null properties. |
 | `keep-existing` | Keep its ID and every existing property. | Create with requested non-null properties. |
 
-**Every policy removes previously owned edges absent from a successfully completed desired result for a selected output kind.** Skipped output kinds are not reconciled or removed. A complete empty answer therefore authorizes removing all old owned edges of that managed kind. A shortened, invalid, failed, or incomplete answer never does.
+**Every policy removes in-scope edges absent from the complete combined answer for a selected output type.** Skipped output types are not refreshed or removed. An empty answer from one producer does not remove an edge another producer still returns. If all producers return no edges, the runner clears the type’s declared endpoint scope. An invalid answer, failed query, or interrupted result stream cannot authorize cleanup. The runner cannot tell whether the author used a debugging `LIMIT` or omitted valid objects from an otherwise successful query; authors must return the complete answer they intend to publish.
 
-The runner checks all existing edges of each managed kind. A missing or foreign owner, or duplicate managed pairs, fails publication rather than granting permission to adopt or delete them. Native and unrelated kinds remain outside this cleanup.
+Duplicate existing source/type/target pairs within the managed scope fail publication. Other relationship types and edges outside the declared endpoint pairs remain outside this cleanup.
 
-For example, this result updates confidence and removes a note during merging:
-
-```cypher
-RETURN source.objectid AS source, target.objectid AS target,
-       'PoC_Example_Link' AS kind,
-       {confidence: 0.9, old_note: null} AS properties
-```
+The [complete properties example](DEVELOPERS.md#calculated-relationships) shows how to add evidence to existing relationships using `merge-properties`. A returned map such as `{confidence: 0.9, old_note: null}` would update confidence and remove `old_note` under that policy. The property map belongs in the producing query; it needs no duplicate schema declaration.
 
 Replacement counts as a removal and addition; a changed merge counts once under `relationships_updated`; no-op merges and kept edges count under `relationships_unchanged`. Replacements are deleted before creation because PostgreSQL permits only one edge of that kind between those endpoints. Every batch remains part of the final transaction, so failure before commit restores original IDs and properties.
 
 ESC1 uses replacement. The vault example uses `keep-existing` to demonstrate stable IDs and preservation of manually added properties. Replacement writes more even when a pair remains justified; its cost counts toward the change allowance.
 
-Native BloodHound does not have one universal calculated-edge policy. Its AD cleanup explicitly includes native `ADCSESC1` with native endpoint restrictions. Other calculations use tracked relationship sinks. Adding a custom property to a native edge does not protect it from native replacement or cleanup. The experiment therefore publishes separate `PoC_` kinds, which are absent from the native cleanup lists, and compares ESC1 answers instead of taking ownership of native output.
+Native BloodHound does not have one universal calculated-edge policy. Its AD cleanup explicitly includes native `ADCSESC1` with native endpoint restrictions. Other calculations use tracked relationship sinks. Adding a custom property to a native edge does not protect it from native replacement or cleanup. The experiment therefore publishes separate `PoC_` kinds, which are absent from the native cleanup lists, and compares ESC1 answers with native output.
 
 ## Shared calculations and ESC1 behavior
 
@@ -298,23 +292,23 @@ Relevant membership and certificate/auth cycles fail the ESC1 calculation. Disco
 
 Schema registration, Neo4j index preparation, and PostgreSQL kind-catalog preparation are separate metadata operations. They can remain after a calculation fails. Upload ingestion and native analysis have also already happened; extension rollback does not undo them.
 
-The final transaction groups **all helper changes, all calculated relationship changes, and the successful-run record**. Independent ready reads may run on separate connections while participating graph writers are excluded. Helper writes are delayed while ordinary reads can progress. After the first helper is staged, subsequent reads run serially inside the final transaction so they can see it. Uncommitted helper changes are not externally published; only one coordinator writes.
+The final transaction groups **all helper changes, all calculated relationship changes, and the successful-run record**. Independent ready reads may run on separate connections while participating graph writers are excluded. Helper writes are delayed while ordinary reads can progress. After helper or relationship changes are staged, subsequent reads run serially inside the final transaction so they can see those changes. Uncommitted helper changes are not externally published; only one coordinator writes.
 
-Before changing edges, the runner finishes complete result reads, endpoint checks, property checks, existing-edge checks, and any requested exact native ESC1 comparison. It sorts desired and existing sets and applies changes in batches. A timeout, invalid row, incomplete file/read, exhausted allowance, or native mismatch fails the calculation. None permits deletion based on a partial answer.
+Before staging a relationship type, the runner finishes every producer’s complete result reads, endpoint checks, property checks, existing-edge checks, and any requested exact native ESC1 comparison. It sorts desired and existing sets and applies changes in batches inside the same transaction. Graph consumers can then use that staged result. Nothing commits until all selected queries succeed. A timeout, invalid row, incomplete file/read, exhausted allowance, or native mismatch fails the calculation. None permits deletion based on a partial answer.
 
-The owned `PoC_Run` node stores the successful batch ID, plan fingerprint, reference commit, and completion time in the same database transaction. A later process can inspect committed state; it does not adopt old foreign objects or reuse unfinished in-memory answers.
+The `PoC_Run` node stores the successful batch ID, plan fingerprint, reference commit, and completion time in the same database transaction. Its identity uses the plan’s schema name. A later process can inspect committed state; it does not reuse unfinished in-memory answers.
 
 ### Helpers stay separate
 
-The domain example uses `PoC_DomainHelper_` plus the real Domain object ID. Its node has only `PoC_DomainHelper`, so it cannot masquerade as a native Domain. An existing object with that ID must have exactly the expected helper kind and owner. Changed properties replace the helper's approved map plus runner-owned fields; identical properties cause no write.
+The domain example uses `PoC_DomainHelper_` plus the real Domain object ID. Its node has only `PoC_DomainHelper`, so it cannot masquerade as a native Domain. An existing object with that ID must have exactly the expected helper kind. Changed properties replace the helper's approved map plus the object ID; identical properties cause no write.
 
-Helper publication scans each declared ID prefix once, includes other kinds to detect native/foreign collisions, then compares sorted answers. It does not repeat an unrestricted graph lookup for every helper. Helper output kinds receive Neo4j object-ID indexes.
+Helper publication scans each declared ID prefix once, includes other kinds to detect collisions with other node kinds, then compares sorted answers. It does not repeat an unrestricted graph lookup for every helper. Helper output kinds receive Neo4j object-ID indexes.
 
 Helpers omitted from a later answer are retained. There is no automatic helper deletion because other data may refer to them. Removing a calculation declaration also retains its old helpers. Any cleanup needs a separate explicit policy. Every returned helper ID must include a nonempty suffix after its declared prefix.
 
 ### A lost commit reply is different from rollback
 
-If the database saves changes but its acknowledgement is lost, the actual outcome is uncertain. Provisional counts do not prove rollback or success. Inspect the saved batch ID and owned graph state before retrying. A known failed PostgreSQL commit can roll back normally.
+If the database saves changes but its acknowledgement is lost, the actual outcome is uncertain. Provisional counts do not prove rollback or success. Inspect the saved batch ID and saved graph state before retrying. A known failed PostgreSQL commit can roll back normally.
 
 For an uncertain native run, this application blocks further graph changes before releasing its exclusive turn. Reads remain admitted. Recovery requires inspecting the saved result and restarting the application. The registry's report alone cannot settle the database's committed state.
 
@@ -329,7 +323,7 @@ These controls stop excessive work without treating an incomplete result as comp
 | Relevant graph/reachable sets | Runner memory, with a conservative cache estimate. Dense sets can still exhaust the allowance. |
 | Complete desired/existing edge sets | Sorted private files, compared in batches. Each in-memory sort part has an allowance. |
 | Database work and unfinished writes | The database; its memory is additional to runner limits. |
-| Committed helpers, edges, and success record | Persist in the graph. Later complete runs remove obsolete owned edges, but not omitted helpers. |
+| Committed helpers, edges, and success record | Persist in the graph. Later complete runs remove obsolete in-scope edges, but not omitted helpers. |
 | Standalone reports | Exact counts plus bounded examples; standard output and `work/runs.jsonl`. Logs rotate near 8 MiB, retaining four older files and the current file. |
 | Persistent registry status | The latest bounded report, rather than a full query-answer log or heartbeat. |
 
@@ -355,7 +349,7 @@ The persistent service calls `DefaultLimits()` with the values below. The flags 
 | `--timeout` | 2 hours | Complete operation. |
 | `--report-pairs` | 100 | Example pairs per relationship kind or comparison side; exact counts remain available. |
 
-Desired report examples together have a 1 MiB encoded allowance; missing/extra comparison examples share a separate 1 MiB allowance. The standalone `compare` command streams complete owned/native sets through bounded files and uses query and run deadlines too; it does not retain every pair in memory.
+Desired report examples together have a 1 MiB encoded allowance; missing/extra comparison examples share a separate 1 MiB allowance. The standalone `compare` command streams complete calculated/native sets through bounded files and uses query and run deadlines too; it does not retain every pair in memory.
 
 Byte allowances measure encoded data or conservative estimates. Go object overhead, temporary copies, garbage collection, database-driver buffers, and multiple workers add memory. Database memory is separate. Batching limits each operation, but all writes still form one potentially expensive final transaction. Dense reach, large answers, disk capacity, prefix scans, and database sorting need measurement on representative graphs.
 
@@ -363,7 +357,7 @@ Native Neo4j's existing driver cannot interrupt every network call immediately u
 
 ## Both databases and focused DAWGS changes
 
-Neo4j and PostgreSQL run the same query plan and shared reach/overlap code, with database-specific reading and publication. Neo4j prepares object-ID indexes for declared input, endpoint, and helper kinds. PostgreSQL prepares catalog entries even for declared kinds with no current objects, so absent prerequisites return empty answers. These preparations do not create owned graph objects.
+Neo4j and PostgreSQL run the same query plan and shared reach/overlap code, with database-specific reading and publication. Neo4j prepares object-ID indexes for declared input, endpoint, and helper kinds. PostgreSQL prepares catalog entries even for declared kinds with no current objects, so absent prerequisites return empty answers. These preparations do not create calculated graph objects.
 
 The PostgreSQL adapter requires exactly one graph named `default`, actual `public` graph/node/edge/kind tables, and validated non-null graph-ID foreign keys to the graph table. Standalone deployment checks require the application's PostgreSQL role. These restrictions prevent reading across graphs or accidentally using different tables or permissions. Persistent mode borrows BloodHound's existing connection.
 
@@ -375,9 +369,9 @@ The persistent root module selects the local POC and DAWGS replacements. The his
 
 ## Selecting affected extension queries
 
-The automatic service records changed node and relationship kinds during native graph writes, including property updates and removals. A change to a kind selects queries that declare it, their later consumers, and the prerequisites needed to calculate their answers. Shared prerequisites execute once in that run. Each selected query runs against the whole graph; this is not selection of individual changed nodes or properties. BloodHound's built-in analysis still runs normally.
+The automatic service records changed node and relationship kinds during native graph writes, including property updates and removals. A change to a kind selects queries that declare it, every producer sharing their relationship outputs, their later consumers, and the prerequisites needed to calculate their answers. Selection repeats until adding a producer, prerequisite, or consumer adds no more work. Shared prerequisites execute once in that run. Each selected query runs against the whole graph; this is not selection of individual changed nodes or properties. BloodHound's built-in analysis still runs normally.
 
-Disabled rules and their paused consumers are excluded first; their declared output contracts remain in the complete plan. Only selected enabled output kinds are published. Their complete new answers are compared with their previous owned results, including removing obsolete connections. Skipped helper and connection kinds are left alone. No prerequisite answers are cached between runs.
+Disabled rules and their paused consumers are excluded first; their declared output contracts remain in the complete plan. Only selected enabled output kinds are published. Their complete new answers are compared with their previous in-scope results, including removing obsolete connections. Skipped helper and connection kinds are left alone. No prerequisite answers are cached between runs.
 
 The success record stores the fingerprint of the entire rule plan, even after a selective run. First runs and new or edited plans require all enabled queries. The service starts with unknown coverage after a process restart, so its next run is also complete. A run with no affected queries skips successfully only when this same plan has already succeeded.
 
@@ -399,6 +393,6 @@ The standalone lab also requires complete upload history: any failed, partial, c
 
 This is a single-server Community Edition experiment. It has not established Enterprise integration, production availability, or performance with 100 million objects or edges. A 100-million-row limit is a brake, not proof of capacity. Small laboratory browser requests demonstrate read availability within their scope, not a load-test guarantee.
 
-Failure preserves the previous committed extension answer when rollback is known, but that answer may be stale. Metadata preparation remains outside rollback. Helpers have no automatic deletion. Rule removal retires owned relationship results only on a later successful run; uploading alone does not run rules or delete graph data. A continuously busy graph can delay admission, database locks/load can delay reads, and direct external writers can invalidate the coordination assumption.
+Failure preserves the previous committed extension answer when rollback is known, but that answer may be stale. Metadata preparation remains outside rollback. Helpers have no automatic deletion. Rule removal refreshes shared outputs or retires their last producer’s relationship scope only on a later successful run; uploading alone does not run rules or delete graph data. A continuously busy graph can delay admission, database locks/load can delay reads, and direct external writers can invalidate the coordination assumption.
 
 Large deployments still need exact native agreement, total runtime, runner/database memory, temporary-disk measurements, query work, transaction duration, rollback behavior, and lost-connection recovery measured together. [REVIEW.md](REVIEW.md) separates current evidence from historical measurements and preserves failed checks. Those records are the basis for assessing this experiment; they do not replace production qualification.

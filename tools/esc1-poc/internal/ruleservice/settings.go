@@ -21,18 +21,9 @@ package ruleservice
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
 )
-
-func copyOwners(owners map[string]string) map[string]string {
-	var result = map[string]string{}
-	for kind, owner := range owners {
-		result[kind] = owner
-	}
-	return result
-}
 
 // Keep a user's disable choice separate from its consequences. A rule waiting
 // on a disabled rule can resume automatically once all its inputs are available.
@@ -88,6 +79,9 @@ func applyRuleSettings(bundle Bundle, plan *extension.Plan) error {
 			}
 		}
 		for _, binding := range plan.Schema.Relationships {
+			// Refreshing just one producer would erase the paused producer's
+			// connections. Pause the shared result until all can run again.
+			pause(binding.Query, blockedKinds["relationship:"+binding.Kind])
 			for _, endpoint := range binding.Endpoints {
 				pause(binding.Query, blockedKinds["node:"+endpoint.SourceKind])
 				pause(binding.Query, blockedKinds["node:"+endpoint.TargetKind])
@@ -131,68 +125,33 @@ func changeEnabledRules(candidate *Bundle, change Change) error {
 	return nil
 }
 
-// Ownership belongs to the individual extension, not to the combined table.
-// Adding a second schema must never relabel the first one's existing results.
-func retainOwnership(previous extension.Plan, next *extension.Plan, candidate *Bundle) error {
-	var (
-		known               = map[string]string{}
-		retired             = copyOwners(candidate.RetiredOwners)
-		previousDefinitions = map[string]extension.Definition{}
-	)
-	for _, definition := range previous.Definitions {
-		previousDefinitions[definition.Schema.Name] = definition
-	}
-	for _, definition := range next.Definitions {
-		owner := definition.PostProcessing.Owner
-		if old, exists := previousDefinitions[definition.Schema.Name]; exists {
-			if (definition.LegacyProcessing && old.PostProcessing.Owner != owner) || old.Schema.Namespace != definition.Schema.Namespace {
-				return fmt.Errorf("keep the owner and namespace of extension %s", definition.Schema.Name)
-			}
-			owner = old.PostProcessing.Owner
-		}
-		if !definition.LegacyProcessing {
-			if candidate.Owners == nil {
-				candidate.Owners = map[string]string{}
-			}
-			candidate.Owners[definition.Schema.Name] = owner
-		}
-	}
-	if err := applyOwners(candidate.Owners, next); err != nil {
-		return err
-	}
-	// Schema files remain registered even after their final rule is removed.
-	// Refuse renaming one by upload: that could also abandon its display types.
+// Remember which connection types no longer have any producing rules. The
+// saved endpoint scope lets the runner clear old results even if a later schema
+// changes the type's name. A shared type is refreshed by its remaining producers.
+func retainRetirements(previous extension.Plan, next extension.Plan, candidate *Bundle) error {
+	var retired = map[string]bool{}
+	// Schema files also hold display information. Keep their identity stable
+	// even when their last rule is deleted.
 	for name, filename := range previous.SchemaFiles {
 		if next.SchemaFiles[name] != filename {
 			return fmt.Errorf("keep the schema name and filename for %s", name)
 		}
 	}
 	for _, kind := range candidate.RetiredRelationships {
-		if retired[kind] == "" {
-			retired[kind] = previous.Schema.Owner
-		}
-		known[kind] = retired[kind]
+		retired[kind] = true
 	}
-	for _, binding := range previous.Schema.Nodes {
-		known[binding.Kind] = binding.EffectiveOwner(previous.Schema.Owner)
+	if candidate.RetiredEndpoints == nil {
+		candidate.RetiredEndpoints = map[string][]extension.Endpoint{}
 	}
 	for _, binding := range previous.Schema.Relationships {
-		known[binding.Kind] = binding.EffectiveOwner(previous.Schema.Owner)
-		retired[binding.Kind] = known[binding.Kind]
-	}
-	for _, binding := range next.Schema.Nodes {
-		if old, exists := known[binding.Kind]; exists && old != binding.EffectiveOwner(next.Schema.Owner) {
-			return fmt.Errorf("%s is already owned by another extension", binding.Kind)
-		}
+		retired[binding.Kind] = true
+		candidate.RetiredEndpoints[binding.Kind] = append([]extension.Endpoint(nil), binding.Endpoints...)
 	}
 	for _, binding := range next.Schema.Relationships {
-		if old, exists := known[binding.Kind]; exists && old != binding.EffectiveOwner(next.Schema.Owner) {
-			return fmt.Errorf("%s is already owned by another extension", binding.Kind)
-		}
 		delete(retired, binding.Kind)
+		delete(candidate.RetiredEndpoints, binding.Kind)
 	}
 	candidate.RetiredRelationships = nil
-	candidate.RetiredOwners = retired
 	for kind := range retired {
 		candidate.RetiredRelationships = append(candidate.RetiredRelationships, kind)
 	}
@@ -200,50 +159,12 @@ func retainOwnership(previous extension.Plan, next *extension.Plan, candidate *B
 	return nil
 }
 
-// Saved identities belong to the registry, not uploaded schema files. Applying
-// them after loading also preserves the single-extension run-state identity.
-func applyOwners(owners map[string]string, plan *extension.Plan) error {
-	var (
-		known      = map[string]bool{}
-		kindOwners = map[string]string{}
-	)
-	for index := range plan.Definitions {
-		definition := &plan.Definitions[index]
-		known[definition.Schema.Name] = true
-		if owner, exists := owners[definition.Schema.Name]; exists {
-			if strings.TrimSpace(owner) == "" || len(owner) > 256 {
-				return fmt.Errorf("invalid saved owner for extension %s", definition.Schema.Name)
-			}
-			if definition.LegacyProcessing && definition.PostProcessing.Owner != owner {
-				return fmt.Errorf("keep the owner of extension %s", definition.Schema.Name)
-			}
-			definition.PostProcessing.Owner = owner
-		}
-		for _, kind := range definition.NodeKinds {
-			kindOwners[kind.Name] = definition.PostProcessing.Owner
-		}
-		for _, kind := range definition.RelationshipKinds {
-			kindOwners[kind.Name] = definition.PostProcessing.Owner
-		}
+// Snapshots are independent: a caller changing an endpoint must not change the
+// cleanup scope used by a running worker or saved in the registry.
+func copyEndpoints(scopes map[string][]extension.Endpoint) map[string][]extension.Endpoint {
+	var result = map[string][]extension.Endpoint{}
+	for kind, endpoints := range scopes {
+		result[kind] = append([]extension.Endpoint(nil), endpoints...)
 	}
-	for name := range owners {
-		if !known[name] {
-			return fmt.Errorf("saved owner refers to unknown extension %s", name)
-		}
-	}
-	for index := range plan.Schema.Nodes {
-		binding := &plan.Schema.Nodes[index]
-		binding.Owner = kindOwners[binding.Kind]
-	}
-	for index := range plan.Schema.Relationships {
-		binding := &plan.Schema.Relationships[index]
-		binding.Owner = kindOwners[binding.Kind]
-	}
-	if len(plan.Definitions) > 0 {
-		plan.Definition = plan.Definitions[0]
-		if len(plan.Definitions) == 1 {
-			plan.Schema.Owner = plan.Definition.PostProcessing.Owner
-		}
-	}
-	return nil
+	return result
 }

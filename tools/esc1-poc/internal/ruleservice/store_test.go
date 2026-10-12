@@ -139,18 +139,7 @@ func TestRejectedUpdatesPreserveActive(t *testing.T) {
 			}
 		})
 	}
-	var schema map[string]any
-	if err := json.Unmarshal([]byte(original["schema.json"]), &schema); err != nil {
-		t.Fatal(err)
-	}
-	schema["post_processing"] = map[string]any{"owner": "changed-owner", "reference_commit": strings.Repeat("a", 40)}
-	contents, err := json.Marshal(schema)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := store.Update(map[string]string{"schema.json": string(contents)}); err == nil {
-		t.Fatal("owner changed")
-	}
+
 }
 
 func TestFailedDiskReplacementAndConcurrentSnapshots(t *testing.T) {
@@ -223,6 +212,9 @@ func TestQueryOutputAndPolicyMayChange(t *testing.T) {
 	}
 	if len(updated.RetiredRelationships) != 1 || updated.RetiredRelationships[0] != "PoC_Vault_HasAccountFor" {
 		t.Fatal("previous output was not retired")
+	}
+	if endpoints := updated.RetiredEndpoints["PoC_Vault_HasAccountFor"]; len(endpoints) != 1 || endpoints[0].SourceKind != "PoC_Vault_Container" || endpoints[0].TargetKind != "User" {
+		t.Fatal("renaming an output must retain the previous cleanup scope", endpoints)
 	}
 }
 func TestCorruptPersistedStateFailsClosed(t *testing.T) {

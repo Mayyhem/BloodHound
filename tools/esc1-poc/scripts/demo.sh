@@ -27,8 +27,8 @@ fi
 ./esc1-poc run testdata/baseline/*.json | tee work/demo/baseline.json
 batch_id=$(python3 -c 'import json; print(json.load(open("work/demo/baseline.json"))["batch_id"].removeprefix("upload-"))')
 
-# The second invocation is a new process, exercising ownership after restart.
-# It uses the completed batch again; the default policy replaces the owned edge.
+# The second invocation is a new process, checking saved graph state after restart.
+# It uses the completed batch again; the default policy replaces the calculated edge.
 ./esc1-poc run -job-id "$batch_id" | tee work/demo/repeated.json
 ./esc1-poc run testdata/variants/two-templates/*.json | tee work/demo/two-templates.json
 ./esc1-poc run testdata/variants/one-support-remaining/*.json | tee work/demo/one-support.json

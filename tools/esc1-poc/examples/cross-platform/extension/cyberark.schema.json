@@ -25,7 +25,7 @@
     {
       "name": "PoC_CyberArk_AccountSummary",
       "display_name": "CyberArk account helper",
-      "description": "Owned account summary independent of directory data.",
+      "description": "Calculated account summary independent of directory data.",
       "is_display_kind": true,
       "icon": "flask",
       "color": "#805AD5"

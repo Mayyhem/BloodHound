@@ -39,7 +39,7 @@ func TestCypherKindPublishesAndEmptyAnswerRemovesOwnedEdges(t *testing.T) {
 			t.Fatal(report, err)
 		}
 		edge := database.graph.Edges[0]
-		if edge.Kind != "PoC_ADCSESC1" || edge.Owner != "test-owner/PoC_ADCSESC1" || edge.Properties["evidence"] != "fixture" {
+		if edge.Kind != "PoC_ADCSESC1" || edge.Properties["evidence"] != "fixture" {
 			t.Fatal("wrong publication", edge)
 		}
 		if _, exists := edge.Properties["kind"]; exists {

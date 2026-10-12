@@ -36,14 +36,14 @@ const (
 	nativeQuery             = "MATCH (source)-[:ADCSESC1]->(target) RETURN DISTINCT source.objectid AS source, target.objectid AS target"
 	endpointQuery           = "MATCH (item {objectid: $id}) RETURN labels(item) AS kinds"
 	helperLookupQuery       = "MATCH (item) WHERE item.objectid STARTS WITH $prefix RETURN item.objectid AS id, labels(item) AS kinds, properties(item) AS properties"
-	stateLookupQuery        = "MATCH (item {objectid: $id}) RETURN labels(item) AS kinds, item.poc_owner AS owner"
-	previousRunQuery        = "MATCH (run:PoC_Run {objectid: $id, poc_owner: $owner}) RETURN run.plan_hash AS plan_hash"
-	relationshipsQuery      = "MATCH (source)-[edge:PoC_ADCSESC1]->(target) RETURN id(edge) AS id, edge.poc_owner AS owner, source.objectid AS source, target.objectid AS target"
-	createRelationshipQuery = "MATCH (source {objectid: $source}), (target {objectid: $target}) CREATE (source)-[edge:`PoC_ADCSESC1`]->(target) SET edge = $properties, edge.poc_owner = $owner RETURN id(edge) AS id"
-	updateRelationshipQuery = "MATCH ()-[edge:`PoC_ADCSESC1`]->() WHERE id(edge) = $id AND edge.poc_owner = $owner SET edge += $properties RETURN id(edge) AS id"
-	deleteRelationshipQuery = "MATCH ()-[edge:`PoC_ADCSESC1`]->() WHERE id(edge) = $id AND edge.poc_owner = $owner WITH edge, id(edge) AS old_id DELETE edge RETURN old_id"
+	stateLookupQuery        = "MATCH (item {objectid: $id}) RETURN labels(item) AS kinds"
+	previousRunQuery        = "MATCH (run:PoC_Run {objectid: $id}) RETURN run.plan_hash AS plan_hash"
+	relationshipsQuery      = "MATCH (source)-[edge:PoC_ADCSESC1]->(target) RETURN id(edge) AS id, source.objectid AS source, target.objectid AS target"
+	createRelationshipQuery = "MATCH (source {objectid: $source}), (target {objectid: $target}) CREATE (source)-[edge:`PoC_ADCSESC1`]->(target) SET edge = $properties RETURN id(edge) AS id"
+	updateRelationshipQuery = "MATCH ()-[edge:`PoC_ADCSESC1`]->() WHERE id(edge) = $id SET edge += $properties RETURN id(edge) AS id"
+	deleteRelationshipQuery = "MATCH ()-[edge:`PoC_ADCSESC1`]->() WHERE id(edge) = $id WITH edge, id(edge) AS old_id DELETE edge RETURN old_id"
 	helperWriteQuery        = "MERGE (item:`PoC_Helper` {objectid: $id}) SET item = $properties"
-	saveRunQuery            = "MERGE (run:PoC_Run {objectid: $id}) SET run.poc_owner = $owner, run.batch_id = $batch, run.plan_hash = $hash, run.completed_at = $completed, run.reference_commit = $reference"
+	saveRunQuery            = "MERGE (run:PoC_Run {objectid: $id}) SET run.batch_id = $batch, run.plan_hash = $hash, run.completed_at = $completed, run.reference_commit = $reference"
 )
 
 type fakeNode struct {
@@ -55,7 +55,6 @@ type fakeNode struct {
 type fakeEdge struct {
 	ID         int64
 	Kind       string
-	Owner      string
 	Pair       runner.Pair
 	Properties map[string]any
 }
@@ -130,8 +129,48 @@ func (s *fakeTransaction) matchingNodes(id any) []fakeNode {
 	return matching
 }
 
+// Recognize the endpoint restriction used by the real publisher. This lets
+// tests verify that another endpoint combination is left alone.
+func splitRelationshipScope(query string) (string, string) {
+	var start = strings.Index(query, " WHERE (source:")
+	if start < 0 {
+		return query, ""
+	}
+	var end = strings.Index(query[start:], " RETURN ") + start
+	return query[:start] + query[end:], query[start+7 : end]
+}
+
+func (s *fakeTransaction) filterScope(rows runner.Rows, scope string) runner.Rows {
+	if scope == "" {
+		return rows
+	}
+	var filtered runner.Rows
+	for _, row := range rows {
+		var matches bool
+		for _, pair := range strings.Split(scope, " OR ") {
+			var kinds = strings.Split(strings.Trim(pair, "()"), " AND target:")
+			var sourceKind = strings.TrimPrefix(kinds[0], "source:")
+			for _, source := range s.matchingNodes(row["source"]) {
+				for _, target := range s.matchingNodes(row["target"]) {
+					for _, left := range source.Kinds {
+						for _, right := range target.Kinds {
+							matches = matches || left == sourceKind && right == kinds[1]
+						}
+					}
+				}
+			}
+		}
+		if matches {
+			filtered = append(filtered, row)
+		}
+	}
+	return filtered
+}
+
 func (s *fakeTransaction) Read(_ context.Context, query string, parameters map[string]any) (runner.Rows, error) {
 	var rows runner.Rows
+	var scope string
+	query, scope = splitRelationshipScope(query)
 	s.database.reads = append(s.database.reads, recordedRead{query: query, parameters: cloneProperties(parameters)})
 	if err := s.database.readErrors[query]; err != nil {
 		return nil, err
@@ -158,7 +197,7 @@ func (s *fakeTransaction) Read(_ context.Context, query string, parameters map[s
 				rows = append(rows, map[string]any{"source": edge.Pair.Source, "target": edge.Pair.Target})
 			}
 			if strings.HasPrefix(query, relationshipsQuery) && edge.Kind == "PoC_ADCSESC1" {
-				row := map[string]any{"id": edge.ID, "owner": edge.Owner, "source": edge.Pair.Source, "target": edge.Pair.Target}
+				row := map[string]any{"id": edge.ID, "source": edge.Pair.Source, "target": edge.Pair.Target}
 				if query != relationshipsQuery {
 					row["properties"] = cloneProperties(edge.Properties)
 				}
@@ -171,15 +210,13 @@ func (s *fakeTransaction) Read(_ context.Context, query string, parameters map[s
 				rows = append(rows, map[string]any{"id": node.ID, "kinds": node.Kinds, "properties": cloneProperties(node.Properties)})
 			}
 		}
-	case endpointQuery, stateLookupQuery, previousRunQuery:
+	case endpointQuery, previousRunQuery:
 		for _, node := range s.matchingNodes(parameters["id"]) {
 			switch query {
 			case endpointQuery:
 				rows = append(rows, map[string]any{"kinds": node.Kinds})
-			case stateLookupQuery:
-				rows = append(rows, map[string]any{"kinds": node.Kinds, "owner": node.Properties["poc_owner"]})
 			case previousRunQuery:
-				if reflect.DeepEqual(node.Kinds, []string{"PoC_Run"}) && node.Properties["poc_owner"] == parameters["owner"] {
+				if reflect.DeepEqual(node.Kinds, []string{"PoC_Run"}) {
 					rows = append(rows, map[string]any{"plan_hash": node.Properties["plan_hash"]})
 				}
 			}
@@ -187,7 +224,7 @@ func (s *fakeTransaction) Read(_ context.Context, query string, parameters map[s
 	default:
 		return nil, fmt.Errorf("fake does not recognize read: %s", query)
 	}
-	return rows, nil
+	return s.filterScope(rows, scope), nil
 }
 
 func (s *fakeTransaction) storeNode(node fakeNode) {
@@ -209,19 +246,19 @@ func (s *fakeTransaction) Write(_ context.Context, query string, parameters map[
 		s.database.helperWrites++
 		s.storeNode(fakeNode{ID: parameters["id"].(string), Kinds: []string{"PoC_Helper"}, Properties: cloneProperties(parameters["properties"].(map[string]any))})
 	case saveRunQuery:
-		s.storeNode(fakeNode{ID: parameters["id"].(string), Kinds: []string{"PoC_Run"}, Properties: map[string]any{"poc_owner": parameters["owner"], "batch_id": parameters["batch"], "plan_hash": parameters["hash"], "completed_at": parameters["completed"], "reference_commit": parameters["reference"]}})
+		s.storeNode(fakeNode{ID: parameters["id"].(string), Kinds: []string{"PoC_Run"}, Properties: map[string]any{"batch_id": parameters["batch"], "plan_hash": parameters["hash"], "completed_at": parameters["completed"], "reference_commit": parameters["reference"]}})
 	case createRelationshipQuery:
 		s.database.relationshipWrites++
 		if len(s.matchingNodes(parameters["source"])) != 1 || len(s.matchingNodes(parameters["target"])) != 1 {
 			return nil, nil
 		}
 		s.staged.NextID++
-		s.staged.Edges = append(s.staged.Edges, fakeEdge{ID: s.staged.NextID, Kind: "PoC_ADCSESC1", Properties: cloneProperties(parameters["properties"].(map[string]any)), Owner: parameters["owner"].(string), Pair: runner.Pair{Source: parameters["source"].(string), Target: parameters["target"].(string)}})
+		s.staged.Edges = append(s.staged.Edges, fakeEdge{ID: s.staged.NextID, Kind: "PoC_ADCSESC1", Properties: cloneProperties(parameters["properties"].(map[string]any)), Pair: runner.Pair{Source: parameters["source"].(string), Target: parameters["target"].(string)}})
 		return runner.Rows{{"id": s.staged.NextID}}, nil
 	case updateRelationshipQuery:
 		s.database.relationshipWrites++
 		for index, edge := range s.staged.Edges {
-			if edge.Kind == "PoC_ADCSESC1" && edge.ID == parameters["id"] && edge.Owner == parameters["owner"] {
+			if edge.Kind == "PoC_ADCSESC1" && edge.ID == parameters["id"] {
 				properties := cloneProperties(edge.Properties)
 				for key, value := range parameters["properties"].(map[string]any) {
 					if value == nil {
@@ -238,7 +275,7 @@ func (s *fakeTransaction) Write(_ context.Context, query string, parameters map[
 	case deleteRelationshipQuery:
 		s.database.relationshipWrites++
 		for index, edge := range s.staged.Edges {
-			if edge.Kind == "PoC_ADCSESC1" && edge.ID == parameters["id"] && edge.Owner == parameters["owner"] {
+			if edge.Kind == "PoC_ADCSESC1" && edge.ID == parameters["id"] {
 				s.staged.Edges = append(s.staged.Edges[:index], s.staged.Edges[index+1:]...)
 				return runner.Rows{{"old_id": edge.ID}}, nil
 			}
@@ -271,7 +308,7 @@ func (s *fakeTransaction) Rollback(context.Context) error {
 func fixturePlan() extension.Plan {
 	return extension.Plan{
 		Schema: extension.Schema{
-			Name: "runner-test", Owner: "test-owner", ReferenceCommit: strings.Repeat("a", 40),
+			Name: "runner-test", ReferenceCommit: strings.Repeat("a", 40),
 			Nodes:         []extension.NodeBinding{{Kind: "PoC_Helper", Query: "helper.cypher", IDPrefix: "PoC_Helper_"}},
 			Relationships: []extension.RelationshipBinding{{Kind: "PoC_ADCSESC1", Query: "esc1.cypher", ExistingEdgePolicy: extension.KeepExisting, Endpoints: []extension.Endpoint{{SourceKind: "User", TargetKind: "Domain"}}}},
 		},
@@ -342,7 +379,7 @@ func TestRunPreservesIdentityUntilFinalSupportIsRemoved(t *testing.T) {
 		t.Fatalf("unchanged rerun wrote relationships: %+v", second)
 	}
 	if !reflect.DeepEqual(database.graph.Edges[1], original) {
-		t.Fatal("rerun changed relationship identity or ownership")
+		t.Fatal("rerun changed relationship identity or properties")
 	}
 	// Two independent evidence rows can support one connection. Losing one
 	// supporting row does not authorize deleting that connection.
@@ -376,7 +413,7 @@ func TestRunRollsBackAfterStagingHelpersAndRelationships(t *testing.T) {
 				fakeNode{ID: "OLD_DOMAIN", Kinds: []string{"Domain"}, Properties: map[string]any{}},
 				fakeNode{ID: "PoC_Helper_example", Kinds: []string{"PoC_Helper"}, Properties: map[string]any{"objectid": "PoC_Helper_example", "poc_owner": "test-owner/PoC_Helper", "name": "previous value"}},
 			)
-			database.graph.Edges = []fakeEdge{{ID: 10, Kind: "PoC_ADCSESC1", Owner: "test-owner/PoC_ADCSESC1", Pair: runner.Pair{Source: "USER", Target: "OLD_DOMAIN"}}}
+			database.graph.Edges = []fakeEdge{{ID: 10, Kind: "PoC_ADCSESC1", Pair: runner.Pair{Source: "USER", Target: "OLD_DOMAIN"}}}
 			var before = cloneGraph(*database.graph)
 			if testCase.afterRelationships {
 				database.writeErrors[saveRunQuery] = fmt.Errorf("run record failed")
@@ -457,7 +494,7 @@ func TestRunChecksCompleteEndpointPairs(t *testing.T) {
 			database.graph.Nodes[1].Kinds = testCase.targetKinds
 			// An invalid replacement must preserve an existing owned edge,
 			// including its identity, as well as the staged helper changes.
-			database.graph.Edges = []fakeEdge{{ID: 7, Kind: "PoC_ADCSESC1", Owner: "test-owner/PoC_ADCSESC1", Pair: runner.Pair{Source: "USER", Target: "DOMAIN"}}}
+			database.graph.Edges = []fakeEdge{{ID: 7, Kind: "PoC_ADCSESC1", Pair: runner.Pair{Source: "USER", Target: "DOMAIN"}}}
 			if !testCase.allowed {
 				assertRollback(t, database, cloneGraph(*database.graph), plan, completeBatch(), "incompatible")
 				if database.relationshipWrites != 0 {
@@ -475,12 +512,12 @@ func TestRunChecksCompleteEndpointPairs(t *testing.T) {
 	}
 }
 
-func TestRunRefusesForeignRelationshipOwner(t *testing.T) {
+func TestRunAcceptsExistingUnmarkedRelationships(t *testing.T) {
 	var database = fixtureDatabase()
-	database.graph.Edges = []fakeEdge{{ID: 7, Kind: "PoC_ADCSESC1", Owner: "someone-else", Pair: runner.Pair{Source: "USER", Target: "DOMAIN"}}}
-	assertRollback(t, database, cloneGraph(*database.graph), fixturePlan(), completeBatch(), "owned by someone else")
-	if database.relationshipWrites != 0 {
-		t.Fatal("foreign relationship was written")
+	database.graph.Edges = []fakeEdge{{ID: 7, Kind: "PoC_ADCSESC1", Pair: runner.Pair{Source: "USER", Target: "DOMAIN"}}}
+	report := runSuccessfully(t, database)
+	if report.Unchanged != 1 || database.graph.Edges[0].ID != 7 {
+		t.Fatal("unmarked edge was not retained", report)
 	}
 }
 
@@ -503,15 +540,15 @@ func TestRunRejectsEqualCountsWithDifferentNativePairs(t *testing.T) {
 	}
 }
 
-func TestRunRetainsOwnershipAcrossClientRestart(t *testing.T) {
+func TestRunRetainsRelationshipsAcrossClientRestart(t *testing.T) {
 	var database = fixtureDatabase()
 	runSuccessfully(t, database)
 	original := database.graph.Edges[0]
 	restarted := fixtureDatabase()
 	restarted.graph = database.graph
 	report := runSuccessfully(t, restarted)
-	if report.Unchanged != 1 || restarted.relationshipWrites != 0 || !reflect.DeepEqual(restarted.graph.Edges[0], original) || original.Owner != "test-owner/PoC_ADCSESC1" {
-		t.Fatalf("restart lost ownership: report=%+v edge=%+v", report, restarted.graph.Edges[0])
+	if report.Unchanged != 1 || restarted.relationshipWrites != 0 || !reflect.DeepEqual(restarted.graph.Edges[0], original) {
+		t.Fatalf("restart changed relationships: report=%+v edge=%+v", report, restarted.graph.Edges[0])
 	}
 }
 

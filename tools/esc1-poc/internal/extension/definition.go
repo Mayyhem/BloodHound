@@ -65,7 +65,7 @@ type NodeKind struct {
 	PostProcessing *NodeProcessing `json:"post_processing,omitempty"`
 }
 
-// ExistingEdgePolicy controls already owned calculated relationships. It does
+// ExistingEdgePolicy controls existing calculated relationships. It does
 // not change how BloodHound ingests collected relationships.
 type ExistingEdgePolicy string
 
@@ -97,6 +97,9 @@ func (s *ExistingEdgePolicy) UnmarshalJSON(contents []byte) error {
 }
 
 type RelationshipKind struct {
+	// These fields are inferred from query files, never supplied by an author.
+	producerQueries    []string
+	producerPolicy     ExistingEdgePolicy
 	ExistingEdgePolicy ExistingEdgePolicy      `json:"existing_edge_policy,omitempty"`
 	Name               string                  `json:"name"`
 	Description        string                  `json:"description,omitempty"`
@@ -114,7 +117,6 @@ type Endpoint struct {
 }
 
 type ProcessingSettings struct {
-	Owner             string `json:"owner"`
 	ReferenceCommit   string `json:"reference_commit"`
 	CompareNativeESC1 bool   `json:"compare_native_esc1,omitempty"`
 }
@@ -236,25 +238,48 @@ func (s Definition) BloodHoundJSON() ([]byte, error) {
 }
 
 // Only kinds naming a query become managed output. Merely describing a
-// collected kind does not give the runner permission to own or delete it.
+// collected kind does not give the runner permission to update or delete it.
 func (s Definition) processingSchema() (Schema, error) {
 	var result Schema
 	if s.PostProcessing == nil {
 		return result, fmt.Errorf("running queries requires top-level post_processing settings")
 	}
 	result.Name = s.Schema.Name
-	result.Owner = s.PostProcessing.Owner
 	result.ReferenceCommit = s.PostProcessing.ReferenceCommit
 	result.CompareNativeESC1 = s.PostProcessing.CompareNativeESC1
 	for _, kind := range s.NodeKinds {
 		if kind.PostProcessing != nil {
-			result.Nodes = append(result.Nodes, NodeBinding{Owner: result.Owner, Kind: kind.Name, Query: kind.PostProcessing.Query, IDPrefix: kind.PostProcessing.IDPrefix})
+			result.Nodes = append(result.Nodes, NodeBinding{Kind: kind.Name, Query: kind.PostProcessing.Query, IDPrefix: kind.PostProcessing.IDPrefix})
 		}
 	}
 	for _, kind := range s.RelationshipKinds {
-		if kind.PostProcessing != nil {
-			result.Relationships = append(result.Relationships, RelationshipBinding{Owner: result.Owner, Kind: kind.Name, Query: kind.PostProcessing.Query, Endpoints: kind.Endpoints, ExistingEdgePolicy: kind.ExistingEdgePolicy})
+		policy := kind.ExistingEdgePolicy
+		if kind.producerPolicy != "" {
+			policy = kind.producerPolicy
+		}
+		for _, query := range kind.producingQueries() {
+			result.Relationships = append(result.Relationships, RelationshipBinding{Kind: kind.Name, Query: query, Endpoints: kind.Endpoints, ExistingEdgePolicy: policy})
 		}
 	}
 	return result, nil
+}
+
+// The schema can name a query explicitly, and additional query files can return
+// the same kind. Keep the definition singular while retaining every producer.
+func (s RelationshipKind) producingQueries() []string {
+	var (
+		result []string
+		seen   = make(map[string]bool)
+	)
+	if s.PostProcessing != nil {
+		result = append(result, s.PostProcessing.Query)
+		seen[s.PostProcessing.Query] = true
+	}
+	for _, query := range s.producerQueries {
+		if !seen[query] {
+			result = append(result, query)
+			seen[query] = true
+		}
+	}
+	return result
 }

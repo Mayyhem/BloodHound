@@ -50,7 +50,7 @@ type Comparison struct {
 // ComparePublished checks saved results without collecting either complete
 // list in memory. It uses the same temporary-file limits as calculation. The
 // caller keeps other writers stopped and rolls back this read transaction.
-func ComparePublished(ctx context.Context, transaction Transaction, owner, temporaryDirectory string, limits Limits) (Comparison, error) {
+func ComparePublished(ctx context.Context, transaction Transaction, temporaryDirectory string, limits Limits) (Comparison, error) {
 	limits, err := limits.checked()
 	if err != nil {
 		return Comparison{}, err
@@ -67,8 +67,8 @@ func ComparePublished(ctx context.Context, transaction Transaction, owner, tempo
 		return Comparison{}, err
 	}
 	defer writer.file.Close()
-	query := "MATCH (source)-[edge:PoC_ADCSESC1]->(target) WHERE edge.poc_owner = $owner RETURN DISTINCT source.objectid AS source, target.objectid AS target"
-	if err := streamWithTimeout(ctx, transaction, limits.QueryTimeout, query, map[string]any{"owner": producer(owner, "PoC_ADCSESC1")}, writer.append); err != nil {
+	query := "MATCH (source)-[edge:PoC_ADCSESC1]->(target) RETURN DISTINCT source.objectid AS source, target.objectid AS target"
+	if err := streamWithTimeout(ctx, transaction, limits.QueryTimeout, query, nil, writer.append); err != nil {
 		return Comparison{}, err
 	}
 	raw, err := writer.finish()

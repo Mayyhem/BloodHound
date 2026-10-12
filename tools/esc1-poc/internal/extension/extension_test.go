@@ -30,7 +30,7 @@ import (
 )
 
 func schemaFor(query string) extension.Schema {
-	return extension.Schema{Name: "ESC1 experiment", Owner: "experiment", ReferenceCommit: strings.Repeat("a", 40), Relationships: []extension.RelationshipBinding{{Kind: "PoC_ESC1", Query: query, Endpoints: []extension.Endpoint{{SourceKind: "User", TargetKind: "Domain"}, {SourceKind: "Group", TargetKind: "Domain"}}}}}
+	return extension.Schema{Name: "ESC1 experiment", ReferenceCommit: strings.Repeat("a", 40), Relationships: []extension.RelationshipBinding{{Kind: "PoC_ESC1", Query: query, Endpoints: []extension.Endpoint{{SourceKind: "User", TargetKind: "Domain"}, {SourceKind: "Group", TargetKind: "Domain"}}}}}
 }
 
 func writeExtension(t *testing.T, schema extension.Schema, queries map[string]string) string {
@@ -73,7 +73,7 @@ func writeExtension(t *testing.T, schema extension.Schema, queries map[string]st
 			"node_kinds":          nodes,
 			"relationship_kinds":  relationships,
 			"external_node_kinds": externalNames,
-			"post_processing":     map[string]any{"owner": schema.Owner, "reference_commit": schema.ReferenceCommit, "compare_native_esc1": schema.CompareNativeESC1},
+			"post_processing":     map[string]any{"reference_commit": schema.ReferenceCommit, "compare_native_esc1": schema.CompareNativeESC1},
 		}
 		contents, err = json.Marshal(definition)
 	)
@@ -174,7 +174,6 @@ func TestLoadRejectsInvalidSchema(t *testing.T) {
 		change func(*extension.Schema)
 		want   string
 	}{
-		{"owner", func(schema *extension.Schema) { schema.Owner = " " }, "owner"},
 		{"reference", func(schema *extension.Schema) { schema.ReferenceCommit = "main" }, "40 hexadecimal"},
 		{"published kind", func(schema *extension.Schema) { schema.Relationships[0].Kind = "ESC1" }, "namespace"},
 		{"endpoint", func(schema *extension.Schema) { schema.Relationships[0].Endpoints[0].TargetKind = "Bad-Label" }, "invalid"},

@@ -188,7 +188,7 @@ The pilot now selects affected extension queries when it has complete change tra
 | --- | --- |
 | Extension files | `.cypher` files describe the analysis. `schema.json` describes object types, allowed connections, which query produces each result, and what happens to an existing matching relationship. |
 | Rule container | Shows the complete rule plan, previews uploads and removals, stores reviewed changes, and displays the latest analysis report. It does not need access to the graph database. |
-| Modified BloodHound application | Runs the rules after its own analysis succeeds, using its existing database connection. It checks which results belong to the extension and saves the complete update. |
+| Modified BloodHound application | Runs the rules after its own analysis succeeds, using its existing database connection. It combines results from every producer of a selected relationship type and saves the complete update within its declared endpoint scope. |
 
 The customer installs the modified application and rule container once. Later rule uploads do not require rebuilding or restarting BloodHound. They take effect after the next successful BloodHound analysis; uploading rules alone does not run them.
 
@@ -196,11 +196,11 @@ The pilot works with Neo4j and PostgreSQL. Focused changes to DAWGS, BloodHound'
 
 ## Reviewing and changing rules
 
-The page shows independent groups, shared graph inputs, declared dependencies, execution order and stages, full Cypher, and each rule's inputs and outputs. These groups describe the plan, not a promise of simultaneous execution. Eligible independent reads run within the worker limit; helper publication and reads after helper staging are serial.
+The current page lists rules in a table with execution order, stage, extension, date added, and enabled state. Expanding a rule shows its Cypher, graph inputs, outputs, prerequisites, and consumers. Stages describe dependencies, not a promise of simultaneous execution. Eligible independent reads run within the worker limit; helper publication and reads after helper staging are serial. The [interactive execution graph](TODO.md#3-build-an-interactive-execution-graph-like-ghidraida) is planned work.
 
-Authors preview before activation and explicitly choose whether to overwrite every changed existing file, including its dependency declarations. Activation requires both the current base revision and the exact reviewed revision, preventing an older tab from replacing newer work. Removing a rule cascades to its dependent rules and prunes prerequisites unused by surviving producers. Calculation declarations are removed while kind names and display information remain. Schema uploads may remove or reassign query bindings; schema name and owner remain unchanged.
+Authors preview before activation and explicitly choose whether to overwrite every changed existing file, including its dependency declarations. Activation requires both the current base revision and the exact reviewed revision, preventing an older tab from replacing newer work. Removing a rule cascades to rules explicitly needing its returned rows and prunes prerequisites unused by surviving producers, while schema kind names and display information remain. Queries declare their outputs. Changing a producing query or moving its output to another query requires a valid complete file set; schema identity stays stable. Other producers of the same type and its graph readers remain; they recalculate together. Disabling preserves existing results by pausing the shared type’s producers and their downstream consumers. Preview checks the files and plan; it does not execute queries or show calculated graph changes.
 
-The saved bundle retains the history of retired relationship kinds across later edits and restarts. During the next successful analysis, the worker scans those kinds, verifies ownership, and deletes old owned relationships in the same final transaction as the new results. A failed run preserves previous committed results. Uploading or removing rules makes no immediate graph change, and helper objects are not automatically deleted.
+The saved bundle retains retired relationship types and their endpoint scopes across later edits and restarts. During the next successful analysis, remaining producers rebuild shared results. If the last producer was removed, the worker clears that recorded scope in the same final transaction as the new results. A failed run preserves previous committed results. Uploading or removing rules makes no immediate graph change, and helper objects are not automatically deleted.
 
 The supplied standalone Compose page is available at `http://127.0.0.1:18081/` without pasting a token. Its explicit local origin and loopback host-port binding provide local browser access; machine API requests still require the secret. Host and Origin checks do not authenticate arbitrary container-network clients. Remote production access should use BloodHound's existing login.
 
@@ -220,11 +220,11 @@ A minimal native integration would add one left-navigation item, route, and Reac
 | **Different analyzers repeat the same queries** | Several rules can name the same earlier query as a dependency. The engine calculates that shared answer once per run and passes it to each consumer. Independent queries can run together within a set limit. | Sharing is within the loaded rule set. Answers are not retained between runs, and this does not remove repeated work inside BloodHound's built-in ESC1 and ESC2 analyses. |
 | **Different extensions rebuild the same capabilities** | The shared engine provides query ordering, group and trust calculations, result checking, and safe relationship updates for both databases. Multiple extension schemas can share earlier query results in one combined execution plan. Authors reuse those capabilities instead of writing them again in each collector. | Authors must explicitly name the earlier queries they need. A reusable library of rules and automatic matching of accounts across different systems remain future work. |
 | **Extensions are difficult to maintain after their authors leave** | Analysis stays in named text files. Dependencies produce an inspectable processing order, errors identify failed queries, and the model picture shows allowed connections. Another author can update the files without rebuilding BloodHound. | A query using answers from earlier queries needs those inputs when tested separately. Not every rule can be pasted unchanged into the query browser. |
-| **Extensions need additional setup** | Once installed, BloodHound schedules analysis after its own checks. Customers do not have to arrange separate analysis schedules or manually order the extension's query files. Saved rules survive a container restart. | Customers still configure collection schedules and install the modified application, rule service, and access settings. Authors can remove or reassign analysis declarations after previewing the complete validated change. Retired owned relationships are cleaned up only during a later successful run; helper objects remain. |
+| **Extensions need additional setup** | Once installed, BloodHound schedules analysis after its own checks. Customers do not have to arrange separate analysis schedules or manually order the extension's query files. Saved rules survive a container restart. | Customers still configure collection schedules and install the modified application, rule service, and access settings. Authors can remove or reassign analysis declarations after previewing the complete validated change. Retired relationship scopes are cleaned up only during a later successful run; helper objects remain. |
 
 ## What happens to a matching relationship
 
-The query's `// existing-edge-policy:` comment provides the three choices proposed above. It applies to **calculated relationships owned by the extension**, not to collection ingestion.
+The query's `// existing-edge-policy:` comment provides the three choices proposed above. All producers of a relationship type must agree on the policy. It applies to existing edges within that type’s declared endpoint pairs, regardless of who created them.
 
 | Choice | Effect |
 | --- | --- |
@@ -232,7 +232,7 @@ The query's `// existing-edge-policy:` comment provides the three choices propos
 | `merge-properties` | Keep the relationship and update only the supplied details. Unmentioned details remain; a supplied null value removes that detail. |
 | `keep-existing` | Leave the matching relationship and its details unchanged. |
 
-Every choice creates newly justified relationships and removes owned relationships that no longer have support. “Keep existing” does not mean “keep forever.” If an existing result has missing or conflicting ownership, the run stops instead of taking it over or deleting it.
+Every choice creates newly justified relationships and removes in-scope relationships absent from every producer’s complete answer. “Keep existing” does not mean “keep forever.” Shared edges merge supplied properties in alphabetical filename order; later filenames win overlapping keys. A manual edge in the same scope can also be updated or removed.
 
 Extra helper objects created for calculations are not automatically deleted when a later answer omits them.
 

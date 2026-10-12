@@ -32,13 +32,13 @@ func registryDefinitions() []extension.Definition {
 	return []extension.Definition{
 		{
 			Schema:            extension.Metadata{Name: "active_directory", DisplayName: "Active Directory", Namespace: "PoC_AD", Version: "v1"},
-			PostProcessing:    &extension.ProcessingSettings{Owner: "ad/v1", ReferenceCommit: strings.Repeat("a", 40)},
+			PostProcessing:    &extension.ProcessingSettings{ReferenceCommit: strings.Repeat("a", 40)},
 			NodeKinds:         []extension.NodeKind{{Name: "PoC_AD_User", PostProcessing: &extension.NodeProcessing{Query: "ad_users.cypher", IDPrefix: "PoC_AD_User_"}}},
 			RelationshipKinds: []extension.RelationshipKind{},
 		},
 		{
 			Schema:            extension.Metadata{Name: "cyberark", DisplayName: "CyberArk", Namespace: "PoC_CA", Version: "v1"},
-			PostProcessing:    &extension.ProcessingSettings{Owner: "ca/v1", ReferenceCommit: strings.Repeat("b", 40)},
+			PostProcessing:    &extension.ProcessingSettings{ReferenceCommit: strings.Repeat("b", 40)},
 			NodeKinds:         []extension.NodeKind{{Name: "PoC_CA_Account"}},
 			ExternalNodeKinds: []string{"PoC_AD_User"},
 			RelationshipKinds: []extension.RelationshipKind{{Name: "PoC_CA_Admin", Endpoints: []extension.Endpoint{{SourceKind: "PoC_AD_User", TargetKind: "PoC_CA_Account"}}, PostProcessing: &extension.RelationshipProcessing{Query: "ca_admin.cypher"}}},
@@ -78,7 +78,7 @@ func registryQueries() map[string]string {
 	}
 }
 
-func TestLoadRegistryOrdersCrossSchemaQueriesAndPreservesOwners(t *testing.T) {
+func TestLoadRegistryOrdersCrossSchemaQueries(t *testing.T) {
 	var (
 		definitions  = registryDefinitions()
 		plan, err    = extension.Load(writeRegistry(t, definitions, registryQueries()))
@@ -101,14 +101,11 @@ func TestLoadRegistryOrdersCrossSchemaQueriesAndPreservesOwners(t *testing.T) {
 	if plan.Queries[0].ExtensionName != "Shared calculations" || plan.Queries[1].ExtensionName != "Active Directory" {
 		t.Fatalf("incorrect display names: %+v", plan.Queries)
 	}
-	if plan.Schema.Name != "registered_extensions" || plan.Schema.Owner != "rules-service/v1" || plan.Schema.ReferenceCommit != definitions[0].PostProcessing.ReferenceCommit {
+	if plan.Schema.Name != "registered_extensions" || plan.Schema.ReferenceCommit != definitions[0].PostProcessing.ReferenceCommit {
 		t.Fatalf("incorrect combined schema %+v", plan.Schema)
 	}
 	if len(plan.Definitions) != 2 || plan.Definition.Schema.Name != "active_directory" || plan.SchemaFiles["cyberark"] != "cyberark.schema.json" {
 		t.Fatalf("incorrect definition metadata %+v", plan)
-	}
-	if plan.Schema.Nodes[0].EffectiveOwner(plan.Schema.Owner) != "ad/v1" || plan.Schema.Relationships[0].EffectiveOwner(plan.Schema.Owner) != "ca/v1" {
-		t.Fatal("combined plan lost binding ownership")
 	}
 	if len(plan.Schema.Nodes) != 1 {
 		t.Fatal("collected CyberArk account was claimed as output")
@@ -167,12 +164,11 @@ func TestLoadRegistryRejectsGlobalConflictsAndInvalidDependencies(t *testing.T) 
 	}
 }
 
-func TestRegistryAllowsSharedOwnerAndStandaloneSchema(t *testing.T) {
+func TestRegistryAllowsStandaloneSchema(t *testing.T) {
 	var (
 		definitions = registryDefinitions()
 		directory   string
 	)
-	definitions[1].PostProcessing.Owner = definitions[0].PostProcessing.Owner
 	directory = writeRegistry(t, definitions, registryQueries())
 	if err := os.Rename(filepath.Join(directory, "active_directory.schema.json"), filepath.Join(directory, "schema.json")); err != nil {
 		t.Fatal(err)
@@ -183,9 +179,6 @@ func TestRegistryAllowsSharedOwnerAndStandaloneSchema(t *testing.T) {
 	}
 	if plan.Definitions[0].Schema.Name != "cyberark" || plan.SchemaFiles["active_directory"] != "schema.json" {
 		t.Fatal("definitions are not in filename order")
-	}
-	if (extension.NodeBinding{}).EffectiveOwner("fallback") != "fallback" || (extension.RelationshipBinding{}).EffectiveOwner("fallback") != "fallback" {
-		t.Fatal("legacy binding owner fallback changed")
 	}
 }
 

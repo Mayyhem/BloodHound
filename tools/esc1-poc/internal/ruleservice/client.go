@@ -94,8 +94,8 @@ func (s Client) Fetch(ctx context.Context) (Bundle, error) {
 	if err := decodeJSON(contents, &bundle); err != nil {
 		return Bundle{}, err
 	}
-	// Validate the complete saved state, including disabled rules, original
-	// owners of removed kinds, and dates. The file text alone is not enough.
+	// Validate the complete saved state, including disabled rules, removed
+	// connection types, and dates. The file text alone is not enough.
 	if _, err := ValidateBundle(bundle); err != nil {
 		return Bundle{}, err
 	}

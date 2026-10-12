@@ -40,7 +40,7 @@ func edgePolicyPlan(policy extension.ExistingEdgePolicy) extension.Plan {
 
 func edgePolicyDatabase() *fakeDatabase {
 	var database = fixtureDatabase()
-	database.graph.Edges = []fakeEdge{{ID: 10, Kind: "PoC_ADCSESC1", Owner: "test-owner/PoC_ADCSESC1", Pair: runner.Pair{Source: "USER", Target: "DOMAIN"}, Properties: map[string]any{"name": "old", "keep": "unspecified", "remove": true}}}
+	database.graph.Edges = []fakeEdge{{ID: 10, Kind: "PoC_ADCSESC1", Pair: runner.Pair{Source: "USER", Target: "DOMAIN"}, Properties: map[string]any{"name": "old", "keep": "unspecified", "remove": true}}}
 	return database
 }
 
@@ -63,7 +63,7 @@ func TestEdgePolicyDefaultReplacesIdentityAndProperties(t *testing.T) {
 				t.Fatalf("replacement counts: %+v edges=%+v", report, database.graph.Edges)
 			}
 			var edge = database.graph.Edges[0]
-			if edge.ID == 10 || edge.Owner != "test-owner/PoC_ADCSESC1" || !reflect.DeepEqual(edge.Properties, map[string]any{"name": "new"}) {
+			if edge.ID == 10 || !reflect.DeepEqual(edge.Properties, map[string]any{"name": "new"}) {
 				t.Fatalf("replacement retained old identity or properties: %+v", edge)
 			}
 			// Replacement remains intentional even when the newly supplied map is equal.
@@ -133,17 +133,15 @@ func TestEdgePolicyAllModesRemoveStaleOwnedConnections(t *testing.T) {
 	}
 }
 
-func TestEdgePolicyRejectsForeignAndMissingOwners(t *testing.T) {
+func TestEdgePoliciesAcceptExistingEdgesRegardlessOfLegacyProperties(t *testing.T) {
 	for _, policy := range []extension.ExistingEdgePolicy{"", extension.ReplaceExisting, extension.MergeProperties, extension.KeepExisting} {
-		for _, owner := range []string{"another-owner", ""} {
-			t.Run(string(policy)+"/"+owner, func(t *testing.T) {
+		for _, marker := range []string{"another-extension", ""} {
+			t.Run(string(policy)+"/"+marker, func(t *testing.T) {
 				var database = edgePolicyDatabase()
-				database.graph.Edges[0].Owner = owner
-				var before = cloneGraph(*database.graph)
-				assertRollback(t, database, before, edgePolicyPlan(policy), completeBatch(), "nothing was adopted or deleted")
-				if database.relationshipWrites != 0 {
-					t.Fatal("foreign relationship was written")
+				if marker != "" {
+					database.graph.Edges[0].Properties["poc_owner"] = marker
 				}
+				runEdgePolicy(t, database, policy)
 			})
 		}
 	}
@@ -171,7 +169,6 @@ func TestEdgePolicyInvalidPropertiesRollbackInEveryMode(t *testing.T) {
 		{"NaN", map[string]any{"source": "USER", "target": "DOMAIN", "properties": map[string]any{"bad": math.NaN()}}, "unsupported answer value"},
 		{"positive infinity", map[string]any{"source": "USER", "target": "DOMAIN", "properties": map[string]any{"bad": math.Inf(1)}}, "unsupported answer value"},
 		{"negative infinity", map[string]any{"source": "USER", "target": "DOMAIN", "properties": map[string]any{"bad": math.Inf(-1)}}, "unsupported answer value"},
-		{"owner", map[string]any{"source": "USER", "target": "DOMAIN", "properties": map[string]any{"poc_owner": "another-owner"}}, "reserved poc_owner"},
 		{"empty name", map[string]any{"source": "USER", "target": "DOMAIN", "properties": map[string]any{" ": true}}, "empty name"},
 	}
 	for _, policy := range []extension.ExistingEdgePolicy{"", extension.ReplaceExisting, extension.MergeProperties, extension.KeepExisting} {
@@ -283,7 +280,7 @@ func TestEdgePolicyLateWritesRestorePriorIdentitiesAndProperties(t *testing.T) {
 		t.Run(string(policy), func(t *testing.T) {
 			var database = edgePolicyDatabase()
 			database.graph.Nodes = append(database.graph.Nodes, fakeNode{ID: "SECOND", Kinds: []string{"Domain"}, Properties: map[string]any{}})
-			database.graph.Edges = append(database.graph.Edges, fakeEdge{ID: 11, Kind: "PoC_ADCSESC1", Owner: "test-owner/PoC_ADCSESC1", Pair: runner.Pair{Source: "USER", Target: "SECOND"}, Properties: map[string]any{"name": "second original"}})
+			database.graph.Edges = append(database.graph.Edges, fakeEdge{ID: 11, Kind: "PoC_ADCSESC1", Pair: runner.Pair{Source: "USER", Target: "SECOND"}, Properties: map[string]any{"name": "second original"}})
 			database.answers[relationshipQuery] = runner.Rows{
 				{"source": "USER", "target": "DOMAIN", "properties": map[string]any{"name": "first changed"}},
 				{"source": "USER", "target": "SECOND", "properties": map[string]any{"name": "second changed"}},
@@ -293,7 +290,7 @@ func TestEdgePolicyLateWritesRestorePriorIdentitiesAndProperties(t *testing.T) {
 				query = updateRelationshipQuery
 				// A stale removal and the first patch precede the failing patch.
 				database.graph.Nodes = append(database.graph.Nodes, fakeNode{ID: "STALE", Kinds: []string{"Domain"}, Properties: map[string]any{}})
-				database.graph.Edges = append(database.graph.Edges, fakeEdge{ID: 12, Kind: "PoC_ADCSESC1", Owner: "test-owner/PoC_ADCSESC1", Pair: runner.Pair{Source: "USER", Target: "STALE"}, Properties: map[string]any{"name": "stale original"}})
+				database.graph.Edges = append(database.graph.Edges, fakeEdge{ID: 12, Kind: "PoC_ADCSESC1", Pair: runner.Pair{Source: "USER", Target: "STALE"}, Properties: map[string]any{"name": "stale original"}})
 			}
 			var failing = &edgePolicyFailureDatabase{fakeDatabase: database, query: query}
 			var before = cloneGraph(*database.graph)

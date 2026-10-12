@@ -82,49 +82,49 @@ func loadDefinitions(directory string, entries []os.DirEntry) ([]Definition, map
 }
 
 // Output bindings identify their extension. Intermediate calculations inherit
-// all extensions that consume them, so shared work does not get an arbitrary owner.
+// all extensions that consume them, so shared work can be displayed together.
 func attributeQueries(queries []Query, definitions []Definition) []Query {
 	var (
-		outputOwners = make(map[string]string)
-		displayNames = make(map[string]string)
-		consumers    = make(map[string]map[string]bool)
+		outputExtensions = make(map[string]string)
+		displayNames     = make(map[string]string)
+		consumers        = make(map[string]map[string]bool)
 	)
 	for _, definition := range definitions {
 		displayNames[definition.Schema.Name] = definition.Schema.DisplayName
 		for _, kind := range definition.NodeKinds {
 			if kind.PostProcessing != nil {
-				outputOwners[kind.PostProcessing.Query] = definition.Schema.Name
+				outputExtensions[kind.PostProcessing.Query] = definition.Schema.Name
 			}
 		}
 		for _, kind := range definition.RelationshipKinds {
-			if kind.PostProcessing != nil {
-				outputOwners[kind.PostProcessing.Query] = definition.Schema.Name
+			for _, query := range kind.producingQueries() {
+				outputExtensions[query] = definition.Schema.Name
 			}
 		}
 	}
 	for _, query := range queries {
 		consumers[query.Name] = make(map[string]bool)
-		if owner := outputOwners[query.Name]; owner != "" {
-			consumers[query.Name][owner] = true
+		if extension := outputExtensions[query.Name]; extension != "" {
+			consumers[query.Name][extension] = true
 		}
 	}
 	for index := len(queries) - 1; index >= 0; index-- {
 		query := queries[index]
 		for _, dependency := range query.Dependencies {
 			if dependency.Type == "query" {
-				for owner := range consumers[query.Name] {
-					consumers[dependency.Name][owner] = true
+				for extension := range consumers[query.Name] {
+					consumers[dependency.Name][extension] = true
 				}
 			}
 		}
 	}
 	for index := range queries {
 		query := &queries[index]
-		if owner := outputOwners[query.Name]; owner != "" {
-			query.Extension, query.ExtensionName = owner, displayNames[owner]
+		if extension := outputExtensions[query.Name]; extension != "" {
+			query.Extension, query.ExtensionName = extension, displayNames[extension]
 		} else if len(consumers[query.Name]) == 1 {
-			for owner := range consumers[query.Name] {
-				query.Extension, query.ExtensionName = owner, displayNames[owner]
+			for extension := range consumers[query.Name] {
+				query.Extension, query.ExtensionName = extension, displayNames[extension]
 			}
 		} else {
 			query.Extension, query.ExtensionName = "shared", "Shared calculations"

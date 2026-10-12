@@ -28,7 +28,8 @@ from pathlib import Path
 
 
 ALICE_SID = "S-1-5-21-111111111-222222222-333333333-1001"
-VAULT_OWNER = "extension/vault_poc"
+VAULT_HELPER = "PoC_Vault_Helper"
+VAULT_RUN_ID = "PoC_Run_vault_poc"
 VAULT_RELATIONSHIP = "PoC_Vault_HasAccountFor"
 
 
@@ -62,7 +63,7 @@ def prepare(directory):
     final_query = final_path.read_text()
     assert "UNWIND $vault_helpers AS helper" in final_query
     declarations = final_query.split("UNWIND $vault_helpers AS helper", 1)[0]
-    final_path.write_text(declarations + "RETURN 1 / 0 AS source, 'unreachable' AS target\n")
+    final_path.write_text(declarations + "RETURN 1 / 0 AS source, 'unreachable' AS target, 'PoC_Vault_HasAccountFor' AS kind\n")
 
 
 class NoRedirects(urllib.request.HTTPRedirectHandler):
@@ -74,14 +75,19 @@ def postgres_snapshot():
     # Container-local psql uses the selected compose project and its native graph.
     # Build the same three row shapes as the Neo4j read-only snapshot.
     kinds = "(SELECT jsonb_agg(kind.name ORDER BY kind.name) FROM kind WHERE kind.id = ANY(node.kind_ids))"
-    owned = "(properties->>'poc_owner' LIKE 'extension/vault_poc%' OR properties->>'poc_owner' LIKE 'extension/esc1_poc%')"
+    selected_nodes = (
+        "EXISTS (SELECT 1 FROM kind WHERE kind.id = ANY(node.kind_ids) "
+        "AND kind.name IN ('PoC_DomainHelper', 'PoC_Vault_Helper')) "
+        "OR (EXISTS (SELECT 1 FROM kind WHERE kind.id = ANY(node.kind_ids) AND kind.name = 'PoC_Run') "
+        "AND node.properties->>'objectid' IN ('PoC_Run_vault_poc', 'PoC_Run_esc1_poc'))"
+    )
     statements = [
-        f"SELECT jsonb_build_array(node.id, {kinds}, node.properties) FROM node WHERE {owned} ORDER BY node.id",
+        f"SELECT jsonb_build_array(node.id, {kinds}, node.properties) FROM node WHERE {selected_nodes} ORDER BY node.id",
         "SELECT jsonb_build_array(edge.id, kind.name, source.properties->>'objectid', "
         "target.properties->>'objectid', edge.properties) FROM edge "
         "JOIN kind ON kind.id = edge.kind_id JOIN node source ON source.id = edge.start_id "
         "JOIN node target ON target.id = edge.end_id WHERE "
-        "(edge.properties->>'poc_owner' LIKE 'extension/vault_poc%' OR edge.properties->>'poc_owner' LIKE 'extension/esc1_poc%') ORDER BY edge.id",
+        "kind.name IN ('PoC_Vault_HasAccountFor', 'PoC_ADCSESC1') ORDER BY edge.id",
         f"SELECT jsonb_build_array(node.properties->>'objectid', {kinds}) FROM node "
         f"WHERE node.properties->>'objectid' = '{ALICE_SID}' "
         "OR EXISTS (SELECT 1 FROM kind WHERE kind.id = ANY(node.kind_ids) AND kind.name = 'PoC_Vault_Base') "
@@ -101,11 +107,10 @@ def postgres_snapshot():
 def neo4j_snapshot():
     # Read through the local graph API; never modify collected or native evidence.
     statements = [
-        "MATCH (node) WHERE node.poc_owner STARTS WITH 'extension/vault_poc' "
-        "OR node.poc_owner STARTS WITH 'extension/esc1_poc' "
+        "MATCH (node) WHERE node:PoC_DomainHelper OR node:PoC_Vault_Helper "
+        "OR (node:PoC_Run AND node.objectid IN ['PoC_Run_vault_poc', 'PoC_Run_esc1_poc']) "
         "RETURN id(node), labels(node), properties(node) ORDER BY id(node)",
-        "MATCH (source)-[edge]->(target) WHERE edge.poc_owner STARTS WITH 'extension/vault_poc' "
-        "OR edge.poc_owner STARTS WITH 'extension/esc1_poc' "
+        "MATCH (source)-[edge]->(target) WHERE type(edge) IN ['PoC_Vault_HasAccountFor', 'PoC_ADCSESC1'] "
         "RETURN id(edge), type(edge), source.objectid, target.objectid, properties(edge) ORDER BY id(edge)",
         "MATCH (node) WHERE node.objectid = $alice OR node:PoC_Vault_Base "
         "RETURN node.objectid, labels(node) ORDER BY node.objectid",
@@ -169,7 +174,7 @@ def verify(directory, scenario, order):
     assert report["query_rows"]["account_users.cypher"] == len(expected), report
     assert report["helpers_changed"] == helper_changes, report
     assert report["queries"] == ["vault_helpers.cypher", "account_users.cypher"], report
-    helpers = [node for node in graph["nodes"] if node[2]["poc_owner"] == VAULT_OWNER + "/PoC_Vault_Helper"]
+    helpers = [node for node in graph["nodes"] if node[1] == [VAULT_HELPER]]
     assert len(helpers) == helper_rows, graph
     if helper_rows:
         helper = helpers[0]
@@ -180,7 +185,6 @@ def verify(directory, scenario, order):
     edges = [edge for edge in graph["relationships"] if edge[1] == VAULT_RELATIONSHIP]
     actual = [{"source": edge[2], "target": edge[3]} for edge in edges]
     assert actual == expected, graph
-    assert all(edge[4]["poc_owner"] == VAULT_OWNER + "/" + VAULT_RELATIONSHIP for edge in edges), graph
 
 
 def compare(before_path, after_path, scope):
@@ -191,8 +195,8 @@ def compare(before_path, after_path, scope):
     elif scope == "vault":
         def vault_objects(graph):
             return {
-                "nodes": [node for node in graph["nodes"] if node[2]["poc_owner"].startswith(VAULT_OWNER)],
-                "relationships": [edge for edge in graph["relationships"] if edge[4]["poc_owner"].startswith(VAULT_OWNER)],
+                "nodes": [node for node in graph["nodes"] if node[1] == [VAULT_HELPER] or (node[1] == ["PoC_Run"] and node[2]["objectid"] == VAULT_RUN_ID)],
+                "relationships": [edge for edge in graph["relationships"] if edge[1] == VAULT_RELATIONSHIP],
                 "collected_kinds": graph["collected_kinds"],
             }
         before, after = vault_objects(before), vault_objects(after)
@@ -232,9 +236,9 @@ def summary(directory):
             "both ingestion orders", "OpenGraph ZIP and mixed OpenGraph/AD ZIP",
             "exact mixed-source pairs", "unchanged relationship identity",
             "two accounts collapse to one identity pair",
-            "malformed upload preserves owned graph",
+            "malformed upload preserves calculated graph state",
             "final query failure rolls back staged helper and successful-run marker",
-            "native ESC1 comparison and separate ownership",
+            "native ESC1 comparison preserves vault results",
         ],
         "expected_pair": read_json("examples/vault/expected.json")["baseline"],
     }

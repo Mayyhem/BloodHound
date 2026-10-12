@@ -123,21 +123,11 @@ func TestRunRejectsHelperCollisionsAndReservedFieldsWithoutMutatingNativeData(t 
 		{
 			name:     "native node using helper-shaped objectid",
 			existing: &fakeNode{ID: "PoC_Helper_example", Kinds: []string{"User"}, Properties: map[string]any{"name": "native user", "poc_owner": "native-owner"}},
-			message:  "native or differently owned",
-		},
-		{
-			name:     "helper owned by another experiment",
-			existing: &fakeNode{ID: "PoC_Helper_example", Kinds: []string{"PoC_Helper"}, Properties: map[string]any{"name": "previous helper", "poc_owner": "other-owner/PoC_Helper"}},
-			message:  "native or differently owned",
+			message:  "different node kind",
 		},
 		{
 			name:    "reserved objectid property",
 			row:     map[string]any{"id": "PoC_Helper_example", "kinds": []string{"PoC_Helper"}, "properties": map[string]any{"objectid": "USER"}},
-			message: "reserved",
-		},
-		{
-			name:    "reserved owner property",
-			row:     map[string]any{"id": "PoC_Helper_example", "kinds": []string{"PoC_Helper"}, "properties": map[string]any{"poc_owner": "native-owner"}},
 			message: "reserved",
 		},
 		{

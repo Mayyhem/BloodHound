@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
 )
@@ -42,14 +43,16 @@ type Change struct {
 }
 
 type Preview struct {
-	BaseRevision         string   `json:"base_revision"`
-	Revision             string   `json:"revision"`
-	Removed              []string `json:"removed"`
-	Overwritten          []string `json:"overwritten"`
-	RetiredRelationships []string `json:"retired_relationships"`
-	Plan                 PlanView `json:"plan"`
-	Disabled             []string `json:"disabled"`
-	Enabled              []string `json:"enabled"`
+	BaseRevision              string   `json:"base_revision"`
+	Revision                  string   `json:"revision"`
+	Removed                   []string `json:"removed"`
+	Overwritten               []string `json:"overwritten"`
+	RetiredRelationships      []string `json:"retired_relationships"`
+	RecalculatedRelationships []string `json:"recalculated_relationships"`
+	Paused                    []string `json:"paused"`
+	Plan                      PlanView `json:"plan"`
+	Disabled                  []string `json:"disabled"`
+	Enabled                   []string `json:"enabled"`
 }
 
 func (s *Store) View() PlanView {
@@ -120,7 +123,7 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 	if err != nil {
 		return Bundle{}, extension.Plan{}, preview, err
 	}
-	if err := retainOwnership(s.plan, &plan, &candidate); err != nil {
+	if err := retainRetirements(s.plan, plan, &candidate); err != nil {
 		return Bundle{}, extension.Plan{}, preview, err
 	}
 	if err := changeEnabledRules(&candidate, change); err != nil {
@@ -139,17 +142,26 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 		return Bundle{}, extension.Plan{}, preview, err
 	}
 	plan.RetiredRelationships = append([]string(nil), candidate.RetiredRelationships...)
-	plan.RetiredOwners = copyOwners(candidate.RetiredOwners)
+	plan.RetiredEndpoints = copyEndpoints(candidate.RetiredEndpoints)
 	preview.Disabled = append([]string{}, change.Disable...)
 	preview.Enabled = append([]string{}, change.Enable...)
 	preview.Revision = candidate.Revision
 	preview.RetiredRelationships = append([]string(nil), candidate.RetiredRelationships...)
 	preview.Plan = BuildView(candidate, plan)
+	preview.Paused = []string{}
+	for _, query := range plan.Queries {
+		if query.DisabledReason != "" {
+			preview.Paused = append(preview.Paused, query.Name)
+		}
+	}
+	sort.Strings(preview.Paused)
+	preview.RecalculatedRelationships = changedRelationshipTypes(s.plan, plan, preview.Removed)
 	sort.Strings(preview.Overwritten)
 	return candidate, plan, preview, nil
 }
 
-// Removing a prerequisite also removes rules that need it. Keep the kind's
+// Removing a query also removes rules that need its returned rows. Graph
+// readers stay and recalculate using the remaining producers. Keep the kind's
 // display information in the schema, but detach its calculation. Finally walk
 // backwards from the remaining outputs and discard unneeded scratch queries.
 // The preview lists every removed file before the user activates this change.
@@ -157,18 +169,11 @@ func removeUnusedRules(files map[string]string, requested []string) ([]string, e
 	var (
 		definitions  = map[string]extension.Definition{}
 		dependencies = map[string][]extension.Dependency{}
-		outputs      = map[string]map[string]bool{}
-		endpoints    = map[string][]extension.Endpoint{}
+		outputs      = map[string]bool{}
 		removed      = map[string]bool{}
 		needed       = map[string]bool{}
 		names        = []string{}
 	)
-	addOutput := func(query, kind string) {
-		if outputs[query] == nil {
-			outputs[query] = map[string]bool{}
-		}
-		outputs[query][kind] = true
-	}
 	for name, contents := range files {
 		if !extension.IsSchemaFile(name) {
 			continue
@@ -180,13 +185,12 @@ func removeUnusedRules(files map[string]string, requested []string) ([]string, e
 		definitions[name] = current
 		for _, kind := range current.NodeKinds {
 			if kind.PostProcessing != nil {
-				addOutput(kind.PostProcessing.Query, "node:"+kind.Name)
+				outputs[kind.PostProcessing.Query] = true
 			}
 		}
 		for _, kind := range current.RelationshipKinds {
-			endpoints["relationship:"+kind.Name] = kind.Endpoints
 			if kind.PostProcessing != nil {
-				addOutput(kind.PostProcessing.Query, "relationship:"+kind.Name)
+				outputs[kind.PostProcessing.Query] = true
 			}
 		}
 	}
@@ -199,16 +203,12 @@ func removeUnusedRules(files map[string]string, requested []string) ([]string, e
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		dependencies[name] = inputs
-		kind, node, err := extension.QueryOutputKind(contents)
+		kind, _, err := extension.QueryOutputKind(contents)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		if kind != "" {
-			prefix := "relationship:"
-			if node {
-				prefix = "node:"
-			}
-			addOutput(name, prefix+kind)
+			outputs[name] = true
 		}
 	}
 	for _, name := range requested {
@@ -224,36 +224,13 @@ func removeUnusedRules(files map[string]string, requested []string) ([]string, e
 	}
 	for changed := true; changed; {
 		changed = false
-		lostKinds := map[string]bool{}
-		for query, kinds := range outputs {
-			if removed[query] {
-				for kind := range kinds {
-					lostKinds[kind] = true
-				}
-			}
-		}
-		// A renamed rule can keep producing the same kind in this change.
-		for query, kinds := range outputs {
-			if !removed[query] {
-				for kind := range kinds {
-					delete(lostKinds, kind)
-				}
-			}
-		}
 		for name, inputs := range dependencies {
 			if removed[name] {
 				continue
 			}
 			for _, input := range inputs {
-				if input.Type == "query" && removed[input.Name] || lostKinds[input.Type+":"+input.Name] {
+				if input.Type == "query" && removed[input.Name] {
 					removed[name], changed = true, true
-				}
-			}
-			for kind := range outputs[name] {
-				for _, endpoint := range endpoints[kind] {
-					if lostKinds["node:"+endpoint.SourceKind] || lostKinds["node:"+endpoint.TargetKind] {
-						removed[name], changed = true, true
-					}
 				}
 			}
 		}
@@ -311,4 +288,63 @@ func removeUnusedRules(files map[string]string, requested []string) ([]string, e
 	}
 	sort.Strings(names)
 	return names, nil
+}
+
+// Deleting a producer refreshes its shared connections and the results of
+// graph readers downstream. Those readers keep their files. This list keeps
+// that graph cleanup separate from the files shown in the deletion preview.
+func changedRelationshipTypes(previous, next extension.Plan, removed []string) []string {
+	var (
+		affectedQueries = map[string]bool{}
+		affectedKinds   = map[string]bool{}
+		result          = []string{}
+	)
+	for _, name := range removed {
+		affectedQueries[name] = true
+	}
+	for changed := true; changed; {
+		changed = false
+		for _, plan := range []extension.Plan{previous, next} {
+			for _, binding := range plan.Schema.Nodes {
+				if affectedQueries[binding.Query] && !affectedKinds["node:"+binding.Kind] {
+					affectedKinds["node:"+binding.Kind], changed = true, true
+				}
+			}
+			for _, binding := range plan.Schema.Relationships {
+				if affectedQueries[binding.Query] && !affectedKinds["relationship:"+binding.Kind] {
+					affectedKinds["relationship:"+binding.Kind], changed = true, true
+				}
+			}
+		}
+		for _, query := range next.Queries {
+			if affectedQueries[query.Name] {
+				continue
+			}
+			for _, input := range query.Dependencies {
+				if input.Type == "query" && affectedQueries[input.Name] || affectedKinds[input.Type+":"+input.Name] {
+					affectedQueries[query.Name], changed = true, true
+				}
+			}
+		}
+		for _, binding := range next.Schema.Relationships {
+			if affectedQueries[binding.Query] {
+				continue
+			}
+			if affectedKinds["relationship:"+binding.Kind] {
+				affectedQueries[binding.Query], changed = true, true
+			}
+			for _, endpoint := range binding.Endpoints {
+				if affectedKinds["node:"+endpoint.SourceKind] || affectedKinds["node:"+endpoint.TargetKind] {
+					affectedQueries[binding.Query], changed = true, true
+				}
+			}
+		}
+	}
+	for kind := range affectedKinds {
+		if strings.HasPrefix(kind, "relationship:") {
+			result = append(result, strings.TrimPrefix(kind, "relationship:"))
+		}
+	}
+	sort.Strings(result)
+	return result
 }

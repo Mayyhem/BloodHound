@@ -15,7 +15,7 @@ You install two parts once: an extra container that stores the rules, and a modi
 
 Later collections can change the answer. A vault account collected before its matching directory user can be connected after that user arrives, without recollecting the vault. The engine also removes calculated connections that are no longer justified by stored facts. Simply leaving an object out of a later collection does not establish that it was removed; stale collected evidence remains a separate problem.
 
-Uploading or removing rules alone does not change the graph. Changes, including cleanup of retired owned connections, apply after the next successful BloodHound analysis. One table lists rules from every extension, with sortable columns for order, name, stage, date added, and extension. Filter by extension, expand a rule for its query and dependencies, or select rules to delete, disable, or enable. Disabling preserves files and existing results while pausing dependent rules. [The usage guide](USAGE.md#change-the-active-rules) explains these controls.
+Uploading or removing rules alone does not change the graph. Changes, including cleanup of retired connection scopes, apply after the next successful BloodHound analysis. One table lists rules from every extension, with sortable columns for order, name, stage, date added, and extension. Filter by extension, expand a rule for its query and dependencies, or select rules to delete, disable, or enable. Disabling preserves files and existing results while pausing other producers of the same relationship type and dependent rules. [The usage guide](USAGE.md#change-the-active-rules) explains these controls.
 
 ## What changes in BloodHound
 
@@ -27,10 +27,10 @@ Existing settings give BloodHound the rule container's address and access secret
 
 ## The main safeguards and limits
 
-- The extension changes only results it owns. It finishes the full calculation before removing obsolete connections. A failed calculation before saving preserves its previous results.
+- The runner combines every producer’s complete answer before refreshing a relationship type within its declared endpoint scope. Existing edges in that scope participate regardless of their origin. A failed calculation before saving preserves the previous results.
 - Each producing query names its edge with a literal `kind` column. Schemas describe types and endpoints; they need no `post_processing` blocks.
 - Each query can choose whether a matching connection is replaced, has its supplied details updated, or is kept unchanged. Replacement is the default.
-- Each extension has its own schema and owner. All uploaded schemas share one dependency order; queries can pass calculated rows across extension boundaries. These settings are **proposed additions to OpenGraph**, not an accepted part of its official definition.
+- Each extension has its own schema. Several queries can produce the same relationship type; their policies must agree. All uploaded schemas share one dependency order, and queries can pass calculated rows across extension boundaries. These settings are **proposed additions to OpenGraph**, not an accepted part of its official definition.
 - Both Neo4j and PostgreSQL have laboratory test evidence. This coordinates one modified Community Edition application; other applications or direct database writers are outside its protection.
 - Up to five ready queries can run together. A ready query can start without waiting for an unrelated slow query. Queries run one at a time after supporting objects are created, so they can see those new objects before saving.
 - First runs, changed rules, restarts, and incomplete change tracking run all enabled rules. Tracking is bounded, so large uploads can also require a full run of enabled rules.
@@ -41,6 +41,8 @@ Existing settings give BloodHound the rule container's address and access secret
 | I want to… | Read |
 | --- | --- |
 | Write my first extension or look up the authoring rules | [Developer guide and quick start](DEVELOPERS.md) |
+| Extend the starter with shared answers, helpers, and properties | [Step-by-step examples](DEVELOPERS.md#continue-with-the-same-example) |
+| Review planned improvements to extension development | [Developer experience backlog](TODO.md) |
 | Read the proposal and how the pilot addresses each problem | [OpenGraph analysis proposal](PROPOSAL.md) |
 | Start it, upload rules, and find the results | [Usage guide](USAGE.md) |
 | Understand the decisions and how it works | [Design guide and decision table](DESIGN.md) |

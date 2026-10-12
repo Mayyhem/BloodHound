@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
 )
@@ -33,20 +34,19 @@ type EndpointReader interface {
 
 type Publisher interface {
 	PutNode(context.Context, string, map[string]any) error
-	CreateRelationships(context.Context, string, string, []Relationship) (int, error)
-	UpdateRelationships(context.Context, string, string, []RelationshipUpdate) (int, error)
-	DeleteRelationships(context.Context, string, string, []int64) (int, error)
+	CreateRelationships(context.Context, string, []Relationship) (int, error)
+	UpdateRelationships(context.Context, string, []RelationshipUpdate) (int, error)
+	DeleteRelationships(context.Context, string, []int64) (int, error)
 }
 
-// Relationship is one requested connection and its ordinary properties. The
-// runner supplies ownership separately so a query cannot impersonate an owner.
+// Relationship is one requested connection and its ordinary properties.
 type Relationship struct {
 	Source     string
 	Target     string
 	Properties map[string]any
 }
 
-// RelationshipUpdate changes only the supplied keys on an owned connection.
+// RelationshipUpdate changes only the supplied keys on a connection.
 // A nil value removes that key. Unmentioned properties stay as they were.
 type RelationshipUpdate struct {
 	ID         int64
@@ -73,13 +73,11 @@ type relationshipChanges struct {
 
 // prepareChanges compares two sorted files by advancing through them once.
 // It never keeps the complete current or desired relationship set in memory.
-// Every existing owner is checked before any of these changes can be applied.
-func prepareChanges(ctx context.Context, transaction Transaction, owner string, binding extension.RelationshipBinding, desired *answerFile) (relationshipChanges, error) {
+func prepareChanges(ctx context.Context, transaction Transaction, binding extension.RelationshipBinding, desired *answerFile) (relationshipChanges, error) {
 	var (
-		result   = relationshipChanges{binding: binding}
-		identity = producer(owner, binding.Kind)
-		space    = desired.space
-		policy   = binding.EffectiveExistingEdgePolicy()
+		result = relationshipChanges{binding: binding}
+		space  = desired.space
+		policy = binding.EffectiveExistingEdgePolicy()
 	)
 	if policy != extension.ReplaceExisting && policy != extension.MergeProperties && policy != extension.KeepExisting {
 		return result, fmt.Errorf("%s has an unknown existing_edge_policy %q", binding.Kind, policy)
@@ -91,14 +89,19 @@ func prepareChanges(ctx context.Context, transaction Transaction, owner string, 
 	defer existingWriter.file.Close()
 	// Managed kinds have already passed the PoC_ identifier check. Use that
 	// name directly so this read works with both query implementations.
-	query := "MATCH (source)-[edge:" + binding.Kind + "]->(target) RETURN id(edge) AS id, edge.poc_owner AS owner, source.objectid AS source, target.objectid AS target"
+	query := "MATCH (source)-[edge:" + binding.Kind + "]->(target)"
+	if len(binding.Endpoints) > 0 {
+		var pairs []string
+		for _, endpoint := range binding.Endpoints {
+			pairs = append(pairs, "(source:"+endpoint.SourceKind+" AND target:"+endpoint.TargetKind+")")
+		}
+		query += " WHERE " + strings.Join(pairs, " OR ")
+	}
+	query += " RETURN id(edge) AS id, source.objectid AS source, target.objectid AS target"
 	if policy == extension.MergeProperties {
 		query += ", properties(edge) AS properties"
 	}
 	if err := streamWithTimeout(ctx, transaction, space.limits.QueryTimeout, query, nil, func(row map[string]any) error {
-		if row["owner"] != identity {
-			return fmt.Errorf("%s already contains a relationship owned by someone else or with no owner; nothing was adopted or deleted", binding.Kind)
-		}
 		if _, err := readPairs(Rows{{"source": row["source"], "target": row["target"]}}); err != nil {
 			return err
 		}
@@ -248,13 +251,11 @@ func pairLess(left, right Pair) bool {
 	return left.Source < right.Source || left.Source == right.Source && left.Target < right.Target
 }
 
-func applyChanges(ctx context.Context, transaction Transaction, owner string, changes relationshipChanges) error {
+func applyChanges(ctx context.Context, transaction Transaction, changes relationshipChanges) error {
 	var (
-		identity           = producer(owner, changes.binding.Kind)
 		publisher, batched = transaction.(Publisher)
-		// The adapters add ownership and replace text endpoint IDs with
-		// database IDs. Account for those additions before sending a batch.
-		extraBytesPerRow = encodedSize(map[string]any{"poc_owner": identity}) + 128
+		// Leave room for the database IDs added by the adapters.
+		extraBytesPerRow = int64(128)
 	)
 	create := func(rows Rows) error {
 		relationships := make([]Relationship, len(rows))
@@ -263,7 +264,7 @@ func applyChanges(ctx context.Context, transaction Transaction, owner string, ch
 			relationships[index] = Relationship{Source: pair.Source, Target: pair.Target, Properties: creationProperties(row["properties"].(map[string]any))}
 		}
 		if batched {
-			count, err := publisher.CreateRelationships(ctx, changes.binding.Kind, identity, relationships)
+			count, err := publisher.CreateRelationships(ctx, changes.binding.Kind, relationships)
 			if err != nil {
 				return err
 			}
@@ -273,7 +274,7 @@ func applyChanges(ctx context.Context, transaction Transaction, owner string, ch
 		} else {
 			// The basic interface remains useful for tiny in-memory tests.
 			for _, relationship := range relationships {
-				rows, err := transaction.Write(ctx, "MATCH (source {objectid: $source}), (target {objectid: $target}) CREATE (source)-[edge:`"+changes.binding.Kind+"`]->(target) SET edge = $properties, edge.poc_owner = $owner RETURN id(edge) AS id", map[string]any{"source": relationship.Source, "target": relationship.Target, "owner": identity, "properties": relationship.Properties})
+				rows, err := transaction.Write(ctx, "MATCH (source {objectid: $source}), (target {objectid: $target}) CREATE (source)-[edge:`"+changes.binding.Kind+"`]->(target) SET edge = $properties RETURN id(edge) AS id", map[string]any{"source": relationship.Source, "target": relationship.Target, "properties": relationship.Properties})
 				if err != nil {
 					return err
 				}
@@ -290,21 +291,21 @@ func applyChanges(ctx context.Context, transaction Transaction, owner string, ch
 			identifiers[index] = row["id"].(int64)
 		}
 		if batched {
-			count, err := publisher.DeleteRelationships(ctx, changes.binding.Kind, identity, identifiers)
+			count, err := publisher.DeleteRelationships(ctx, changes.binding.Kind, identifiers)
 			if err != nil {
 				return err
 			}
 			if count != len(identifiers) {
-				return fmt.Errorf("relationship ownership changed during publication; rolling back")
+				return fmt.Errorf("relationship identity changed during publication; rolling back")
 			}
 		} else {
 			for _, identifier := range identifiers {
-				rows, err := transaction.Write(ctx, "MATCH ()-[edge:`"+changes.binding.Kind+"`]->() WHERE id(edge) = $id AND edge.poc_owner = $owner WITH edge, id(edge) AS old_id DELETE edge RETURN old_id", map[string]any{"id": identifier, "owner": identity})
+				rows, err := transaction.Write(ctx, "MATCH ()-[edge:`"+changes.binding.Kind+"`]->() WHERE id(edge) = $id WITH edge, id(edge) AS old_id DELETE edge RETURN old_id", map[string]any{"id": identifier})
 				if err != nil {
 					return err
 				}
 				if len(rows) != 1 {
-					return fmt.Errorf("relationship ownership changed during publication; rolling back")
+					return fmt.Errorf("relationship identity changed during publication; rolling back")
 				}
 			}
 		}
@@ -316,21 +317,21 @@ func applyChanges(ctx context.Context, transaction Transaction, owner string, ch
 			updates[index] = RelationshipUpdate{ID: row["id"].(int64), Properties: row["properties"].(map[string]any)}
 		}
 		if batched {
-			count, err := publisher.UpdateRelationships(ctx, changes.binding.Kind, identity, updates)
+			count, err := publisher.UpdateRelationships(ctx, changes.binding.Kind, updates)
 			if err != nil {
 				return err
 			}
 			if count != len(updates) {
-				return fmt.Errorf("relationship ownership changed during property update; rolling back")
+				return fmt.Errorf("relationship identity changed during property update; rolling back")
 			}
 		} else {
 			for _, update := range updates {
-				rows, err := transaction.Write(ctx, "MATCH ()-[edge:`"+changes.binding.Kind+"`]->() WHERE id(edge) = $id AND edge.poc_owner = $owner SET edge += $properties RETURN id(edge) AS id", map[string]any{"id": update.ID, "owner": identity, "properties": update.Properties})
+				rows, err := transaction.Write(ctx, "MATCH ()-[edge:`"+changes.binding.Kind+"`]->() WHERE id(edge) = $id SET edge += $properties RETURN id(edge) AS id", map[string]any{"id": update.ID, "properties": update.Properties})
 				if err != nil {
 					return err
 				}
 				if len(rows) != 1 {
-					return fmt.Errorf("relationship ownership changed during property update; rolling back")
+					return fmt.Errorf("relationship identity changed during property update; rolling back")
 				}
 			}
 		}

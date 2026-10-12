@@ -2,6 +2,8 @@ Do not use technical software engineering jargon. I barely understand Go, so the
 
 Make the code, architecture, and documentation easy to understand. This is the most important thing. I need to be able to understand every bit of it (despite severely limited Go experience) and explain it to the software engineers responsible for reviewing and merging it with BloodHound proper. 
 
+If I don't ask you to start coding, don't start coding. Request permission if you are uncertain. 
+
 Prioritize ease of use and understanding for extension developers. Changes to DAWGS and BloodHound are allowed if necessary but should be minimized unless it makes things easier for extension developers or enhances performance significantly.
 
 Don't change the requirements for extension authors (e.g., schema.json or .cypher file definitions) based on assumptions without my approval. 

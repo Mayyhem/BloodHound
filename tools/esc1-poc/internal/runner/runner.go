@@ -139,13 +139,13 @@ func Run(ctx context.Context, database Database, plan extension.Plan, options Op
 	planHash := fingerprint(plan)
 	plan = runnablePlan(plan)
 	if options.Changes.CoverageKnown {
-		previous, err := transaction.Read(ctx, "MATCH (run:PoC_Run {objectid: $id, poc_owner: $owner}) RETURN run.plan_hash AS plan_hash", map[string]any{"id": stateID(plan), "owner": plan.Schema.Owner})
+		previous, err := transaction.Read(ctx, "MATCH (run:PoC_Run {objectid: $id}) RETURN run.plan_hash AS plan_hash", map[string]any{"id": stateID(plan)})
 		if err != nil {
 			return report, err
 		}
 		if len(previous) == 1 && previous[0]["plan_hash"] == planHash {
 			plan = affectedPlan(plan, options.Changes)
-			if len(plan.Queries) == 0 {
+			if len(plan.Queries) == 0 && len(plan.RetiredRelationships) == 0 {
 				report.Skipped = true
 				report.Elapsed = time.Since(started)
 				return report, nil
@@ -166,60 +166,57 @@ func Run(ctx context.Context, database Database, plan extension.Plan, options Op
 		return report, fmt.Errorf("graph contains missing, empty, or duplicate objectids; existing results were kept")
 	}
 
-	desiredByKind, err := calculate(ctx, database, transaction, plan, space, &report)
+	var staged = map[string]bool{}
+	stage := func(binding extension.RelationshipBinding, desired *answerFile) error {
+		if staged[binding.Kind] {
+			return nil
+		}
+		if binding.Kind == "PoC_ADCSESC1" && plan.Schema.CompareNativeESC1 {
+			comparison, err := compareFiles(ctx, transaction, desired)
+			report.NativeComparison = &comparison
+			if err != nil {
+				return err
+			}
+			if comparison.MissingCount != 0 || comparison.ExtraCount != 0 {
+				return fmt.Errorf("experimental ESC1 differs from native ESC1: %d missing and %d extra connections; all changes were rolled back", comparison.MissingCount, comparison.ExtraCount)
+			}
+		}
+		changes, err := prepareChanges(ctx, transaction, binding, desired)
+		if err != nil {
+			return err
+		}
+		changed := int64(report.Added+report.Removed+report.Updated+report.HelpersChanged+1) + changes.additions.rows + changes.removals.rows + changes.updates.rows
+		if changed > limits.ChangedObjects {
+			return fmt.Errorf("combined graph changes exceed the %d-change transaction budget", limits.ChangedObjects)
+		}
+		if err := applyChanges(ctx, transaction, changes); err != nil {
+			return err
+		}
+		report.Added += int(changes.additions.rows)
+		report.Removed += int(changes.removals.rows)
+		report.Updated += int(changes.updates.rows)
+		report.Unchanged += changes.unchanged
+		staged[binding.Kind] = true
+		for _, file := range []*answerFile{changes.additions, changes.removals, changes.updates} {
+			if err := file.remove(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	desiredByKind, err := calculate(ctx, database, transaction, plan, space, &report, stage)
 	if err != nil {
 		return report, err
 	}
-	if plan.Schema.CompareNativeESC1 {
-		comparison, err := compareFiles(ctx, transaction, desiredByKind["PoC_ADCSESC1"])
-		report.NativeComparison = &comparison
-		if err != nil {
-			return report, err
-		}
-		if comparison.MissingCount != 0 || comparison.ExtraCount != 0 {
-			return report, fmt.Errorf("experimental ESC1 differs from native ESC1: %d missing and %d extra connections; all changes were rolled back", comparison.MissingCount, comparison.ExtraCount)
-		}
-	}
-	// An explicit rule removal means this owner now wants no connections of
-	// that kind. Use the normal bounded comparison and ownership checks, with
-	// an empty answer. Nothing is deleted unless every remaining rule succeeds.
-	for _, kind := range plan.RetiredRelationships {
-		writer, err := space.create()
-		if err != nil {
-			return report, err
-		}
-		empty, err := writer.finish()
-		if err != nil {
-			return report, err
-		}
-		desiredByKind[kind] = empty
-		plan.Schema.Relationships = append(plan.Schema.Relationships, extension.RelationshipBinding{Kind: kind, Owner: plan.RetiredOwners[kind]})
-		report.DesiredCounts[kind] = 0
-		report.Desired[kind] = []Pair{}
-	}
-	var changes []relationshipChanges
-	var changed = int64(report.HelpersChanged) + 1 // Include the saved run record.
+	// Only types read by later rules needed early writes. Save all remaining
+	// combined answers now, still within the same transaction.
 	for _, binding := range plan.Schema.Relationships {
-		prepared, err := prepareChanges(ctx, transaction, binding.EffectiveOwner(plan.Schema.Owner), binding, desiredByKind[binding.Kind])
-		if err != nil {
+		if err := stage(binding, desiredByKind[binding.Kind]); err != nil {
 			return report, err
 		}
-		changed += prepared.additions.rows + prepared.removals.rows + prepared.updates.rows
-		if changed > limits.ChangedObjects {
-			return report, fmt.Errorf("combined graph changes exceed the %d-change transaction budget", limits.ChangedObjects)
-		}
-		changes = append(changes, prepared)
 	}
-	// These batches all belong to ONE transaction. A late failure, cancellation,
-	// or ownership conflict rolls back every earlier batch and helper change.
-	for _, change := range changes {
-		if err := applyChanges(ctx, transaction, change.binding.EffectiveOwner(plan.Schema.Owner), change); err != nil {
-			return report, err
-		}
-		report.Added += int(change.additions.rows)
-		report.Removed += int(change.removals.rows)
-		report.Updated += int(change.updates.rows)
-		report.Unchanged += change.unchanged
+	if int64(report.Added+report.Removed+report.Updated+report.HelpersChanged+1) > limits.ChangedObjects {
+		return report, fmt.Errorf("combined graph changes exceed the %d-change transaction budget", limits.ChangedObjects)
 	}
 	report.TemporaryPeakBytes = space.peak
 
@@ -230,7 +227,7 @@ func Run(ctx context.Context, database Database, plan extension.Plan, options Op
 		if errors.Is(err, ErrCommitRolledBack) {
 			return report, err
 		}
-		return report, fmt.Errorf("%w: %w; inspect graph ownership and the saved batch ID before retrying", ErrCommitUncertain, err)
+		return report, fmt.Errorf("%w: %w; inspect graph state and the saved batch ID before retrying", ErrCommitUncertain, err)
 	}
 	report.Committed = true
 	report.GraphObjectsChanged = report.Added + report.Removed + report.Updated + report.HelpersChanged + 1
@@ -250,6 +247,10 @@ func prepareDatabase(ctx context.Context, database Database, plan extension.Plan
 	)
 	for _, kind := range plan.RetiredRelationships {
 		allKinds[kind] = true
+		for _, endpoint := range retiredBinding(plan, kind).Endpoints {
+			nodeKinds[endpoint.SourceKind] = true
+			nodeKinds[endpoint.TargetKind] = true
+		}
 	}
 	for _, binding := range plan.Schema.Nodes {
 		allKinds[binding.Kind] = true
@@ -363,11 +364,39 @@ func keepQueries(plan extension.Plan, names map[string]bool) extension.Plan {
 // existing connections. Selected queries still calculate their complete answer;
 // we are choosing whole calculations, not slices of their results.
 func affectedPlan(plan extension.Plan, changes Changes) extension.Plan {
-	var names = map[string]bool{}
-	for _, name := range plan.Affected(changes.Nodes, changes.Relationships, true) {
+	var (
+		names                = map[string]bool{}
+		changedNodes         = map[string]bool{}
+		changedRelationships = map[string]bool{}
+		retired              []string
+		relationshipChanges  = append([]string(nil), changes.Relationships...)
+	)
+	for _, kind := range changes.Nodes {
+		changedNodes[kind] = true
+	}
+	for _, kind := range changes.Relationships {
+		changedRelationships[kind] = true
+	}
+	// The saved hash proves these removals already succeeded. Repeat cleanup
+	// only when ingestion could have changed that type or its endpoint scope.
+	for _, kind := range plan.RetiredRelationships {
+		affected := changedRelationships[kind]
+		for _, endpoint := range retiredBinding(plan, kind).Endpoints {
+			affected = affected || changedNodes[endpoint.SourceKind] || changedNodes[endpoint.TargetKind]
+		}
+		if affected {
+			retired = append(retired, kind)
+			// Cleanup can change this type even when ingestion only changed
+			// its endpoints. Include graph readers in the same run.
+			relationshipChanges = append(relationshipChanges, kind)
+		}
+	}
+	for _, name := range plan.Affected(changes.Nodes, relationshipChanges, true) {
 		names[name] = true
 	}
-	return keepQueries(plan, names)
+	result := keepQueries(plan, names)
+	result.RetiredRelationships = retired
+	return result
 }
 
 func stateID(plan extension.Plan) string {
@@ -375,18 +404,18 @@ func stateID(plan extension.Plan) string {
 }
 
 func saveRun(ctx context.Context, transaction Transaction, plan extension.Plan, batchID, planHash string) error {
-	var parameters = map[string]any{"id": stateID(plan), "owner": plan.Schema.Owner, "batch": batchID, "hash": planHash, "completed": time.Now().UTC().Format(time.RFC3339Nano), "reference": plan.Schema.ReferenceCommit}
-	rows, err := transaction.Read(ctx, "MATCH (item {objectid: $id}) RETURN labels(item) AS kinds, item.poc_owner AS owner", parameters)
+	var parameters = map[string]any{"id": stateID(plan), "batch": batchID, "hash": planHash, "completed": time.Now().UTC().Format(time.RFC3339Nano), "reference": plan.Schema.ReferenceCommit}
+	rows, err := transaction.Read(ctx, "MATCH (item {objectid: $id}) RETURN labels(item) AS kinds", parameters)
 	if err != nil {
 		return err
 	}
-	if len(rows) > 1 || len(rows) == 1 && (!onlyKind(rows[0]["kinds"], "PoC_Run") || rows[0]["owner"] != plan.Schema.Owner) {
+	if len(rows) > 1 || len(rows) == 1 && (!onlyKind(rows[0]["kinds"], "PoC_Run")) {
 		return fmt.Errorf("saved-run identity is already used by another object")
 	}
 	if publisher, ok := transaction.(Publisher); ok {
-		return publisher.PutNode(ctx, "PoC_Run", map[string]any{"objectid": parameters["id"], "poc_owner": parameters["owner"], "batch_id": parameters["batch"], "plan_hash": parameters["hash"], "completed_at": parameters["completed"], "reference_commit": parameters["reference"]})
+		return publisher.PutNode(ctx, "PoC_Run", map[string]any{"objectid": parameters["id"], "batch_id": parameters["batch"], "plan_hash": parameters["hash"], "completed_at": parameters["completed"], "reference_commit": parameters["reference"]})
 	}
-	_, err = transaction.Write(ctx, "MERGE (run:PoC_Run {objectid: $id}) SET run.poc_owner = $owner, run.batch_id = $batch, run.plan_hash = $hash, run.completed_at = $completed, run.reference_commit = $reference", parameters)
+	_, err = transaction.Write(ctx, "MERGE (run:PoC_Run {objectid: $id}) SET run.batch_id = $batch, run.plan_hash = $hash, run.completed_at = $completed, run.reference_commit = $reference", parameters)
 	return err
 }
 

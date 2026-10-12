@@ -518,7 +518,7 @@ func compareStoppedGraph(ctx context.Context, plan extension.Plan, application d
 	if err != nil {
 		return err
 	}
-	comparison, err := runner.ComparePublished(ctx, transaction, plan.Schema.Owner, temporaryDirectory, configuration.limits)
+	comparison, err := runner.ComparePublished(ctx, transaction, temporaryDirectory, configuration.limits)
 	if err != nil {
 		return err
 	}

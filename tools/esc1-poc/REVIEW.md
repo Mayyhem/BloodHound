@@ -4,6 +4,43 @@ This is a proof of concept for one modified BloodHound Community Edition process
 
 Start with [README.md](README.md) for the proposal, [USAGE.md](USAGE.md) for operating instructions, and [DESIGN.md](DESIGN.md) for the rules the code follows and its failure behavior. [HANDOFF.md](HANDOFF.md) retains the dated work history, full historical commands, private log locations, and local running state.
 
+## Shared relationship results — 11 October 2026
+
+The current implementation removes graph ownership settings, saved owners, owner properties added by the runner, and ownership checks. Several rules can produce one declared relationship type. The runner combines their complete pairs and merges supplied properties in alphabetical filename order; later filenames win overlapping keys. Every producer must agree on the existing-edge policy. Refreshing uses the declared type and endpoint pairs, including pre-existing or manually inserted edges in that scope. Helpers match by object ID and exact kind.
+
+Review the complete lifecycle: selecting a producer includes its peers, inputs, and consumers; graph readers wait for the shared type’s complete staged answer. Disabling pauses shared producers and their downstream consumers while preserving results. Deletion removes explicit query dependents, retains graph readers and surviving producers, and refreshes their results. Removing the final producer records its endpoint scope for later cleanup. Every graph change still commits or rolls back with the whole run.
+
+Validation of this change passed:
+
+- Complete extension suite: `go test -race ./...` from `tools/esc1-poc`, including shared producers, policy agreement, graph dependencies, self-reads, Disable/Delete, saved cleanup scopes, and selective runs.
+- Complete graph integration suite: `go test -race -tags integration -count=1 ./internal/graphdb` against the isolated Neo4j and PostgreSQL test databases. Passed in 103.668 seconds; log: `work/ownership-graphdb-live-race-final.log`. Checks include combined results visible to graph consumers, filename property precedence, preserved results while disabled, surviving and last-producer deletion, rollback after staged writes, legacy properties, and untouched connections outside the declared endpoints.
+- BloodHound integration packages: `go test ./cmd/api/src/daemons/datapipe ./cmd/api/src/daemons/api/toolapi ./cmd/api/src/services` from the repository root.
+- Updated example JSON, shell and Python syntax, demonstration-script checks, and the rules page's JavaScript syntax.
+
+The full repository `just prepare-for-codereview` command has not been run. Nothing was staged, committed, or deployed. The historical test logs below describe earlier revisions, including now-removed ownership checks, and are not validation of this change. See the current [handoff entry](HANDOFF.md#ownership-removed-and-shared-relationship-producers--11-october-2026) for environment details.
+
+## Authoring documentation check
+
+The documentation portion of [TODO item 1](TODO.md#1-keep-the-authoring-instructions-and-examples-consistent) was completed on 11 October 2026. The authoring guide now builds shared answers, helpers, and relationship properties on the same starter schema, with explicit filenames and instructions to replace rather than duplicate a producer. It separates author choices from automatic platform work. The example guides, usage instructions, design explanation, and proposal's implementation description were checked against the current loader and runner. Historical handoff entries and recorded test evidence retain their original scope.
+
+Only Markdown documentation was changed for this work. No application source, tests, scripts, schema files, or `.cypher` files were changed. No application was rebuilt, rules activated, or database calculation run.
+
+The one-time file checks used the existing local executable at `work/extensions-build/registry/esc1-poc`. The tutorial's JSON and Cypher were copied from the Markdown into a temporary directory under `work/`, checked, and removed. All of the following loaded successfully, with each prerequisite before its consumers:
+
+| Example | Queries in the plan | What was checked |
+| --- | ---: | --- |
+| Quick start | 1 | One membership producer with the declared relationship kind. |
+| Shared answers | 2 | The enabled-user calculation has role `intermediate` and precedes the membership producer. |
+| Helper objects | 3 | The added query produces the note kind already declared by the starter schema. |
+| Relationship properties | 3 | The replacement query keeps its prerequisite and output kind; the complete folder loads. |
+| Shipped ESC1 | 13 | Every shipped query is included in the plan. |
+| Shipped vault | 2 | The helper precedes the relationship query. |
+| Shipped Active Directory/CyberArk | 3 | The directory helper precedes its cross-extension consumer. |
+
+This checks file loading and plan construction using an existing build. It is not a fresh source build, a full query-language check, or evidence that the new tutorial produces the expected graph results on either database.
+
+**Still pending:** add permanent tests that extract the tutorial files from Markdown, check every stage and shipped example, and compare actual results with the documented expectations on both databases. Those tests should include disabled and missing-property users, helper identities, updating evidence on existing edges, and complete empty answers. This requires code changes and is awaiting the user's approval. Existing tests of shipped examples do not replace checks of the copied tutorial. The TODO remains open for that work.
+
 ## Five ready queries at a time
 
 The scheduler now defaults to five simultaneous queries, with a permitted setting of one to five. A finished query releases its place after its answers are checked; another ready query can start without waiting for unrelated queries. Shared answers remain available until their last reader finishes. Creating supporting objects still requires later reads to use the same database operation, one at a time. Complete results still save together.
@@ -23,15 +60,15 @@ The first database command used a PostgreSQL address format rejected by the test
 
 ## Cypher output declarations
 
-Relationship queries now declare their edge name with a literal `kind` in the final `RETURN`. Helper queries declare a literal one-element `kinds` list. The shipped schemas contain no `post_processing` blocks; the platform supplies ownership and experiment defaults. [DEVELOPERS.md](DEVELOPERS.md) explains the contract, empty results, query policies, and legacy migration.
+Relationship queries now declare their edge name with a literal `kind` in the final `RETURN`. Helper queries declare a literal one-element `kinds` list. The shipped schemas contain no `post_processing` blocks; the platform supplies experiment defaults. [DEVELOPERS.md](DEVELOPERS.md) explains the contract, empty results, query policies, and legacy migration.
 
 Validation for this change: the full POC unit suite passed with `-race`, and the complete `internal/graphdb` integration suite passed on the dedicated Neo4j and PostgreSQL databases. Checks cover ESC1 results, properties, empty results, disabled/removed rules, ownership, and rollback. New tests also cover literal discovery, rejected dynamic/duplicate output declarations, and saved-owner migration through registry restart. Logs: `work/cypher-output-race-tests.log` and `work/cypher-output-database-tests.log`. The regenerated offline model pages also passed browser checks, with no browser errors or web requests (`work/cypher-output-model-check/checks.json`). These fixture runs are not a production-scale performance benchmark or a deployment of the updated application.
 
 ## Review priorities
 
 1. Follow the place where rules run after normal BloodHound analysis, and how other graph changes wait. Confirm every application graph writer participates, including tag renames and raw PostgreSQL deletion. Database switch and migration tools must refuse work while the optional integration is enabled. Other applications and direct database writers are outside this coordination.
-2. Follow uploaded rules through checks, saved storage, and fetching. Confirm a calculation keeps the same saved copy of the rules throughout. Uploading alone does not run rules. Check that the owner, output kind/query assignments, and helper ID prefixes stay stable. Check authentication, request limits, and rejected uploads.
-3. Follow the runner from ordered query results to checks on which results it owns and the final saved changes. Helpers, calculated relationships, and the run record save together. Schema registration, kind entries, and index preparation are separate operations and may remain after failure. Helpers omitted by later rules are not automatically deleted.
+2. Follow uploaded rules through checks, saved storage, and fetching. Confirm a calculation keeps the same saved copy of the rules throughout. Uploading alone does not run rules. Check combined output kind/query assignments, matching policies, saved retirement scopes, and helper ID prefixes. Check authentication, request limits, and rejected uploads.
+3. Follow the runner from ordered query results to checks on the declared type and endpoint scope and the final saved changes. Helpers, calculated relationships, and the run record save together. Schema registration, kind entries, and index preparation are separate operations and may remain after failure. Helpers omitted by later rules are not automatically deleted.
 4. Inspect database adapters and the separate DAWGS checkout. Review exact result numbers, checks that analysis queries cannot write, choices for updating existing connections, and how failed changes are discarded on both databases. A parent BloodHound commit does not capture DAWGS edits.
 5. Compare the recorded outcomes and retained failures below with the claims. No complete repository checks or `just prepare-for-codereview` were run. Repository instructions require that command before committing; nothing was staged or committed in this work.
 
@@ -51,10 +88,10 @@ The Go code separates its jobs into packages, which are folders of related sourc
 | --- | --- | --- |
 | `postprocessing` | Run the same saved rules after normal analysis, make other graph changes wait, and decide safe retries | [service.go](postprocessing/service.go), [gate.go](postprocessing/gate.go) |
 | `internal/ruleservice` | Store validated uploads and report the latest execution status | [store.go](internal/ruleservice/store.go), [http.go](internal/ruleservice/http.go), [client.go](internal/ruleservice/client.go) |
-| `internal/extension` | Read the one OpenGraph definition, check allowed combinations, prepare today's BloodHound upload, and order calculation queries | [definition.go](internal/extension/definition.go), [extension.go](internal/extension/extension.go) |
+| `internal/extension` | Read the schemas and query output declarations, check allowed combinations, prepare today's BloodHound upload, and order calculation queries | [definition.go](internal/extension/definition.go), [extension.go](internal/extension/extension.go) |
 | `internal/modelview` | Turn the same definition into an offline interactive picture and complete connection table | [modelview.go](internal/modelview/modelview.go), [viewer.html](internal/modelview/viewer.html) |
 | `internal/bloodhound` | Validate collection files, upload them, and wait for successful ingestion and native analysis | [client.go](internal/bloodhound/client.go) |
-| `internal/runner` | Share graph calculations, bound saved answers, compare complete results, and publish owned changes together | [runner.go](internal/runner/runner.go), [calculate.go](internal/runner/calculate.go), [reach.go](internal/runner/reach.go), [overlap.go](internal/runner/overlap.go) |
+| `internal/runner` | Share graph calculations, bound saved answers, compare complete results, and publish combined changes together | [runner.go](internal/runner/runner.go), [calculate.go](internal/runner/calculate.go), [reach.go](internal/runner/reach.go), [overlap.go](internal/runner/overlap.go) |
 | `internal/graphdb` | Connect to the selected graph database, check read-only queries, and apply validated changes | [native.go](internal/graphdb/native.go) for persistent mode; [neo4j.go](internal/graphdb/neo4j.go), [postgres.go](internal/graphdb/postgres.go) for standalone mode |
 | Standalone command | Join those pieces together, run one batch at a time, and stop/restart the dedicated BloodHound service | [main.go](main.go), [deployment.go](deployment.go), [stack.go](stack.go), [container_stack.go](container_stack.go) |
 
@@ -120,7 +157,7 @@ Most of the new code lives in `tools/esc1-poc`. The files under `cmd/api` connec
 | [match.go](../DAWGS/cypher/models/pgsql/translate/match.go), [translator.go](../DAWGS/cypher/models/pgsql/translate/translator.go), [traversal.go](../DAWGS/cypher/models/pgsql/translate/traversal.go), [unwind.go](../DAWGS/cypher/models/pgsql/translate/unwind.go) | Optional joins, leading UNWIND/WITH frames, and bound traversal roots for the simpler rule queries. |
 | [format.go](../DAWGS/cypher/models/pgsql/format/format.go), [selectivity.go](../DAWGS/cypher/models/pgsql/optimize/selectivity.go) | Supporting SQL formatting and query selection behavior. |
 | [result.go](../DAWGS/drivers/pg/result.go), [result_test.go](../DAWGS/drivers/pg/result_test.go) | PostgreSQL result handling and its regression checks. |
-| [explicit_transaction.go](../DAWGS/drivers/pg/explicit_transaction.go), [unit tests](../DAWGS/drivers/pg/explicit_transaction_test.go), [integration tests](../DAWGS/drivers/pg/explicit_transaction_integration_test.go), [explicit_relationships.go](../DAWGS/drivers/pg/explicit_relationships.go), [relationship tests](../DAWGS/drivers/pg/explicit_relationships_test.go) | Explicit final transactions and generic per-row relationship batches, with ownership guards and late rollback. |
+| [explicit_transaction.go](../DAWGS/drivers/pg/explicit_transaction.go), [unit tests](../DAWGS/drivers/pg/explicit_transaction_test.go), [integration tests](../DAWGS/drivers/pg/explicit_transaction_integration_test.go), [explicit_relationships.go](../DAWGS/drivers/pg/explicit_relationships.go), [relationship tests](../DAWGS/drivers/pg/explicit_relationships_test.go) | Explicit final transactions and generic per-row relationship batches, with identity guards and late rollback. |
 | [nodes.sql](../DAWGS/cypher/models/pgsql/test/translation_cases/nodes.sql), [mutation_tests.json](../DAWGS/cypher/test/cases/mutation_tests.json), [negative_tests.json](../DAWGS/cypher/test/cases/negative_tests.json), [collection_constraint_shapes.json](../DAWGS/integration/testdata/templates/collection_constraint_shapes.json), [map_shapes.json](../DAWGS/integration/testdata/templates/map_shapes.json) | Expected SQL, rejected expressions, and live semantic fixtures. |
 | [README.md](../DAWGS/README.md), [translator README](../DAWGS/cypher/models/pgsql/translate/README.md) | Dependency behavior and limitations. |
 
@@ -331,6 +368,7 @@ Maintained files under this experiment are listed individually. The counts recor
 | [HANDOFF.md](HANDOFF.md) | Dated local history, detailed commands, preserved failures, and continuation notes. |
 | [README.md](README.md) | Executive overview of the proposal and a guide to the other documents. |
 | [DEVELOPERS.md](DEVELOPERS.md) | Extension author quick start, schema and query reference, current Cypher limitations, performance guidance, and troubleshooting. |
+| [TODO.md](TODO.md) | Prioritized authoring improvements, documentation work completed, and remaining work including the proposed interactive execution graph. |
 | [PROPOSAL.md](PROPOSAL.md) | User's OpenGraph analysis proposal, with an Implementation section mapping each problem to working pilot features and remaining work. |
 | [USAGE.md](USAGE.md) | Setup, rule upload, demonstrations, operation, and recovery instructions. |
 | [DESIGN.md](DESIGN.md) | Rule contracts, calculation and publication behavior, coordination, and design limits. |
@@ -382,8 +420,8 @@ Maintained files under this experiment are listed individually. The counts recor
 | [internal/extension/reach.go](internal/extension/reach.go) | Checks reachability, group-overlap, and batch declarations. |
 | [internal/extension/reach_test.go](internal/extension/reach_test.go) | Checks helper declarations, rejected settings, and current query syntax. |
 | [internal/extension/readonly_test.go](internal/extension/readonly_test.go) | Checks forbidden query text and allowed read-only query forms. |
-| [internal/extension/registry.go](internal/extension/registry.go) | Loads separately named schemas, combines declarations, retains owners, and assigns queries to their extensions. |
-| [internal/extension/registry_test.go](internal/extension/registry_test.go) | Checks global dependency order, schema identity, cross-schema references, owner preservation, duplicate declarations, and helper-prefix collisions. |
+| [internal/extension/registry.go](internal/extension/registry.go) | Loads separately named schemas, combines declarations, retains every relationship producer, and assigns queries to their extensions. |
+| [internal/extension/registry_test.go](internal/extension/registry_test.go) | Checks global dependency order, schema identity, cross-schema references, shared producers, duplicate declarations, and helper-prefix collisions. |
 | [internal/runner/batch_test.go](internal/runner/batch_test.go) | Checks late write-batch failures, complete rollback, sampled reports, and bounded input batches. |
 | [internal/runner/calculate.go](internal/runner/calculate.go) | Schedules bounded ready reads, releases answers, and serializes helper-dependent work. |
 | [internal/runner/compare.go](internal/runner/compare.go) | Compares exact pairs with written expectations or native ESC1 answers. |
@@ -395,7 +433,7 @@ Maintained files under this experiment are listed individually. The counts recor
 | [internal/runner/overlap.go](internal/runner/overlap.go) | Applies reusable ordered group-aware permission overlap. |
 | [internal/runner/overlap_test.go](internal/runner/overlap_test.go) | Checks group shortcuts, special sides, overlaps, and ordered remove-self rules. |
 | [internal/runner/parallel_test.go](internal/runner/parallel_test.go) | Checks the five-query limit, immediate scheduling, shared answers, helper visibility, and cancellation before connection closing and file cleanup. |
-| [internal/runner/publish.go](internal/runner/publish.go) | Validates graph endpoints and ownership and maintains helpers and relationships. |
+| [internal/runner/publish.go](internal/runner/publish.go) | Validates graph endpoints and identity and maintains helpers and relationships. |
 | [internal/runner/publish_file.go](internal/runner/publish_file.go) | Compares complete sorted sets and publishes validated endpoint batches. |
 | [internal/runner/reach.go](internal/runner/reach.go) | Builds shared reachable sets from relevant single-hop graph reads. |
 | [internal/runner/reach_test.go](internal/runner/reach_test.go) | Checks diamonds, cycles, cancellation, limits, and all small directed graph closures. |
@@ -415,8 +453,8 @@ Maintained files under this experiment are listed individually. The counts recor
 | [internal/graphdb/address_test.go](internal/graphdb/address_test.go) | Checks host and private container graph address restrictions. |
 | [internal/graphdb/endpoints_integration_test.go](internal/graphdb/endpoints_integration_test.go) | Checks exact permitted endpoint combinations and preservation of previous state when a combination is rejected in real Neo4j. |
 | [internal/graphdb/edge_policy_integration_test.go](internal/graphdb/edge_policy_integration_test.go) | Checks all publication policies and late property-update rollback on both real databases. |
-| [internal/graphdb/guards_integration_test.go](internal/graphdb/guards_integration_test.go) | Checks ownership, identities, selective triggers, exact mismatches, and uncertain commit acknowledgements against real graph state. |
-| [internal/graphdb/multiple_integration_test.go](internal/graphdb/multiple_integration_test.go) | Checks the public two-schema rules through the real rule-service client and both native database adapters, including selective disable, ownership, rollback, and removal cleanup. |
+| [internal/graphdb/guards_integration_test.go](internal/graphdb/guards_integration_test.go) | Checks identities, selective triggers, exact mismatches, and uncertain commit acknowledgements against real graph state. |
+| [internal/graphdb/multiple_integration_test.go](internal/graphdb/multiple_integration_test.go) | Checks the public two-schema rules through the real rule-service client and both native database adapters, including selective disable, scope checks, rollback, and removal cleanup. |
 | [internal/graphdb/neo4j.go](internal/graphdb/neo4j.go) | Adapts the official Neo4j driver to the runner and checks that analysis queries are read-only. |
 | [internal/graphdb/neo4j_integration_test.go](internal/graphdb/neo4j_integration_test.go) | Exercises ESC1 queries, publication, rollback, read-only enforcement, and membership cycles in real Neo4j. |
 | [internal/graphdb/neo4j_publish.go](internal/graphdb/neo4j_publish.go) | Prepares input/endpoint indexes and performs typed batched publication. |
@@ -428,8 +466,8 @@ Maintained files under this experiment are listed individually. The counts recor
 | [internal/graphdb/postgres_json.go](internal/graphdb/postgres_json.go) | Preserves exact integer values in PostgreSQL JSON answers without changing the shared driver. |
 | [internal/graphdb/postgres_json_test.go](internal/graphdb/postgres_json_test.go) | Checks nested integer precision and rejects malformed or out-of-range JSON answers. |
 | [internal/graphdb/postgres_test.go](internal/graphdb/postgres_test.go) | Checks PostgreSQL addresses and parsed read-only queries. |
-| [internal/graphdb/relationship_properties.go](internal/graphdb/relationship_properties.go) | Prepares owned relationship creation and guarded property updates for both adapters. |
-| [internal/graphdb/relationship_properties_test.go](internal/graphdb/relationship_properties_test.go) | Checks ownership protection and malformed property-update batches. |
+| [internal/graphdb/relationship_properties.go](internal/graphdb/relationship_properties.go) | Prepares relationship creation and guarded property updates for both adapters. |
+| [internal/graphdb/relationship_properties_test.go](internal/graphdb/relationship_properties_test.go) | Checks relationship identities and malformed property-update batches. |
 
 ### Offline model viewer
 
@@ -496,10 +534,10 @@ Maintained files under this experiment are listed individually. The counts recor
 
 | File | Purpose |
 | --- | --- |
-| [examples/cross-platform/README.md](examples/cross-platform/README.md) | Explains the synthetic two-schema example, separately owned helpers, explicit prerequisite row flow, and factual account association. |
-| [examples/cross-platform/extension/active_directory.schema.json](examples/cross-platform/extension/active_directory.schema.json) | Declares the Active Directory helper kind, native User reference; the platform assigns its owner. |
-| [examples/cross-platform/extension/ad_users.cypher](examples/cross-platform/extension/ad_users.cypher) | Returns separately owned directory helper rows carrying each native user's SID. |
-| [examples/cross-platform/extension/cyberark.schema.json](examples/cross-platform/extension/cyberark.schema.json) | Declares synthetic CyberArk account kinds, the independent helper, and a non-traversable account-to-user association under cyberark-example/v1. |
+| [examples/cross-platform/README.md](examples/cross-platform/README.md) | Explains the synthetic two-schema example, separate helper kinds, explicit prerequisite row flow, and factual account association. |
+| [examples/cross-platform/extension/active_directory.schema.json](examples/cross-platform/extension/active_directory.schema.json) | Declares the Active Directory helper kind, and native User reference. |
+| [examples/cross-platform/extension/ad_users.cypher](examples/cross-platform/extension/ad_users.cypher) | Returns directory helper rows carrying each native user's SID. |
+| [examples/cross-platform/extension/cyberark.schema.json](examples/cross-platform/extension/cyberark.schema.json) | Declares synthetic CyberArk account kinds, the independent helper, and a non-traversable account-to-user association. |
 | [examples/cross-platform/extension/cyberark_accounts.cypher](examples/cross-platform/extension/cyberark_accounts.cypher) | Summarizes collected synthetic accounts independently of directory rules. |
 | [examples/cross-platform/extension/cyberark_links.cypher](examples/cross-platform/extension/cyberark_links.cypher) | Consumes current directory prerequisite rows and joins account user_sid values to native User object IDs. |
 
@@ -556,7 +594,7 @@ synthetic data and clearly scoped current or historical checks; private identifi
 | [internal/graphdb/native_test.go](internal/graphdb/native_test.go) | Checks native adapter behavior without a running graph. |
 | [internal/graphdb/selection_integration_test.go](internal/graphdb/selection_integration_test.go) | Checks selected publication, skipped output preservation, rollback, and actual automatic change tracking on both databases. |
 | [internal/runner/selection_test.go](internal/runner/selection_test.go) | Checks which queries run, complete-answer cleanup, native comparison, saved-plan identity, and preservation of skipped outputs. |
-| [internal/ruleservice/client.go](internal/ruleservice/client.go) | Fetches and validates complete snapshots, including revisions, disabled settings, dates, and retirement owners, and reports status without redirects or environment proxies. |
+| [internal/ruleservice/client.go](internal/ruleservice/client.go) | Fetches and validates complete snapshots, including revisions, disabled settings, dates, and retirement scopes, and reports status without redirects or environment proxies. |
 | [internal/ruleservice/analysis_client.go](internal/ruleservice/analysis_client.go) | Uses a server-held BloodHound API key to request normal analysis and read its status, with fixed operations and bounded requests. |
 | [internal/ruleservice/analysis_client_test.go](internal/ruleservice/analysis_client_test.go) | Checks signed requests, native status handling, rejected responses, permissions, time limits, redirects, and private error messages. |
 | [internal/ruleservice/analysis_http.go](internal/ruleservice/analysis_http.go) | Connects the manual analysis button to BloodHound, refuses overlapping requests, and distinguishes accepted requests from completion. |
@@ -564,9 +602,9 @@ synthetic data and clearly scoped current or historical checks; private identifi
 | [internal/ruleservice/http.go](internal/ruleservice/http.go) | Provides authenticated plan, preview, confirmed activation, and status endpoints with size and time limits. |
 | [internal/ruleservice/http_test.go](internal/ruleservice/http_test.go) | Checks authentication, strict bodies, client limits, redirects, and concurrent uploads. |
 | [internal/ruleservice/store.go](internal/ruleservice/store.go) | Validates and atomically persists active snapshots and the latest status. |
-| [internal/ruleservice/store_test.go](internal/ruleservice/store_test.go) | Checks persistence, independent snapshots, stable ownership, reassignment, additions, removals, and rejected updates. |
-| [internal/ruleservice/settings.go](internal/ruleservice/settings.go) | Saves explicit disabled settings, pauses dependent rules, checks activation dates, and preserves schema and output ownership. |
-| [internal/ruleservice/multiple_test.go](internal/ruleservice/multiple_test.go) | Checks the two-schema plan, incremental uploads, persistent dates, selective disable and re-enable, removal ownership, restart metadata, and complete client validation. |
+| [internal/ruleservice/store_test.go](internal/ruleservice/store_test.go) | Checks persistence, independent snapshots, schema identity, reassignment, additions, removals, and rejected updates. |
+| [internal/ruleservice/settings.go](internal/ruleservice/settings.go) | Saves explicit disabled settings, pauses shared producers and dependent rules, and checks activation dates. |
+| [internal/ruleservice/multiple_test.go](internal/ruleservice/multiple_test.go) | Checks the two-schema plan, incremental uploads, persistent dates, selective disable and re-enable, removal scopes, restart metadata, and complete client validation. |
 | [internal/ruleservice/upload.html](internal/ruleservice/upload.html) | Presents one sortable and filterable rules table, expandable query details, schema downloads, upload review, readable confirmation lists, aligned actions, Run Analysis, and separate native and extension status. |
 | [internal/ruleservice/validation.go](internal/ruleservice/validation.go) | Bounds and validates schema/query files, complete bundle revisions, JSON, saved disabled settings, activation dates, and retirement metadata. |
 | [postprocessing/gate_test.go](postprocessing/gate_test.go) | Checks writer exclusion, nested admission, cancellation, and read availability. |
@@ -586,10 +624,10 @@ synthetic data and clearly scoped current or historical checks; private identifi
 | [scripts/check-rules-table.py](scripts/check-rules-table.py) | Checks the single rules table in an isolated browser API fixture, including ordering, sorting, filtering, selection, dates, expansion, confirmation, cancellation, and status polling. |
 | [compose.persistent-lab.yaml](compose.persistent-lab.yaml) | Uses fresh Neo4j lab storage and separate ports without replacing the preserved control data. |
 | [compose.persistent-pg-lab.yaml](compose.persistent-pg-lab.yaml) | Uses fresh PostgreSQL lab storage and host port 35432 with the persistent application on port 28080. |
-| [internal/ruleservice/changes.go](internal/ruleservice/changes.go) | Builds complete multi-schema previews, requires explicit overwrites and current revisions, cascades removal, saves disabled settings, and retains retired kinds with their owners. |
+| [internal/ruleservice/changes.go](internal/ruleservice/changes.go) | Builds complete multi-schema previews, requires explicit overwrites and current revisions, cascades removal, saves disabled settings, and retains retired kinds with their endpoint scopes. |
 | [internal/ruleservice/changes_test.go](internal/ruleservice/changes_test.go) | Checks preview isolation, overwrites, stale tabs, reassignment, removal, and persistence of removal history. |
 | [internal/ruleservice/local.go](internal/ruleservice/local.go) | Enables explicitly configured local browser access while keeping the worker API secret protected. |
 | [internal/ruleservice/local_test.go](internal/ruleservice/local_test.go) | Checks exact local origin and methods, blocked cross-site changes, and continued worker authentication. |
 | [internal/ruleservice/view.go](internal/ruleservice/view.go) | Describes the complete ordered plan, per-query extension, stage, activation date, enabled state, dependency details, and shared groups for the table and API. |
 | [internal/ruleservice/view_test.go](internal/ruleservice/view_test.go) | Checks independent groups, shared inputs, branching order, endpoint inputs, and complete query details. |
-| [internal/graphdb/removal_integration_test.go](internal/graphdb/removal_integration_test.go) | Checks removal, late rollback, foreign ownership, and last-rule removal against both real graph databases. |
+| [internal/graphdb/removal_integration_test.go](internal/graphdb/removal_integration_test.go) | Checks removal, late rollback, mixed-origin edges, and last-rule removal against both real graph databases. |

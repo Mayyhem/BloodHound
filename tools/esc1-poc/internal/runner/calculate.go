@@ -34,19 +34,22 @@ type queryAnswer struct {
 // calculate starts ready queries whenever a place is free. A slow query does
 // not hold up the next step of an unrelated chain. Shared prerequisites run once
 // and their files stay available until every consumer has finished reading.
-func calculate(ctx context.Context, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report) (map[string]*answerFile, error) {
+func calculate(ctx context.Context, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report, stage func(extension.RelationshipBinding, *answerFile) error) (map[string]*answerFile, error) {
 	var (
-		answers       = map[string]*answerFile{}
-		remaining     = map[string]int{}
-		started       = map[string]bool{}
-		completed     = map[string]bool{}
-		helperQueries = map[string]bool{}
-		desired       = map[string]*answerFile{}
-		finished      = make(chan queryAnswer, space.limits.Workers)
-		running       int
-		workers       = 1
-		helpersStaged bool
-		sampleBytes   = maxReportSampleBytes
+		answers            = map[string]*answerFile{}
+		remaining          = map[string]int{}
+		started            = map[string]bool{}
+		completed          = map[string]bool{}
+		helperQueries      = map[string]bool{}
+		desired            = map[string]*answerFile{}
+		produced           = map[string]map[string]*answerFile{}
+		staged             = map[string]bool{}
+		graphInputs        = map[string]bool{}
+		finished           = make(chan queryAnswer, space.limits.Workers)
+		running            int
+		workers            = 1
+		graphChangesStaged bool
+		sampleBytes        = maxReportSampleBytes
 	)
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer func() {
@@ -66,17 +69,66 @@ func calculate(ctx context.Context, database Database, transaction Transaction, 
 	}
 	for _, query := range plan.Queries {
 		for _, dependency := range query.Dependencies {
+			if dependency.Type == "relationship" {
+				graphInputs[dependency.Name] = true
+			}
 			if dependency.Type == "query" {
 				remaining[strings.TrimSuffix(dependency.Name, ".cypher")]++
 			}
 		}
 	}
+	// Retired types have an empty complete answer. Clear them before any
+	// consumer reads the graph; the outer transaction still protects rollback.
+	for _, kind := range plan.RetiredRelationships {
+		file, err := combineRelationshipAnswers(ctx, space, nil)
+		if err != nil {
+			return nil, err
+		}
+		if err := stage(retiredBinding(plan, kind), file); err != nil {
+			return nil, err
+		}
+		desired[kind] = file
+		report.DesiredCounts[kind] = 0
+		report.Desired[kind] = []Pair{}
+		graphChangesStaged = true
+		workers = 1
+	}
 	for len(completed) < len(plan.Queries) {
 		if err := context.Cause(ctx); err != nil {
 			return nil, err
 		}
+		// Graph consumers need the complete combined type, not just the
+		// producer that finished first. Wait for other readers to close before
+		// staging it, then keep later reads on the same transaction.
+		if running == 0 {
+			for _, binding := range plan.Schema.Relationships {
+				if staged[binding.Kind] || !graphInputs[binding.Kind] {
+					continue
+				}
+				ready := true
+				for _, producer := range plan.Schema.Relationships {
+					if producer.Kind == binding.Kind && !completed[producer.Query] {
+						ready = false
+					}
+				}
+				if !ready {
+					continue
+				}
+				file, err := combineRelationshipAnswers(ctx, space, produced[binding.Kind])
+				if err != nil {
+					return nil, err
+				}
+				desired[binding.Kind] = file
+				if err := stage(binding, file); err != nil {
+					return nil, err
+				}
+				staged[binding.Kind] = true
+				graphChangesStaged = true
+				workers = 1
+			}
+		}
 		for running < workers {
-			query, ready := nextReadyQuery(plan.Queries, started, completed, helperQueries, running)
+			query, ready := nextReadyQuery(plan, started, completed, helperQueries, staged, running)
 			if !ready || ctx.Err() != nil {
 				break
 			}
@@ -91,7 +143,7 @@ func calculate(ctx context.Context, database Database, transaction Transaction, 
 			}
 			started[query.Name] = true
 			running++
-			separateReader := workers > 1 && !helpersStaged
+			separateReader := workers > 1 && !graphChangesStaged
 			go func() {
 				file := readQueryAnswers(ctx, database, transaction, separateReader, query, inputs, space, cancel)
 				finished <- queryAnswer{query: query, file: file}
@@ -132,13 +184,13 @@ func calculate(ctx context.Context, database Database, transaction Transaction, 
 			if err != nil {
 				return nil, err
 			}
-			if err := publishHelperAnswers(ctx, transaction, binding.EffectiveOwner(plan.Schema.Owner), binding, sorted, report); err != nil {
+			if err := publishHelperAnswers(ctx, transaction, binding, sorted, report); err != nil {
 				return nil, fmt.Errorf("helper answers from %s: %w", query.Name, err)
 			}
 			if err := sorted.remove(); err != nil {
 				return nil, err
 			}
-			helpersStaged = true
+			graphChangesStaged = true
 		}
 		for _, binding := range plan.Schema.Relationships {
 			if binding.Query != query.Name {
@@ -151,25 +203,15 @@ func calculate(ctx context.Context, database Database, transaction Transaction, 
 			if err := validateFileEndpoints(ctx, transaction, binding, pairs); err != nil {
 				return nil, err
 			}
-			desired[binding.Kind] = pairs
-			report.DesiredCounts[binding.Kind] = pairs.rows
-			report.Desired[binding.Kind] = []Pair{}
-			if err := pairs.each(ctx, func(row map[string]any) error {
-				sample := report.Desired[binding.Kind]
-				appendReportPair(&sample, pairFromRow(row), space.limits.ReportPairs, &sampleBytes)
-				report.Desired[binding.Kind] = sample
-				return nil
-			}); err != nil {
-				return nil, err
+			if produced[binding.Kind] == nil {
+				produced[binding.Kind] = map[string]*answerFile{}
 			}
-			if pairs.rows > int64(len(report.Desired[binding.Kind])) {
-				report.DesiredTruncated = true
-			}
+			produced[binding.Kind][query.Name] = pairs
 		}
 		// Helpers are not committed yet. Later reads use this same database
 		// operation so they can see them. Publication still succeeds or fails
 		// for the whole run; we never save one chain on its own.
-		if helpersStaged {
+		if graphChangesStaged {
 			workers = 1
 		}
 		completed[query.Name] = true
@@ -187,22 +229,71 @@ func calculate(ctx context.Context, database Database, transaction Transaction, 
 			}
 		}
 	}
+	for _, binding := range plan.Schema.Relationships {
+		if _, exists := desired[binding.Kind]; exists {
+			continue
+		}
+		file, err := combineRelationshipAnswers(ctx, space, produced[binding.Kind])
+		if err != nil {
+			return nil, err
+		}
+		desired[binding.Kind] = file
+	}
+	for _, kind := range sortedAnswerNames(desired) {
+		file := desired[kind]
+		report.DesiredCounts[kind] = file.rows
+		report.Desired[kind] = []Pair{}
+		if err := file.each(ctx, func(row map[string]any) error {
+			sample := report.Desired[kind]
+			appendReportPair(&sample, pairFromRow(row), space.limits.ReportPairs, &sampleBytes)
+			report.Desired[kind] = sample
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		if file.rows > int64(len(report.Desired[kind])) {
+			report.DesiredTruncated = true
+		}
+	}
+
 	return desired, nil
 }
 
 // Prefer ordinary reads while they can still make progress. A helper can be
 // created once those reads finish, without another connection missing it.
-func nextReadyQuery(queries []extension.Query, started, completed, helpers map[string]bool, running int) (extension.Query, bool) {
+func nextReadyQuery(plan extension.Plan, started, completed, helpers, staged map[string]bool, running int) (extension.Query, bool) {
 	var helper *extension.Query
-	for _, query := range queries {
+	for _, query := range plan.Queries {
 		if started[query.Name] {
 			continue
 		}
 		ready := true
-		for _, dependency := range query.Dependencies {
-			if dependency.Type == "query" && !completed[dependency.Name] {
+		for _, name := range plan.Prerequisites(query) {
+			if !completed[name] {
 				ready = false
 				break
+			}
+		}
+		for _, dependency := range query.Dependencies {
+			if dependency.Type != "relationship" {
+				continue
+			}
+			readsOwnOutput := false
+			for _, binding := range plan.Schema.Relationships {
+				if binding.Kind == dependency.Name && binding.Query == query.Name {
+					readsOwnOutput = true
+					break
+				}
+			}
+			// Producers may read the previous graph for their own output type.
+			// Waiting for its combined answer would also wait for this query.
+			if readsOwnOutput {
+				continue
+			}
+			for _, binding := range plan.Schema.Relationships {
+				if binding.Kind == dependency.Name && binding.Query != query.Name && !staged[binding.Kind] {
+					ready = false
+				}
 			}
 		}
 		if !ready {
@@ -294,7 +385,9 @@ func calculateQuery(ctx context.Context, transaction Transaction, query extensio
 	execute := func() error {
 		return stream(ctx, transaction, query.Text, parameters, func(row map[string]any) error {
 			if query.OutputKind != "" {
-				if row["kind"] != query.OutputKind {
+				// Relationships return kind; helpers return a one-item kinds
+				// list. Their full row shapes are checked before saving either.
+				if row["kind"] != query.OutputKind && !onlyKind(row["kinds"], query.OutputKind) {
 					return fmt.Errorf("query %s returned a kind different from its declared literal %s", query.Name, query.OutputKind)
 				}
 			}

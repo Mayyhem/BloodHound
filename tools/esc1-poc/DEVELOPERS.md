@@ -13,7 +13,9 @@ This guide covers the current experimental architecture in `tools/esc1-poc`. It 
 | I want to… | Go to… |
 | --- | --- |
 | Make my first working rule | [Quick start](#quick-start) |
+| Extend that example one step at a time | [Continue with the same example](#continue-with-the-same-example) |
 | Understand what runs where | [How a run works](#how-a-run-works) |
+| See what I must choose and what BloodHound handles | [Author choices and automatic work](#author-choices-and-automatic-work) |
 | Name and describe my extension | [Files and schema](#files-and-schema) |
 | Reuse another query's answer | [Dependencies and shared queries](#dependencies-and-shared-queries) |
 | Return edges, properties, or helper nodes | [What queries return](#what-queries-return) |
@@ -92,7 +94,7 @@ RETURN DISTINCT person.objectid AS source, group.objectid AS target,
        'PoC_Start_DirectMemberOf' AS kind
 ```
 
-The comment tells the runner when this rule needs to run. The query decides which connections should exist and names their kind. The schema describes that kind and its permitted endpoint types. The optional `existing-edge-policy` comment keeps an existing matching edge unchanged; omit it to use the default replacement policy.
+The `depends-on` comment tells the runner when this rule needs to run. The query decides which connections should exist and names their kind. The schema describes that kind and its permitted endpoint types. The optional `existing-edge-policy` comment keeps an existing matching edge unchanged; omit it to use the default replacement policy. Every policy still removes in-scope edges absent from all producers’ complete successful answers.
 
 ### 2. Check the query and plan
 
@@ -104,7 +106,9 @@ If you have the local Go tooling and dependencies from the setup guide, you can 
 ./scripts/go.sh run . plan -extension /path/to/developer-start
 ```
 
-This checks the schema, filenames, dependencies, output assignments, and basic query restrictions. It **does not execute the query or prove database compatibility**. The script uses locally cached dependencies and does not download missing packages. If your dependencies are in another cache, set `POC_MODULE_CACHE` to that directory as described in the setup guide.
+Expect one planned query, `getting_started_memberships.cypher`, with role `relationship` and kind `PoC_Start_DirectMemberOf`.
+
+This checks the schema, filenames, declared prerequisites, output declarations, and basic query restrictions. It **does not execute the query, validate all query syntax, or prove database compatibility**. It also does not establish that you declared every graph kind the query reads. The script uses locally cached dependencies and does not download missing packages. If your dependencies are in another cache, set `POC_MODULE_CACHE` to that directory as described in the setup guide.
 
 ### 3. Activate the two files
 
@@ -130,7 +134,20 @@ MATCH (person:User)-[:PoC_Start_DirectMemberOf]->(group:Group)
 RETURN person.objectid AS source, group.objectid AS target
 ```
 
-The pairs should match the direct membership query. The original `MemberOf` relationships stay under BloodHound's control. Your extension owns the separate `PoC_Start_DirectMemberOf` kind.
+This is an inspection query, not a rule file to upload, so it needs no output declaration or dependency comment. The pairs should match the direct membership query. The original `MemberOf` relationships stay under BloodHound's control. Your extension calculates the separate `PoC_Start_DirectMemberOf` kind.
+
+### Continue with the same example
+
+Keep the `developer-start` folder and its schema. The following examples build on it in this order; each section names the file to add or replace.
+
+| Step | Change | What to check after a successful run |
+| --- | --- | --- |
+| 1. [Quick start](#quick-start) | Create the schema and membership query above. | Every direct user-to-group membership has one example connection. |
+| 2. [Shared answers](#pass-rows-from-one-query-to-another) | Add `getting_started_enabled_users.cypher` and replace the membership query. | Only users whose `enabled` property is `true` have example connections. |
+| 3. [Helper objects](#helper-nodes) | Add `getting_started_notes.cypher`, using the already declared note kind. | Each native user has one separate note object; the membership rule is unchanged. |
+| 4. [Relationship properties](#calculated-relationships) | Replace the membership query with the properties version. | The same enabled-user connections have an `evidence` property. |
+
+These tutorial steps replace the earlier version of the same rule. Overwrite that file as directed. Several queries can intentionally produce the same relationship kind; their answers combine, so leaving an earlier tutorial rule active would keep its broader results. Check the updated folder with `plan`, then review and activate the changed files together. Activation still needs a later successful analysis before results change.
 
 For a useful collected-data example, continue with the [vault extension](examples/vault/README.md). For two extensions sharing an answer, use the [AD/CyberArk example](examples/cross-platform/README.md). ESC1 is the advanced example, not the starting template for every rule.
 
@@ -157,6 +174,20 @@ The application holds other participating graph writers while native and extensi
 
 You can update a rule without rebuilding BloodHound. Adding a missing DAWGS language feature requires an application build and deployment before rules can use it.
 
+### Author choices and automatic work
+
+| You decide | BloodHound handles |
+| --- | --- |
+| The collected facts, their stable IDs, and the properties that connect different sources. | Importing those facts. Omission from a later upload does not automatically mean deletion. |
+| Your schema's names, kinds, allowed endpoint pairs, presentation, and whether a connection is traversable. | Registering the display schema and checking calculated endpoints. |
+| The complete answer your query should return, including its literal output kind and any properties. | Checking rows, combining identical answers, and saving combined results together. |
+| All graph kinds read by the query and every prerequisite query it consumes. | Choosing affected queries, ordering their work, and sharing each prerequisite's answer within the run. |
+| An optional `existing-edge-policy` comment on a relationship query. | Applying that policy and removing in-scope relationships no producer still returns. |
+| Whether helper objects are needed, their declared kind, and a stable ID suffix for each object. | Deriving the ID prefix as the kind followed by `_`, checking object identity and type, and saving helpers with relationships. Helpers omitted later are retained. |
+| Which changed files to review and activate. | Recording the revision and keeping an in-progress run on the revision it already fetched. |
+
+For a new extension, you do not supply a reference commit or `post_processing` blocks. The platform supplies its reference settings. There is no graph ownership setting. It also sets execution limits and manages temporary answers. ESC1's special instructions are explained separately under [the current exception](#the-current-esc1-exception).
+
 ### Combining custom data with native data
 
 Collect custom objects under your own kinds and IDs. Keep a linking property, such as an account's `user_sid`, and join it to the native user's `objectid` in your query. Do not give a custom OpenGraph object native `User` or `Base` labels to make it look like directory data.
@@ -176,17 +207,17 @@ Use a distinct named schema, such as `my_extension.schema.json`, and descriptive
 | `schema.version` | A semantic version such as `v1.0.0`; this experiment requires the `v` prefix. |
 | `schema.namespace` | Prefix for this schema's declared kinds. With `PoC_Start`, kinds must begin `PoC_Start_`. Namespaces must be unique. |
 | `node_kinds` / `relationship_kinds` | Arrays describing your own kinds. Current BloodHound registration requires at least one local node kind; relationships may be `[]`. Do not redeclare another extension's kinds. |
-| `external_node_kinds` | Existing endpoint kinds you refer to, such as native `User`, or helper kinds owned by another extension. This does not create or relabel objects. |
+| `external_node_kinds` | Existing endpoint kinds you refer to, such as native `User`, or helper kinds declared by another extension. This does not create or relabel objects. |
 | Relationship `endpoints` | Exact allowed source/target kind pairs. Allowing `User → Domain` and `Group → Computer` does not allow `User → Computer`. |
 | `is_traversable` | Whether pathfinding may follow the relationship. Use `false` for factual associations that do not establish an attack step. |
 
 Current experiment restriction: **calculated kinds and helper ID prefixes must start with `PoC_`**. They must also follow their schema namespace rules. This separates experimental output from native output.
 
-A declared kind with no producing query is descriptive or collected data; the runner does not take ownership of it. The runner registers the display schema separately from calculating results. The custom `external_node_kinds` and `endpoints` fields are interpreted by this architecture, not by an ordinary OpenGraph schema upload.
+A declared kind with no producing query is descriptive or collected data; declaring it alone does not schedule graph changes. If its last producing rule was deleted, previously managed results are cleared on the next successful run. The runner registers the display schema separately from calculating results. The custom `external_node_kinds` and `endpoints` fields are interpreted by this architecture, not by an ordinary OpenGraph schema upload.
 
-**Do not add `post_processing` blocks.** Output declarations live in Cypher. The platform supplies stable ownership, the reference build, and the shipped ESC1 experiment's native-agreement check. New extensions receive an owner based on `schema.name`; the registry saves that identity through updates and restarts. You do not choose an owner or reference commit in the schema.
+**Do not add `post_processing` blocks.** Output declarations live in Cypher. The platform supplies the reference build and the shipped ESC1 experiment’s native-agreement check. Declare each relationship kind once in a schema; several query files may return it.
 
-Keep an activated schema's filename, name, and namespace stable when updating it. You can add producers and change their queries through reviewed uploads. See [USAGE.md — Change the active rules](USAGE.md#change-the-active-rules) for removal and reassignment.
+Keep an activated schema's filename and name stable when updating it. You can add producers and change their queries through reviewed uploads. See [USAGE.md — Change the active rules](USAGE.md#change-the-active-rules) for removal and reassignment.
 
 ## Dependencies and shared queries
 
@@ -194,14 +225,14 @@ Every query starts with a `depends-on` comment. Declare the node and relationshi
 
 ```cypher
 // depends-on: node:User, node:Group, relationship:MemberOf,
-// query:eligible_users.cypher
+// query:getting_started_enabled_users.cypher
 ```
 
 These declarations do two jobs: order queries and decide which rules need to run after data changes. Include kinds used in filters and traversals, not just those in the final output. If a query has no inputs, write `// depends-on: none`.
 
 ### Pass rows from one query to another
 
-For example, `eligible_users.cypher` could return a reusable list of enabled users:
+Continue from the quick start. Add **`getting_started_enabled_users.cypher`** beside the schema; it returns a reusable list of enabled users:
 
 ```cypher
 // depends-on: node:User
@@ -210,30 +241,35 @@ WHERE person.enabled = true
 RETURN person.objectid AS user_id
 ```
 
-A relationship query can consume those rows:
+Replace **`getting_started_memberships.cypher`** with the following query. Keep its name and the existing schema; the output kind is already declared there.
 
 ```cypher
-// depends-on: query:eligible_users.cypher,
+// depends-on: query:getting_started_enabled_users.cypher,
 // node:User, node:Group, relationship:MemberOf
+// existing-edge-policy: keep-existing
 
-UNWIND $eligible_users AS eligible
+UNWIND $getting_started_enabled_users AS eligible
 MATCH (person:User)-[:MemberOf]->(group:Group)
 WHERE person.objectid = eligible.user_id
 RETURN DISTINCT person.objectid AS source, group.objectid AS target,
        'PoC_Start_DirectMemberOf' AS kind
 ```
 
-The filename without `.cypher` becomes the parameter: `$eligible_users` is a list of row maps. Query parameters currently come from declared query prerequisites; there is no separate arbitrary parameter/configuration file for authors.
+The filename without `.cypher` becomes the parameter: `$getting_started_enabled_users` is a list of rows, each with `user_id`. Query parameters currently come from declared query prerequisites; there is no separate arbitrary parameter/configuration file for authors.
 
 Both files must be in the loaded bundle. The final query names its declared edge kind in `RETURN`; the prerequisite has no output declaration. Query dependencies can cross extension boundaries, and a shared prerequisite runs once for its consumers in that run. Answers are not cached between runs. Circular dependencies are rejected.
 
+The plan now lists the enabled-user query with role `intermediate`, before the membership query. After a successful run, users with `enabled: true` keep their direct membership connections. Users with `false` or a missing `enabled` property have none of these calculated connections. Their native `MemberOf` relationships remain unchanged.
+
+The membership query needs the earlier query's rows as a parameter. Pasting it alone into the normal query interface will not supply that parameter; use the complete extension in the lab to check both steps together.
+
 ### Fresh answers versus existing graph data
 
-**Use a query prerequisite when you need another rule's answer from the same run.** Matching that rule's calculated relationship kind in the graph can read its previous result: new relationships are saved after calculations finish.
+**Use a query prerequisite to receive another rule’s returned rows as a parameter.** To read calculated edges from the graph, declare their relationship kind under `depends-on`. The runner waits for every producer of that type and stages their combined answer before the graph reader runs.
 
-Helper nodes are different. They can be staged inside the final transaction before dependent graph reads, provided the query declares the helper producer as a prerequisite. Reads after helper staging are serial. Passing the producer's rows directly is often simpler. See [the shared extension example](examples/cross-platform/README.md).
+Helper nodes are also staged before their declared graph readers. All reads after graph changes are staged run one at a time inside the same transaction; the changes become visible to other users only after the whole run succeeds. A rule reading its own output type sees its previous state, even when other rules also produce that type; it does not wait for those peers. Other dependencies forming a cycle between different rules are rejected. Passing the producer’s rows directly remains useful. See [the shared extension example](examples/cross-platform/README.md).
 
-Changed kinds select whole queries and their consumers, not just individual changed objects. A selected producer must return its **complete current answer**. First runs, changed rules, restarts, and incomplete change tracking cause all enabled rules to run. A skipped rule keeps its previous output.
+Changed kinds select whole queries, every producer sharing their output type, their prerequisites, and their consumers, continuing until all affected work is included. A selected producer must return its **complete current answer**. First runs, changed rules, restarts, and incomplete change tracking cause all enabled rules to run. A skipped rule keeps its previous output.
 
 ## What queries return
 
@@ -249,21 +285,30 @@ Queries are read-only. Return ordinary strings, numbers, booleans, lists, and ma
 
 `source` and `target` must be nonempty string `objectid` values. Do not use database-internal numeric IDs. Each endpoint must resolve to one object and match a permitted endpoint pair. Referenced helpers must exist or be created by their prerequisite producer in the run.
 
-**The query supplies the edge name:** return a literal string as `kind`. That name must be declared in a schema's `relationship_kinds`. You can add properties:
+**The query supplies the edge name:** return a literal string as `kind`. That name must be declared in a schema's `relationship_kinds`.
+
+To add properties after the [shared-answer example](#pass-rows-from-one-query-to-another), replace **`getting_started_memberships.cypher`** with the following. Keep the enabled-user query, schema, and optional helper query. The `merge-properties` policy adds the evidence to existing connections too; `keep-existing` would leave their old properties unchanged.
 
 ```cypher
-// depends-on: node:User, node:Group, relationship:MemberOf
+// depends-on: query:getting_started_enabled_users.cypher,
+// node:User, node:Group, relationship:MemberOf
+// existing-edge-policy: merge-properties
+
+UNWIND $getting_started_enabled_users AS eligible
 MATCH (person:User)-[:MemberOf]->(group:Group)
+WHERE person.objectid = eligible.user_id
 RETURN DISTINCT person.objectid AS source, group.objectid AS target,
        'PoC_Start_DirectMemberOf' AS kind,
-       {evidence: 'direct membership'} AS properties
+       {evidence: 'direct membership of an enabled user'} AS properties
 ```
+
+After a successful run, the endpoint pairs should match the shared-answer example. Each connection should have `evidence` set to `direct membership of an enabled user`. Adding this property requires no new schema field.
 
 Each query produces **one kind**. Use one final outer `RETURN`, explicit column names, and a literal such as `'PoC_Start_DirectMemberOf' AS kind`. A variable, parameter, expression, or `UNION` cannot declare the output. Use separate files for separate output kinds.
 
 The runner reads the literal before execution, so an empty result still has a known output kind. That makes stale-edge cleanup possible without a second declaration in the schema. Every returned row must agree with the declared kind. A comment or a `WITH` alias cannot declare an output.
 
-Repeated pairs collapse when their property maps agree. The same pair with conflicting properties fails the run. Combine supporting evidence into one agreed result rather than relying on row order.
+Within one query, repeated pairs collapse when their property maps agree; conflicting maps fail the run. Across different queries producing the same type, supplied properties merge in alphabetical filename order. Later filenames win overlapping keys, including explicit null removals. This order is fixed regardless of which query finishes first.
 
 ### Properties
 
@@ -271,62 +316,68 @@ Repeated pairs collapse when their property maps agree. The same pair with confl
 - Stored properties cannot contain nested maps, nested lists, or lists containing nulls. Prerequisite row maps can be richer; they are not stored property maps.
 - Omit the relationship `properties` column for an empty map. The column itself cannot be `null`.
 - A relationship property value of `null` removes that key with `merge-properties`; on creation/replacement, the key stays absent.
-- The runner owns `poc_owner`. Helper `objectid` and `poc_owner` are also reserved. Property names cannot be blank.
+- Helper `objectid` is reserved because the `id` column supplies it. Property names cannot be blank. No property establishes graph ownership.
 
 ### Helper nodes
 
 Use helpers only when you need calculated objects in the graph. A shared prerequisite is enough when you only need intermediate rows.
 
-Declare a helper type in `node_kinds`, then return its literal name in the one-element `kinds` list. Its ID prefix is automatically the kind name followed by `_`. For a declared `PoC_Example_User` kind:
+Declare a helper type in `node_kinds`, then return its literal name in the one-element `kinds` list. Its ID prefix is automatically the kind name followed by `_`.
+
+The quick-start schema already declares `PoC_Start_Note`. To create one note per native user, add **`getting_started_notes.cypher`** beside the existing files. No schema change is needed:
 
 ```cypher
 // depends-on: node:User
 MATCH (person:User)
-RETURN 'PoC_Example_User_' + person.objectid AS id,
-       ['PoC_Example_User'] AS kinds,
+RETURN 'PoC_Start_Note_' + person.objectid AS id,
+       ['PoC_Start_Note'] AS kinds,
        {user_id: person.objectid} AS properties
 ```
 
+This query is independent of the enabled-user calculation. It creates notes for all native users, including disabled users, and does not change which membership connections qualify. Expect one note with ID `PoC_Start_Note_<user-objectid>` for each user. A schema declaration alone created no notes in the quick start; this query makes that kind a calculated output.
+
 The ID must have a nonempty suffix after the prefix and remain stable across runs. `kinds` must contain only the declared helper kind. Helpers have their own identity: they do not gain native `User` or `Base` labels. Their properties cannot contain nulls.
 
-An existing object with the same ID but another owner or kind causes failure. Helpers missing from a later result are retained; automatic deletion currently applies to calculated relationships, not helper nodes.
+An existing object with the same ID and exactly the declared helper kind can be updated regardless of its origin. A different kind or duplicate identity causes failure. Helpers missing from a later result are retained; automatic deletion currently applies to calculated relationships, not helper nodes.
 
 ## How saved results change
 
-**Your query returns the connections that should exist now, not a list of changes to apply.** Do not use `CREATE`, `MERGE`, `SET`, or `DELETE` in a rule. The runner writes the results and records their owner.
+**Your query returns the connections that should exist now, not a list of changes to apply.** Do not use `CREATE`, `MERGE`, `SET`, or `DELETE` in a rule. The runner combines the producers’ results and writes the complete answer.
 
 To change how matching edges are updated, add one optional comment to the relationship query, for example `// existing-edge-policy: keep-existing`. There is no matching schema setting to maintain.
 
-| Query policy | What happens to an existing matching owned relationship |
+| Query policy | What happens to an existing matching relationship |
 | --- | --- |
 | `replace-existing` — default | Delete and recreate it with the returned properties. Its database ID changes. |
 | `merge-properties` | Keep its ID, update supplied properties, remove keys explicitly set to null, and retain unmentioned properties. |
 | `keep-existing` | Keep its ID and properties. Returned properties still apply to newly created relationships. |
 
-**All three policies remove owned relationships absent from a complete successful answer.** An empty successful result removes that producer's previous relationships. `keep-existing` does not mean “keep obsolete connections.”
+**All producers of one relationship type must use the same policy. All three policies remove in-scope relationships absent from every producer’s complete successful answer.** An empty answer from one rule keeps edges still returned by another. If all producers return no rows, the runner clears the declared endpoint scope. `keep-existing` does not mean “keep obsolete connections.”
 
 Do not add a debugging `LIMIT`, sample rows, or return only recently changed objects in an active producer. Those partial answers can incorrectly remove valid output. Test a limited read separately from the published rule.
 
-Missing/foreign ownership or duplicate existing managed pairs cause failure rather than adoption. A failure before commit preserves the last committed output; it may now be stale. Schema registration and database metadata preparation happen separately and can remain after failure.
+The scope is the relationship type and its declared source/target kind pairs. Existing edges within that scope participate regardless of who created them: manual edges can be updated or removed too. Edges outside those endpoint pairs remain untouched. Duplicate existing pairs within the scope cause failure. A failure before commit preserves the last committed output; it may now be stale. Schema registration and database metadata preparation happen separately and can remain after failure.
 
 ### Updating, disabling, and removing rules
 
 | Action | Result |
 | --- | --- |
 | Upload/overwrite | Review and activate the complete proposed revision. It takes effect after a later successful native analysis. |
-| Disable | Keep files and previous graph output. Dependent rules pause too; independent rules can continue. |
+| Disable | Keep files and previous graph output. Pause every producer sharing the relationship type, then their query and graph consumers. Independent work continues. |
 | Enable | Resume eligible rules on a later analysis. Other disabled prerequisites can still keep a rule paused. |
-| Remove | Review the dependent files that will also be removed. Retired calculated relationships are cleaned up on a later successful run; helpers remain. |
+| Remove | Delete explicit query dependents and unused supporting queries. Keep other producers and graph readers. Refresh combined results from the remaining producers on a later successful run; deleting the last producer clears its old scope. Helpers remain. |
+
+For example, A and B produce `CanAccess`, C reads that type, and D directly needs A’s returned rows. Disabling A also pauses B, C, and D so the previous shared graph answer stays intact. Deleting A removes D, keeps B and C, refreshes `CanAccess` from B, and then runs C against the refreshed graph. If B is also deleted, the scope is cleared and C can run with no matching edges. Enabling A removes its explicit disabled setting; other disabled dependencies can still keep related rules paused.
 
 None of these actions alone runs queries or changes graph output. An in-progress run keeps the revision it already fetched. The page's report shows the last reported attempt, not a live health check; compare its revision and time with your changes.
 
 ### Updating older bundles
 
-Previously saved schemas with `post_processing` blocks still load. To migrate one, add a literal `kind` to each relationship query, use literal helper `kinds`, and remove the schema's processing blocks. Move any `existing_edge_policy` to the query's `existing-edge-policy` comment. Modern helper IDs must begin with their kind name plus `_`.
+Use a literal `kind` in each relationship query and literal helper `kinds`. Remove old schema `post_processing` blocks, including any owner field. Move an `existing_edge_policy` setting to each producer’s `existing-edge-policy` comment, using the same value for all producers of that type. Helper IDs must begin with their kind name plus `_`.
 
-Upload these changes together to the **existing registry**. It retains the original owners in saved platform metadata, including after restart or rule removal. Keep that registry's saved state when upgrading. Loading a converted folder directly in the standalone runner has no registry history; it derives a new owner and will reject previously owned objects rather than adopt them. Leave the legacy settings in place for that standalone workflow until its state is migrated.
+Preview and activate a complete set of current files together. Saved ownership metadata is no longer part of the format. Existing graph properties such as `poc_owner` do not grant or prevent updates.
 
-To rename a query, add the renamed file, update consumers' prerequisites/parameters, and explicitly remove the old file in the same reviewed change. Two active queries cannot publish the same kind. Changing an output kind requires declaring the new kind in the schema; the registry records the old kind for cleanup. Removing a rule keeps its display schema intact.
+To rename a query, add the renamed file, update consumers' prerequisites/parameters, and explicitly remove the old file in the same reviewed change. Two active relationship queries may publish the same kind, so leaving the old file in place keeps its contribution active. Changing an output kind requires declaring the new kind in the schema; the registry records the old kind for cleanup. Removing a rule keeps its display schema intact.
 
 ## Cypher support and DAWGS
 
@@ -457,8 +508,8 @@ The local `plan` command is a useful first check. Use the rule page and a dedica
 
 | Symptom | What to check |
 | --- | --- |
-| File upload rejected | Filenames, size limits, valid schema fields, missing prerequisite files, unused queries, and a literal output kind and one producer per kind. |
-| Output declaration rejected | Use a literal `kind`, declare that kind in the schema, and keep one producing file per kind. |
+| File upload rejected | Filenames, size limits, valid schema fields, missing prerequisite files, unused queries, and literal output kinds with matching policies for shared relationship producers. |
+| Output declaration rejected | Use a literal `kind`, declare that kind once in the schema, and give all its producers the same update policy. |
 | Query parameter rejected | Declare `query:filename.cypher`; use `$filename` without the extension. |
 | Rule never runs after activation | Activation alone does not execute it. Trigger a later successful native analysis with a collection upload; check disabled prerequisites and report revision. |
 | Rule does not rerun after relevant data changes | Check all node/relationship dependencies, including kinds used only in filters. |
@@ -480,7 +531,7 @@ See [USAGE.md — Troubleshooting](USAGE.md#troubleshooting) for container comma
 | Document | Purpose |
 | --- | --- |
 | [USAGE.md](USAGE.md) | Build/start the lab, activate rules, inspect status, and manage their lifecycle. |
-| [DESIGN.md](DESIGN.md) | Execution, ownership, transactions, helper visibility, limits, and backend details. |
+| [DESIGN.md](DESIGN.md) | Execution, shared outputs, transactions, graph visibility, limits, and backend details. |
 | [Vault example](examples/vault/README.md) | Connect collected custom objects to native users. |
 | [AD/CyberArk example](examples/cross-platform/README.md) | Separate extensions consuming shared query answers. |
 | [ESC1 query notes](extension/QUERY_NOTES.md) | Exact ESC1 calculations and current Go-assisted operations. |

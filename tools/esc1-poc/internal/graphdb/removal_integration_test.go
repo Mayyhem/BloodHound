@@ -31,7 +31,7 @@ import (
 
 // Exercise the uploaded removal through both real database adapters. In
 // particular, a failure after deletion must restore identities and properties,
-// and another owner's connection must never be adopted or deleted.
+// including existing connections carrying a legacy property.
 func TestRuleRemovalAndRollbackOnBothDatabases(t *testing.T) {
 	if os.Getenv("NEO4J_TEST_URI") == "" || os.Getenv("ESC1_POC_POSTGRES_TEST_URI") == "" {
 		t.Skip("both isolated graph databases are required")
@@ -90,25 +90,15 @@ func TestRuleRemovalAndRollbackOnBothDatabases(t *testing.T) {
 			if after := selectionSnapshot(t, backend.database); !reflect.DeepEqual(before, after) {
 				t.Fatal("late failure lost previous graph data")
 			}
-			setOwner := func(owner string) {
-				properties := graph.NewProperties()
-				properties.Set("poc_owner", owner)
-				if err := backend.native.WriteTransaction(t.Context(), func(transaction graph.Transaction) error {
-					return transaction.Relationships().Filter(query.Kind(query.Relationship(), graph.StringKind("PoC_ADCSESC1"))).Update(properties)
-				}); err != nil {
-					t.Fatal(err)
-				}
+			// A label left by an older version has no special meaning. Removing
+			// this type clears matching connections regardless of its value.
+			if err := backend.native.WriteTransaction(t.Context(), func(transaction graph.Transaction) error {
+				var properties = graph.NewProperties()
+				properties.Set("poc_owner", "someone-else")
+				return transaction.Relationships().Filter(query.Kind(query.Relationship(), graph.StringKind("PoC_ADCSESC1"))).Update(properties)
+			}); err != nil {
+				t.Fatal(err)
 			}
-			setOwner("someone-else")
-			foreign := selectionSnapshot(t, backend.database)
-			report, err = runner.Run(t.Context(), backend.database, plan, runOptions)
-			if err == nil || report.Committed {
-				t.Fatalf("foreign ownership accepted: %+v %v", report, err)
-			}
-			if after := selectionSnapshot(t, backend.database); !reflect.DeepEqual(foreign, after) {
-				t.Fatal("foreign ownership failure changed the graph")
-			}
-			setOwner(plan.Schema.Owner + "/PoC_ADCSESC1")
 			report, err = runner.Run(t.Context(), backend.database, plan, runOptions)
 			if err != nil || !report.Committed || len(report.Queries) != 2 {
 				t.Fatalf("remove one branch: %+v %v", report, err)

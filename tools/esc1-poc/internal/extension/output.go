@@ -210,6 +210,7 @@ func bindQueryOutput(definitions []Definition, query *Query, output *queryOutput
 				if kind.PostProcessing == nil {
 					kind.PostProcessing = &NodeProcessing{Query: query.Name, IDPrefix: kind.Name + "_"}
 				}
+				query.OutputKind = output.kind
 				return nil
 			}
 		} else {
@@ -218,16 +219,24 @@ func bindQueryOutput(definitions []Definition, query *Query, output *queryOutput
 				if kind.Name != output.kind {
 					continue
 				}
-				if kind.PostProcessing != nil && kind.PostProcessing.Query != query.Name {
-					return fmt.Errorf("output kind %s has multiple producers", output.kind)
+				policy := output.policy
+				if policy == "" {
+					policy = kind.ExistingEdgePolicy
 				}
-				if output.policy != "" {
-					if kind.ExistingEdgePolicy != "" && kind.ExistingEdgePolicy != output.policy {
-						return fmt.Errorf("query and legacy schema disagree on existing-edge-policy for %s", kind.Name)
-					}
-					kind.ExistingEdgePolicy = output.policy
+				if policy == "" {
+					policy = ReplaceExisting
 				}
-				kind.PostProcessing = &RelationshipProcessing{Query: query.Name}
+				if kind.ExistingEdgePolicy != "" && kind.ExistingEdgePolicy != policy {
+					return fmt.Errorf("query and schema disagree on existing-edge-policy for %s", kind.Name)
+				}
+				if kind.producerPolicy != "" && kind.producerPolicy != policy {
+					return fmt.Errorf("producers for %s must agree on existing-edge-policy", kind.Name)
+				}
+				kind.producerPolicy = policy
+				kind.producerQueries = append(kind.producerQueries, query.Name)
+				if kind.PostProcessing == nil {
+					kind.PostProcessing = &RelationshipProcessing{Query: query.Name}
+				}
 				query.OutputKind = output.kind
 				return nil
 			}

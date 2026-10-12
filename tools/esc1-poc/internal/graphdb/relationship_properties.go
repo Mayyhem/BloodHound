@@ -23,37 +23,26 @@ import (
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
 )
 
-func relationshipCreationProperties(owner string, properties map[string]any) (map[string]any, error) {
-	var copied = make(map[string]any, len(properties)+1)
-	if owner == "" {
-		return nil, fmt.Errorf("relationship owner is required")
-	}
+// A null property means the key should be absent. Copy the supplied values so
+// preparing a database write never changes the query's answer.
+func relationshipCreationProperties(properties map[string]any) map[string]any {
+	var copied = make(map[string]any, len(properties))
 	for key, value := range properties {
-		if key == "poc_owner" {
-			return nil, fmt.Errorf("relationship ownership cannot be supplied as an ordinary property")
-		}
 		if value != nil {
 			copied[key] = value
 		}
 	}
-	copied["poc_owner"] = owner
-	return copied, nil
+	return copied
 }
 
-func validateRelationshipUpdates(owner string, updates []runner.RelationshipUpdate) error {
+func validateRelationshipUpdates(updates []runner.RelationshipUpdate) error {
 	var seen = make(map[int64]bool, len(updates))
-	if owner == "" {
-		return fmt.Errorf("relationship owner is required")
-	}
 	for _, update := range updates {
 		if update.ID < 0 {
 			return fmt.Errorf("invalid relationship ID")
 		}
 		if seen[update.ID] {
 			return fmt.Errorf("duplicate relationship update ID")
-		}
-		if _, found := update.Properties["poc_owner"]; found {
-			return fmt.Errorf("relationship ownership cannot be modified")
 		}
 		seen[update.ID] = true
 	}

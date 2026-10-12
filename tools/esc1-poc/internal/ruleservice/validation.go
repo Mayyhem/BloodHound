@@ -29,7 +29,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -44,8 +43,9 @@ const (
 )
 
 var (
-	queryName       = regexp.MustCompile(`^[a-z][a-z0-9_]*\.cypher$`)
-	retiredKindName = regexp.MustCompile(`^PoC_[A-Za-z_][A-Za-z0-9_]*$`)
+	queryName        = regexp.MustCompile(`^[a-z][a-z0-9_]*\.cypher$`)
+	retiredKindName  = regexp.MustCompile(`^PoC_[A-Za-z_][A-Za-z0-9_]*$`)
+	endpointKindName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 )
 
 // Bundle is one complete snapshot. A worker keeps its snapshot even if an author
@@ -53,14 +53,12 @@ var (
 type Bundle struct {
 	Revision string            `json:"revision"`
 	Files    map[string]string `json:"files"`
-	// Platform-owned identities survive replacement of legacy schema settings.
-	Owners map[string]string `json:"owners,omitempty"`
 	// Keep this history across uploads, including rules removed before the
 	// worker fetched them. An older, already-running snapshot may still finish.
-	RetiredRelationships []string             `json:"retired_relationships,omitempty"`
-	RetiredOwners        map[string]string    `json:"retired_owners,omitempty"`
-	Disabled             []string             `json:"disabled,omitempty"`
-	AddedAt              map[string]time.Time `json:"added_at,omitempty"`
+	RetiredRelationships []string                        `json:"retired_relationships,omitempty"`
+	RetiredEndpoints     map[string][]extension.Endpoint `json:"retired_endpoints,omitempty"`
+	Disabled             []string                        `json:"disabled,omitempty"`
+	AddedAt              map[string]time.Time            `json:"added_at,omitempty"`
 }
 
 func revision(files map[string]string, retired ...[]string) string {
@@ -77,10 +75,10 @@ func revision(files map[string]string, retired ...[]string) string {
 // Dates describe the saved files but do not change what runs. Leaving them out
 // lets Preview and Apply agree even though new dates are assigned only on save.
 func bundleRevision(bundle Bundle) string {
-	if len(bundle.Disabled) == 0 && len(bundle.RetiredOwners) == 0 && len(bundle.Owners) == 0 {
+	if len(bundle.Disabled) == 0 && len(bundle.RetiredEndpoints) == 0 {
 		return revision(bundle.Files, bundle.RetiredRelationships)
 	}
-	contents, _ := json.Marshal(Bundle{Files: bundle.Files, Owners: bundle.Owners, RetiredRelationships: bundle.RetiredRelationships, RetiredOwners: bundle.RetiredOwners, Disabled: bundle.Disabled})
+	contents, _ := json.Marshal(Bundle{Files: bundle.Files, RetiredRelationships: bundle.RetiredRelationships, RetiredEndpoints: bundle.RetiredEndpoints, Disabled: bundle.Disabled})
 	digest := sha256.Sum256(contents)
 	return hex.EncodeToString(digest[:])
 }
@@ -142,9 +140,6 @@ func validateBundle(directory string, bundle Bundle) (extension.Plan, error) {
 	if err != nil {
 		return extension.Plan{}, err
 	}
-	if err := applyOwners(bundle.Owners, &plan); err != nil {
-		return extension.Plan{}, err
-	}
 	if err := checkRetirements(bundle, plan); err != nil {
 		return extension.Plan{}, err
 	}
@@ -152,7 +147,7 @@ func validateBundle(directory string, bundle Bundle) (extension.Plan, error) {
 		return extension.Plan{}, err
 	}
 	plan.RetiredRelationships = append([]string(nil), bundle.RetiredRelationships...)
-	plan.RetiredOwners = copyOwners(bundle.RetiredOwners)
+	plan.RetiredEndpoints = copyEndpoints(bundle.RetiredEndpoints)
 	return plan, nil
 }
 
@@ -170,18 +165,6 @@ func checkRetirements(bundle Bundle, plan extension.Plan) error {
 		}
 		seen[kind] = true
 	}
-	for kind, owner := range bundle.RetiredOwners {
-		if !seen[kind] || strings.TrimSpace(owner) == "" {
-			return fmt.Errorf("removed relationship %s has invalid ownership", kind)
-		}
-	}
-	if len(plan.Definitions) > 1 {
-		for kind := range seen {
-			if bundle.RetiredOwners[kind] == "" {
-				return fmt.Errorf("removed relationship %s is missing its original owner", kind)
-			}
-		}
-	}
 	for _, binding := range plan.Schema.Relationships {
 		if seen[binding.Kind] {
 			return fmt.Errorf("%s cannot be both active and removed", binding.Kind)
@@ -192,11 +175,24 @@ func checkRetirements(bundle Bundle, plan extension.Plan) error {
 			return fmt.Errorf("removed relationship %s cannot become a helper kind", binding.Kind)
 		}
 	}
-	for _, query := range plan.Queries {
-		for _, input := range query.Dependencies {
-			if input.Type == "relationship" && seen[input.Name] {
-				return fmt.Errorf("%s still reads removed relationship %s; update or remove that rule too", query.Name, input.Name)
+	// Graph readers remain valid after a producer is deleted. Save the old
+	// endpoint pairs separately so an author can rename a type in the schema
+	// without losing the scope needed to clear its previous connections.
+	for _, kind := range bundle.RetiredRelationships {
+		if len(bundle.RetiredEndpoints[kind]) == 0 {
+			return fmt.Errorf("removed relationship %s is missing its previous endpoints", kind)
+		}
+	}
+	for kind, endpoints := range bundle.RetiredEndpoints {
+		var pairs = map[extension.Endpoint]bool{}
+		if !seen[kind] {
+			return fmt.Errorf("saved endpoints refer to a relationship that was not removed: %s", kind)
+		}
+		for _, endpoint := range endpoints {
+			if !endpointKindName.MatchString(endpoint.SourceKind) || !endpointKindName.MatchString(endpoint.TargetKind) || pairs[endpoint] {
+				return fmt.Errorf("removed relationship %s has an invalid or repeated endpoint pair", kind)
 			}
+			pairs[endpoint] = true
 		}
 	}
 	contents, err := json.Marshal(bundle)

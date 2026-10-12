@@ -598,7 +598,8 @@ SPDX-License-Identifier: Apache-2.0
               + (output.endpoints || [])
                 .map(endpoint => endpoint.source_kind + ' → ' + endpoint.target_kind)
                 .join('; ')
-              + '] · existing connection policy: ' + output.existing_edge_policy)
+              + '] · existing connection policy: ' + output.existing_edge_policy
+              + ((output.producers || []).length > 1 ? ' · shared producers (later filenames win for supplied properties): ' + output.producers.join(' → ') : ''))
         ));
         if (!(query.outputs || []).length) {
           entry(facts, 'Graph output', 'Result rows only; this rule does not publish objects or connections.');
@@ -780,7 +781,9 @@ SPDX-License-Identifier: Apache-2.0
         entry(changes, 'All deleted files', describe(review.removed));
         entry(changes, 'Disabled rules', describe(review.disabled));
         entry(changes, 'Enabled rules', describe(review.enabled));
-        entry(changes, 'Connections to delete', describe(review.retired_relationships) + '. Connections owned by deleted rules are deleted after the next successful analysis. Supporting objects stay in the graph.');
+        entry(changes, 'Disabled or paused rules', describe(review.paused));
+        entry(changes, 'Connection types to recalculate', describe(review.recalculated_relationships));
+        entry(changes, 'Connection types with no remaining producer', describe(review.retired_relationships) + '. Their connections within the declared endpoints are cleared after the next successful analysis. Supporting objects stay in the graph.');
         byID('review').hidden = false;
       }
 
@@ -847,22 +850,20 @@ SPDX-License-Identifier: Apache-2.0
         const dialog = byID('confirm-dialog'), deleting = action === 'remove';
         byID('confirm-title').textContent = deleting ? 'Delete these rules?' : action === 'disable' ? 'Disable these rules?' : 'Enable these rules?';
         byID('confirm-description').textContent = deleting
-          ? 'This deletes the listed files, including dependent rules and supporting rules that are no longer needed. Connections owned by deleted rules will be deleted on the next successful analysis. Supporting objects will stay in the graph.'
+          ? 'This deletes the listed files, including rules that require their returned rows and supporting rules that are no longer needed. Graph readers remain. The next successful analysis combines remaining producers and removes connections they no longer produce. Supporting objects stay in the graph.'
           : action === 'disable'
-            ? 'These rules will stop running. Their files and existing graph results will stay. Rules that need them will pause too.'
+            ? 'These rules will stop running. Their files and existing graph results will stay. Other producers of the same connections and rules that need those results will pause too.'
             : 'These rules can run again on the next analysis. A rule still waits if one of the rules it needs remains disabled.';
-        byID('confirm-names').textContent = (deleting ? 'All files to delete: ' : 'Selected rules: ') + describe(deleting ? review.removed : names);
+        byID('confirm-names').textContent = (deleting ? 'All files to delete: ' : 'Selected rules: ') + describe(deleting ? review.removed : names) + (deleting ? '\nConnection types to recalculate: ' + describe(review.recalculated_relationships) + '\nTypes with no remaining producer: ' + describe(review.retired_relationships) : '');
         const paused = queries(review.plan).filter(query => query.disabled_reason);
         const pausedRules = byID('confirm-paused-rules');
         pausedRules.replaceChildren();
-        byID('confirm-paused').hidden = deleting || !paused.length;
+        byID('confirm-paused').hidden = !paused.length;
         // Use text nodes so names and reasons from uploaded rules stay literal text.
-        if (!deleting) {
-          for (const query of paused) {
-            const item = element('li');
-            item.append(element('strong', query.name), element('span', query.disabled_reason, 'muted'));
-            pausedRules.append(item);
-          }
+        for (const query of paused) {
+          const item = element('li');
+          item.append(element('strong', query.name), element('span', query.disabled_reason, 'muted'));
+          pausedRules.append(item);
         }
         byID('confirm-change').textContent = deleting ? 'Delete rules' : action === 'disable' ? 'Disable rules' : 'Enable rules';
         return new Promise(resolve => {

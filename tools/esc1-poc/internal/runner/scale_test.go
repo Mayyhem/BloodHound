@@ -148,7 +148,7 @@ func benchmarkStreamSortAndReconcile100000Pairs(b *testing.B) {
 		b.Fatalf("incomplete desired result: %d", desired.rows)
 	}
 	b.Logf("complete desired sort: input_rows=%d deduplicated_pairs=%d elapsed=%s", input.rows, desired.rows, time.Since(started))
-	changes, err := prepareChanges(ctx, transaction, "scale", extension.RelationshipBinding{ExistingEdgePolicy: extension.KeepExisting, Kind: "PoC_Scale"}, desired)
+	changes, err := prepareChanges(ctx, transaction, extension.RelationshipBinding{ExistingEdgePolicy: extension.KeepExisting, Kind: "PoC_Scale"}, desired)
 	if err != nil {
 		reportScaleResources(b, space, started)
 		b.Fatal(err)

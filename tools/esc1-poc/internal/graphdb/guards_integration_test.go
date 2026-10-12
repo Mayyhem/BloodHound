@@ -42,14 +42,9 @@ func TestPublicationGuardsPreserveGraph(t *testing.T) {
 			errorContains: "duplicate objectids",
 		},
 		{
-			name:          "foreign_relationship_owner",
-			change:        "MATCH ()-[edge:PoC_ADCSESC1]->() SET edge.poc_owner = 'another-experiment'",
-			errorContains: "owned by someone else",
-		},
-		{
 			name:          "helper_label_collision",
 			change:        "MATCH (helper:PoC_DomainHelper) SET helper:Base",
-			errorContains: "belongs to a native or differently owned node",
+			errorContains: "different node kind",
 		},
 		{
 			name:          "incompatible_endpoint",
@@ -86,7 +81,7 @@ func TestPublicationGuardsPreserveGraph(t *testing.T) {
 			if report.Committed {
 				t.Fatal("rejected publication reported a commit")
 			}
-			if (testCase.name == "foreign_relationship_owner" || testCase.name == "incompatible_endpoint") && report.HelpersChanged != 1 {
+			if testCase.name == "incompatible_endpoint" && report.HelpersChanged != 1 {
 				t.Fatalf("expected helper update to be staged before rejection: %+v", report)
 			}
 			if after := guardGraphSnapshot(t, database); !reflect.DeepEqual(before, after) {
@@ -233,13 +228,13 @@ func TestLostCommitAcknowledgementLeavesPublishedGraph(t *testing.T) {
 	}
 	// The real commit succeeded. The runner's deferred rollback cannot undo
 	// the edge, helper, and saved batch even though it did not receive success.
-	if rows := read(t, database, "MATCH (source)-[edge:PoC_ADCSESC1]->(target) RETURN source.objectid AS source, target.objectid AS target, edge.poc_owner AS owner", nil); !reflect.DeepEqual(rows, runner.Rows{{"source": "PoC_Test_User", "target": "PoC_Test_Domain", "owner": plan.Schema.Owner + "/PoC_ADCSESC1"}}) {
+	if rows := read(t, database, "MATCH (source)-[edge:PoC_ADCSESC1]->(target) RETURN source.objectid AS source, target.objectid AS target", nil); !reflect.DeepEqual(rows, runner.Rows{{"source": "PoC_Test_User", "target": "PoC_Test_Domain"}}) {
 		t.Fatalf("committed relationship was not retained: %v", rows)
 	}
-	if rows := read(t, database, "MATCH (helper:PoC_DomainHelper) RETURN helper.name AS name, helper.domainid AS domain, helper.poc_owner AS owner", nil); !reflect.DeepEqual(rows, runner.Rows{{"name": "TEST DOMAIN", "domain": "PoC_Test_Domain", "owner": plan.Schema.Owner + "/PoC_DomainHelper"}}) {
+	if rows := read(t, database, "MATCH (helper:PoC_DomainHelper) RETURN helper.name AS name, helper.domainid AS domain", nil); !reflect.DeepEqual(rows, runner.Rows{{"name": "TEST DOMAIN", "domain": "PoC_Test_Domain"}}) {
 		t.Fatalf("committed helper was not retained: %v", rows)
 	}
-	if rows := read(t, database, "MATCH (run:PoC_Run) RETURN run.batch_id AS batch, run.poc_owner AS owner", nil); !reflect.DeepEqual(rows, runner.Rows{{"batch": runOptions.BatchID, "owner": plan.Schema.Owner}}) {
+	if rows := read(t, database, "MATCH (run:PoC_Run) RETURN run.batch_id AS batch", nil); !reflect.DeepEqual(rows, runner.Rows{{"batch": runOptions.BatchID}}) {
 		t.Fatalf("committed run state was not retained: %v", rows)
 	}
 }
