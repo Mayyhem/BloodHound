@@ -5,9 +5,32 @@ This is a proof of concept for one modified BloodHound Community Edition process
 Start with [README.md](README.md) for the proposal, [USAGE.md](USAGE.md) for operating instructions, and [DESIGN.md](DESIGN.md) for the rules the code follows and its failure behavior. [HANDOFF.md](HANDOFF.md) retains the dated work history, full historical commands, private log locations, and local running state.
 
 
+## Earlier validation and execution reports — 12 October 2026
+
+TODOs #2 and #4 are implemented. The file loader checks complete query syntax with the same DAWGS language reader and read-only restrictions used at execution. It finds literal graph labels, relationship types, and prerequisite parameters in the parsed query, checks their declarations, and gives filename/line corrections. It rejects unsupported forms and invalid output columns before activation. Drafts can retain these mistakes while activation remains blocked. The shared reader is in [internal/querycheck](internal/querycheck); it reads the already checked query once, preserving original line numbers. This adds no DAWGS or BloodHound source changes.
+
+Explicit dependency declarations remain the authoring contract. Reliable names could be supplied automatically in a future format; no such format change was made. Reads without named kinds, and dynamic kind inspection, trigger conservative recalculation after a graph change. Confirmed empty change lists still skip safely. That change required updating an older test that assumed every new kind was unrelated to ESC1. Validation also exposed a missing `EnterpriseCA` declaration in the shipped rules and missing direct declarations in a test fixture; these were corrected.
+
+[internal/runner/report.go](internal/runner/report.go) separates calculation from saving and records each query’s stage, state, reason, count, read duration, and proposed/confirmed output count. Stored errors use fixed explanations rather than copying values from database errors. Failed runs have no saved counts; uncertain commit acknowledgements remain explicitly uncertain. Native Neo4j’s surrounding save must confirm before success is reported. [internal/ruleservice/store.go](internal/ruleservice/store.go) saves up to 20 attempts and the last confirmed saved revision together. Worker reporting failures are retried independently of calculation. The rules page exposes the report and history, preserves expanded history while refreshing, and distinguishes unavailable reports and uncertain saves with words and color. Intermediate graph answers are not included.
+
+`plan` now returns an object with `validation` and `queries`, explicitly saying database execution was not run. No database translation or data-dependent result is promised by file checks. The CLI was rebuilt locally; the running application and rule service were not replaced.
+
+Validation passed:
+
+- Complete pilot tests with `go test -mod=readonly -race ./...`: `work/validation-reports-final-unit.log`.
+- Complete isolated Neo4j/PostgreSQL suite with `go test -mod=readonly -race -tags integration -count=1 ./internal/graphdb`: `work/validation-reports-final-databases.log` (132.510 seconds).
+- Permanent tests extract all four tutorial stages from the actual Markdown and check memberships, disabled and missing-property users, helper identities, property updates without replacing connections, and complete empty answers. Shipped ESC1, Vault, and cross-platform examples are covered on both databases.
+- Report tests cover query failure, confirmed rollback, uncertain commit, secret-free stored details, disabled/skipped queries, bounded history, restart, stale revisions, unavailable reports, and reporting retries without recalculation. Final focused checks are in `work/validation-report-storage-final.log`, `work/validation-reports-native-confirmation.log`, and `work/validation-draft-final.log`.
+- Browser checks: `work/execution-report-browser/checks.json` and `work/validation-reports-table.log`. The report check also verifies escaped error text and distinct state indicators.
+- Root callers: `work/validation-reports-root.log`. Static Go checks: `work/validation-reports-vet.log`. CLI output: `work/validation-reports-cli-plan.json`.
+
+No application data was modified, and nothing was staged or committed. The existing isolated test database containers were started for verification and returned to their original stopped state afterward. `just prepare-for-codereview` remains required before the user’s manual commit.
+
+Separate follow-up: PostgreSQL returned a different order from Neo4j for a test query shaped like `MATCH (source)-[...]... RETURN source.objectid AS source ... ORDER BY source`. The returned alias reuses the node variable’s name. The new tests compare connection sets, whose ordering is irrelevant. Investigate that alias ordering behavior separately before relying on it with `LIMIT`; no DAWGS change was made here.
+
 ## Schema kind declarations and inactive drafts
 
-TODO #8 is implemented, including the user's follow-up choice to save incomplete uploads as inactive drafts. `external_node_kinds` is removed. Relationships use `compatible_kinds`, with exactly the same directed source/target combinations. Native kinds come from BloodHound's existing graph definitions; custom kinds come from the complete accompanying schema set. Declared node and relationship inputs are checked too. Missing schemas prevent activation, not draft saving. This work does not add full Cypher parsing or automatic dependency discovery; those remain under TODO #2.
+TODO #8 is implemented, including the user's follow-up choice to save incomplete uploads as inactive drafts. `external_node_kinds` is removed. Relationships use `compatible_kinds`, with exactly the same directed source/target combinations. Native kinds come from BloodHound's existing graph definitions; custom kinds come from the complete accompanying schema set. Declared node and relationship inputs are checked too. Missing schemas prevent activation, not draft saving. Full Cypher parsing and checks for visible input declarations were added subsequently by TODO #2 above. Automatic dependency declarations remain unimplemented.
 
 Two schemas can refer to one another in either upload order. Save the first as a draft, add the second, review the full proposal, and explicitly activate it. A circular requirement for newly calculated answers still fails validation. Drafts persist separately from active rules, survive restart, and never reach the analysis worker. Stale active or draft revisions cannot replace newer work. The offline viewer accepts accompanying schemas together and displays native references without an extra list.
 

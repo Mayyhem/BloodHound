@@ -30,19 +30,42 @@ import (
 	"unicode/utf8"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
+	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
 )
 
 var ErrNoActive = errors.New("no active rule bundle")
 
-// Status records only the latest worker report, rather than growing a history
-// containing query text, credentials, or collected graph data.
+// Status contains counts and explanations, never query answers or credentials.
+// The saved revision means the last confirmed save, not the latest activation.
 type Status struct {
-	State     string    `json:"state"`
-	Event     string    `json:"event"`
-	Revision  string    `json:"revision"`
-	Message   string    `json:"message"`
-	UpdatedAt time.Time `json:"updated_at"`
+	State            string            `json:"state"`
+	Event            string            `json:"event"`
+	RunID            string            `json:"run_id,omitempty"`
+	Revision         string            `json:"revision"`
+	Backend          string            `json:"backend,omitempty"`
+	Message          string            `json:"message"`
+	UpdatedAt        time.Time         `json:"updated_at"`
+	Execution        *runner.Execution `json:"execution,omitempty"`
+	SavedRevision    string            `json:"saved_revision,omitempty"`
+	ResultsUncertain bool              `json:"results_uncertain"`
+	ResultsStale     bool              `json:"results_stale"`
+	History          []RunRecord       `json:"history,omitempty"`
 }
+
+// A separate history entry cannot itself contain another history.
+type RunRecord struct {
+	State     string            `json:"state"`
+	Event     string            `json:"event"`
+	RunID     string            `json:"run_id"`
+	Revision  string            `json:"revision"`
+	Backend   string            `json:"backend,omitempty"`
+	Message   string            `json:"message"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	Execution *runner.Execution `json:"execution,omitempty"`
+}
+
+const MaxRecentRuns = 20
+const maxStoredStatusBytes = MaxRecentRuns*MaxStatusBytes + MaxStatusBytes
 
 type Store struct {
 	mutex     sync.Mutex
@@ -56,7 +79,7 @@ type Store struct {
 // Open restores a validated active snapshot. Corrupt state is an error; it never
 // silently becomes an empty bundle that a worker could mistake for a deletion.
 func Open(directory string) (*Store, error) {
-	var store = &Store{directory: directory, status: Status{State: "no-rules", Event: "not-reported", Message: "No execution report received."}}
+	var store = &Store{directory: directory, status: Status{State: "unavailable", Event: "not-reported", Message: "No execution report received."}}
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return nil, err
 	}
@@ -83,7 +106,7 @@ func Open(directory string) (*Store, error) {
 			return nil, fmt.Errorf("validate stored rules: %w", err)
 		}
 	}
-	contents, err = readPrivate(filepath.Join(directory, "status.json"), MaxStatusBytes)
+	contents, err = readPrivate(filepath.Join(directory, "status.json"), maxStoredStatusBytes)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
@@ -186,14 +209,33 @@ func (s *Store) activate(candidate Bundle, plan extension.Plan) (Bundle, error) 
 func (s *Store) LatestStatus() Status {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	return s.status
+	var result = cloneStatus(s.status)
+	result.ResultsStale = result.SavedRevision == "" || result.SavedRevision != s.active.Revision || result.ResultsUncertain || result.State == "failed" || result.State == "running" || result.State == "unavailable" || result.State == "uncertain"
+	// A lost final report must not leave a permanent success-looking spinner.
+	// This is a reporting deadline, not evidence that the graph rolled back.
+	if result.State == "running" && time.Since(result.UpdatedAt) > runner.DefaultLimits().RunTimeout+time.Minute {
+		result.State = "unavailable"
+		result.Message = "No completion report arrived before the run deadline. The save outcome is unknown."
+		result.ResultsUncertain, result.ResultsStale = true, true
+	}
+	return result
+}
+
+func cloneStatus(status Status) Status {
+	var result Status
+	contents, _ := json.Marshal(status)
+	_ = json.Unmarshal(contents, &result)
+	return result
 }
 
 func (s *Store) Report(status Status) error {
+	// History and saved-result state belong to this store, never to a sender.
+	if len(status.History) != 0 || status.SavedRevision != "" || status.ResultsUncertain || status.ResultsStale {
+		return fmt.Errorf("workers report one run; saved history belongs to the rule service")
+	}
 	if err := validateStatus(status); err != nil {
 		return err
 	}
-	status.UpdatedAt = time.Now().UTC()
 	contents, err := json.Marshal(status)
 	if err != nil {
 		return err
@@ -201,18 +243,59 @@ func (s *Store) Report(status Status) error {
 	if len(contents) > MaxStatusBytes {
 		return fmt.Errorf("status exceeds its byte limit")
 	}
+	if status.UpdatedAt.IsZero() {
+		status.UpdatedAt = time.Now().UTC()
+	}
+	if status.RunID == "" {
+		status.RunID = status.Event
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	status.SavedRevision, status.ResultsUncertain = s.status.SavedRevision, s.status.ResultsUncertain
+	if status.Execution != nil {
+		if status.Execution.Save == "succeeded" || status.Execution.Save == "unchanged" {
+			status.SavedRevision, status.ResultsUncertain = status.Revision, false
+		} else if status.Execution.Save == "uncertain" {
+			status.ResultsUncertain = true
+		}
+	}
+	for _, previous := range s.status.History {
+		if previous.RunID != status.RunID {
+			status.History = append(status.History, previous)
+		}
+	}
+	status.History = append(status.History, RunRecord{State: status.State, Event: status.Event, RunID: status.RunID, Revision: status.Revision, Backend: status.Backend, Message: status.Message, UpdatedAt: status.UpdatedAt, Execution: status.Execution})
+	if len(status.History) > MaxRecentRuns {
+		status.History = status.History[len(status.History)-MaxRecentRuns:]
+	}
+	contents, err = json.Marshal(status)
+	if err != nil {
+		return err
+	}
+	if len(contents) > maxStoredStatusBytes {
+		return fmt.Errorf("report history exceeds its byte limit")
+	}
 	if err := writePrivate(s.directory, "status.json", contents); err != nil {
 		return err
 	}
-	s.status = status
+	s.status = cloneStatus(status)
 	return nil
 }
 
 func validateStatus(status Status) error {
-	if status.State != "success" && status.State != "failed" && status.State != "running" && status.State != "no-rules" {
-		return fmt.Errorf("status state must be success, failed, running, or no-rules")
+	if status.State != "success" && status.State != "failed" && status.State != "running" && status.State != "no-rules" && status.State != "uncertain" && status.State != "unavailable" {
+		return fmt.Errorf("status state must be success, failed, running, no-rules, uncertain, or unavailable")
+	}
+	if len(status.RunID) > 180 || len(status.Backend) > 16 || len(status.History) > MaxRecentRuns {
+		return fmt.Errorf("report metadata exceeds its limits")
+	}
+	if err := validateExecution(status.Execution); err != nil {
+		return err
+	}
+	for _, record := range status.History {
+		if err := validateStatus(Status{State: record.State, Event: record.Event, RunID: record.RunID, Revision: record.Revision, Backend: record.Backend, Message: record.Message, UpdatedAt: record.UpdatedAt, Execution: record.Execution}); err != nil {
+			return err
+		}
 	}
 	if len(status.Event) > 128 || len(status.Message) > 2048 || !utf8.ValidString(status.Event) || !utf8.ValidString(status.Message) {
 		return fmt.Errorf("status event or message exceeds its text limit")

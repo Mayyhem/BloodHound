@@ -325,3 +325,40 @@ func TestDraftWaitsForSchemaOfDeclaredGraphInput(t *testing.T) {
 		})
 	}
 }
+
+// A complete schema set is not enough: bad query text must stay an inactive
+// draft too, including after a restart. Activation checks the same files again.
+func TestInvalidQueryDraftCannotActivate(t *testing.T) {
+	for _, source := range []string{
+		"// depends-on: none\nMACH (person) RETURN person.objectid AS source, 'target' AS target, 'PoC_Vault_HasAccountFor' AS kind",
+		"// depends-on: node:User, node:Group\nMATCH (person:User)-[:MemberOf]->(group:Group) RETURN person.objectid AS source, group.objectid AS target, 'PoC_Vault_HasAccountFor' AS kind",
+	} {
+		directory := t.TempDir()
+		store, err := ruleservice.Open(directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		active, err := store.Update(files(t))
+		if err != nil {
+			t.Fatal(err)
+		}
+		draft, err := store.SaveDraft(ruleservice.Change{BaseRevision: active.Revision, Files: map[string]string{"account_users.cypher": source}, Overwrite: []string{"account_users.cypher"}})
+		if err != nil || draft.Ready || !strings.Contains(draft.ValidationError, "account_users.cypher: line 2") && !strings.Contains(draft.ValidationError, "account_users.cypher: file syntax: line 2") {
+			t.Fatalf("draft: %+v %v", draft, err)
+		}
+		store, err = ruleservice.Open(directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if store.Draft().Ready || store.Draft().Revision != draft.Revision {
+			t.Fatal("restart lost invalid draft")
+		}
+		if _, err := store.Apply(ruleservice.Change{BaseRevision: active.Revision, DraftRevision: draft.Revision, ConfirmRevision: active.Revision}); err == nil {
+			t.Fatal("invalid query activated")
+		}
+		current, err := store.Active()
+		if err != nil || current.Revision != active.Revision {
+			t.Fatal("bad query changed active rules")
+		}
+	}
+}

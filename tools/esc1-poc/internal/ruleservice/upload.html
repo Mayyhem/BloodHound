@@ -206,13 +206,13 @@ SPDX-License-Identifier: Apache-2.0
         display: inline-block;
         width: 10px;
         height: 10px;
-        background: #62846c;
+        background: #7b8590;
         border-radius: 50%;
         margin-right: 8px;
       }
-      .status-light.running {
-        background: #be7b13;
-      }
+      .status-light.success { background: #62846c; }
+      .status-light.failed { background: #ba3b36; }
+      .status-light.uncertain { background: #be7b13; }
       .trash {
         width: 38px;
         height: 38px;
@@ -356,7 +356,8 @@ SPDX-License-Identifier: Apache-2.0
     </section>
     <details>
       <summary>Latest analysis report</summary>
-      <pre id="status">No report loaded.</pre>
+      <div id="execution-report" aria-live="polite">No report loaded.</div>
+      <details><summary>Full report and recent history</summary><pre id="status">No report loaded.</pre></details>
     </details>
     <dialog id="overwrite-dialog" aria-labelledby="overwrite-title">
       <h2 id="overwrite-title">Choose whether to overwrite</h2>
@@ -499,7 +500,10 @@ SPDX-License-Identifier: Apache-2.0
       // Manual refresh and polling share a pending status request to avoid overlapping fetches.
       function loadStatus() {
         if (!statusRequest) {
-          statusRequest = call('status').finally(() => {
+          statusRequest = call('status').catch(error => {
+ renderStatus({state: 'unavailable', message: 'The execution report could not be loaded. Saved results are unconfirmed.'});
+ throw error;
+ }).finally(() => {
             statusRequest = null;
           });
         }
@@ -606,6 +610,7 @@ SPDX-License-Identifier: Apache-2.0
 
       function detailsFor(query) {
         const container = element('div'), facts = element('dl'), processing = query.processing || {};
+        if (query.input_warning) entry(facts, 'Input check', query.input_warning);
         entry(facts, 'Graph inputs', describe((query.inputs || []).map(input => input.type + ': ' + input.name)));
         entry(facts, 'Waits for rules', describe((query.prerequisites || []).map(input => input.name + ' → $' + input.parameter)));
         entry(facts, 'Used by rules', describe(query.dependents));
@@ -724,7 +729,45 @@ SPDX-License-Identifier: Apache-2.0
       function renderStatus(status) {
         byID('status').textContent = JSON.stringify(status, null, 2);
         const state = status.state || status.status || (status.running ? 'running' : 'No analysis is running');
-        byID('analysis-state').replaceChildren(element('span', undefined, state === 'running' ? 'spinner' : 'status-light'), document.createTextNode('Latest extension report: ' + state));
+        byID('analysis-state').replaceChildren(element('span', undefined, state === 'running' ? 'spinner' : 'status-light ' + state), document.createTextNode('Latest extension report: ' + state));
+        const report = byID('execution-report');
+ const expanded = new Set([...report.querySelectorAll('details[open]')].map(item => item.dataset.runId));
+        report.replaceChildren(element('p', status.message || 'No execution report is available.'));
+        report.append(element('p', 'Active revision: ' + (active.revision || 'none') + '. Last confirmed saved revision: ' + (status.saved_revision || 'unknown') + '.'));
+        if (status.results_uncertain) report.append(element('p', 'The save outcome is unknown. A missing confirmation does not prove success or failure.', 'notice'));
+        else if (status.results_stale || (status.saved_revision && status.saved_revision !== active.revision)) report.append(element('p', 'Saved results have not been confirmed for the current rules and latest inputs.', 'notice'));
+        renderExecution(report, status);
+        for (const previous of [...(status.history || [])].reverse()) {
+          const details = element('details');
+ details.dataset.runId = previous.run_id || previous.updated_at;
+ details.open = expanded.has(details.dataset.runId);
+          details.append(element('summary', (previous.updated_at || '') + ' — ' + previous.state + ' — revision ' + previous.revision));
+          details.append(element('p', previous.message));
+          renderExecution(details, previous);
+          report.append(details);
+        }
+      }
+
+      function renderExecution(parent, record) {
+        const execution = record.execution;
+        if (!execution) return;
+        parent.append(element('p', 'Calculation: ' + execution.calculation.replaceAll('-', ' ') + '. Saving: ' + execution.save.replaceAll('-', ' ') + '. Database: ' + ({pg: 'PostgreSQL', neo4j: 'Neo4j'}[record.backend] || record.backend || 'not reported') + '.'));
+        if (execution.failure) {
+          const failure = execution.failure;
+          parent.append(element('p', (failure.query ? failure.query + ' (stage ' + failure.stage + '), ' : '') + failure.phase.replaceAll('-', ' ') + ': ' + failure.message, 'notice'));
+        }
+        const counts = execution.proposed || {};
+ if (execution.save !== 'succeeded' && execution.save !== 'unchanged') parent.append(element('p', 'Counts from an unfinished or failed run may be incomplete. Proposed outputs are not proof of a save.', 'muted'));
+        parent.append(element('p', 'Proposed changes: ' + (counts.relationships_added || 0) + ' connections added, ' + (counts.relationships_removed || 0) + ' removed, ' + (counts.relationships_updated || 0) + ' updated, ' + (counts.helpers_changed || 0) + ' helpers changed. ' + (execution.saved ? 'These changes were saved.' : 'These changes have no confirmed save.')));
+        const table = element('table'), head = element('tr'), body = element('tbody');
+        for (const title of ['Query', 'Stage', 'State', 'Rows', 'Read time', 'Proposed outputs', 'Saved outputs', 'Reason']) head.append(element('th', title));
+        const heading = element('thead'); heading.append(head); table.append(heading, body);
+        for (const query of execution.queries || []) {
+          const row = element('tr');
+          for (const value of [query.name, query.stage, query.state, query.rows ?? 'unknown', (query.elapsed_nanoseconds / 1e6).toFixed(1) + ' ms', query.proposed_outputs ?? '—', query.saved_outputs ?? 'unconfirmed', query.reason]) row.append(element('td', String(value)));
+          body.append(row);
+        }
+        parent.append(table, element('p', 'Output counts describe each query’s contribution. Shared connections count once in the saved graph. Read time includes producing the query’s complete answer; stages show dependency order, not simultaneous execution.', 'muted'));
       }
 
       async function readSnapshot() {
@@ -802,6 +845,7 @@ SPDX-License-Identifier: Apache-2.0
         byID('review-revisions').textContent = 'Based on: ' + (review.base_revision || 'no active revision') + '\nProposed revision: ' + review.revision;
         const changes = byID('review-changes');
         changes.replaceChildren();
+ entry(changes, 'File and language checks', 'Passed. Queries have not been executed against the database.');
         entry(changes, 'New files', describe(Object.keys(change.files || (change.draft_revision ? draft.files : {})).filter(name => !Object.hasOwn(active.files, name)).sort()));
         entry(changes, 'Overwritten files', describe(review.overwritten));
         entry(changes, 'All deleted files', describe(review.removed));

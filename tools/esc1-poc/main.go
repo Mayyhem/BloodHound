@@ -36,6 +36,7 @@ import (
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/graphdb"
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/modelview"
+	"github.com/specterops/bloodhound/tools/esc1-poc/internal/ruleservice"
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
 )
 
@@ -167,7 +168,10 @@ func execute(ctx context.Context, configuration configuration) error {
 		if err != nil {
 			return err
 		}
-		return printJSON(describePlan(plan))
+		return printJSON(struct {
+			Validation ruleservice.ValidationView `json:"validation"`
+			Queries    []plannedQuery             `json:"queries"`
+		}{Validation: ruleservice.BuildView(ruleservice.Bundle{}, plan).Validation, Queries: describePlan(plan)})
 	case "model":
 		// Writing to standard output also works from the command container.
 		// No credentials, Docker connection, or running database are needed.

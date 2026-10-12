@@ -2,6 +2,38 @@
 
 Use [DEVELOPERS.md](DEVELOPERS.md) for current authoring instructions and [USAGE.md](USAGE.md) for the persistent lab. Entries below record earlier implementations and deployments; old schema processing blocks, ownership settings, commands, and performance limits are not a second current authoring format.
 
+## Validation and execution reports — 12 October 2026
+
+The user explicitly requested “Execute #2 and #4” and reminded us to use plain English. Both are implemented; see [the review entry](REVIEW.md#earlier-validation-and-execution-reports--12-october-2026) for file responsibilities and test evidence. Keep their unrelated `.gitignore`, `END_USERS.md`, README link, and FAQ handoff edits. No files were staged or committed, and no live service was deployed.
+
+`internal/querycheck.Check` first verifies the complete grammar, then walks that same tree with DAWGS’s normal query reader and read-only filters. It finds named inputs from syntax, not text matching. Missing declarations include locations and corrections. The loader, saved-draft review, activation, and native adapters use these checks. `Query.BroadRead` prevents unsafe skipping for unnamed or dynamic graph reads when changes occurred; known empty changes still skip. Keep explicit dependencies for ordering and special instructions. The ESC1 `trusted_cas.cypher` now declares its direct `EnterpriseCA` read. `plan` JSON changed from an array to `{validation, queries}`. The guide’s six hidden `tested-example` markers identify the complete files used by permanent tests for its four stages. The old upload-validation paragraph in USAGE.md noted by the FAQ work below has also been corrected.
+
+The runner’s `Execution` contains public-safe names/counts/timings/explanations only. Query workers return timing and failure information to the coordinator, which updates the report after readers finish; shared report state is never written by workers. `ConfirmNativeSave` waits for the surrounding Neo4j operation’s actual confirmation. Only confirmed saves populate saved counts. The existing full runner report still has local inspection samples; those are not sent to the rule service.
+
+Status storage keeps the latest report, 20 recent attempts, and last confirmed saved revision in one private file, with all of them replaced together. One received report is bounded to 64 KiB; stored history to 21 times that. Stale/unavailable/uncertain are distinct from success. A missing completion expires after the two-hour run budget plus one minute. The worker keeps 20 unsent status updates and retries delivery on idle ticks without recalculating successful work; that delivery queue is in memory. No intermediate answers or raw database errors are stored in status. Generic errors still require private application logs.
+
+Final checks passed: full pilot race tests; full isolated graph race tests on both databases (132.510 seconds); affected root packages; Go static checks; report browser and existing rule-table browser checks. See `work/validation-reports-final-unit.log`, `work/validation-reports-final-databases.log`, `work/validation-reports-root.log`, `work/validation-reports-vet.log`, and `work/execution-report-browser/checks.json`. Later focused checks verify empty-plan wording, query-error locations, draft activation refusal, save-confirmation phase, and unavailable-report freshness. The local CLI was rebuilt. The existing `esc1-poc-test-graph-1` and `esc1-poc-test-pg-graph-1` containers were stopped when tests began; they were started for these checks and stopped again afterward. No application containers or graphs were changed.
+
+A separate observed follow-up is PostgreSQL ordering when a returned alias shadows a node variable (`RETURN source.objectid AS source ... ORDER BY source`). Compare with Neo4j and determine expected behavior before relying on this with `LIMIT`. It did not change the tested connection sets; the test now compares sets. No DAWGS edit belongs to this task.
+
+After reviewing all changes, a manual commit is appropriate. From the repository root:
+
+```sh
+just prepare-for-codereview
+# Review generated files and the separate FAQ edits before choosing what to stage.
+git add -p tools/esc1-poc
+# Add the new validation/report/test files explicitly after reviewing them.
+git commit -m "feat: Validate extension queries and report execution results <Jira tag>"
+```
+
+Replace the Jira placeholder. `just prepare-for-codereview` was not run during this task. Live rules containing newly detected missing declarations must be corrected before starting the new service; old schema-format conversion from #8 remains a separate deployment concern.
+
+## End-user FAQ — 12 October 2026
+
+Added [END_USERS.md](END_USERS.md) for people using supplied schemas and rules rather than writing them, and linked it from README.md. Its 21 questions cover separate file/data uploads, three sources arriving at different times, drafts, updates, deletion versus disabling, shared connections, old evidence, reports, failures, and pathfinding. Behavior was checked against the current rule page, saved-draft and rule-change code, analysis runner, and existing tests. Local links, question headings, and whitespace were checked; application tests and `just prepare-for-codereview` were not run for this documentation-only change. Nothing was staged or committed. Existing edits were preserved.
+
+Follow-up: the upload-validation paragraph in USAGE.md still says the full application query check happens later. Current code and the earlier paragraph in that guide check complete query syntax during review; actual database execution still happens later. END_USERS.md follows the current behavior. That older wording was left unchanged in this task.
+
 
 ## Schema kinds and inactive drafts — 11 October 2026
 

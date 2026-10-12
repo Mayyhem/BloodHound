@@ -103,15 +103,34 @@ func TestChangeCoverageControlsPublication(t *testing.T) {
 	}
 
 	write(t, database, "CREATE (:Base:UnrelatedFixture {objectid:'PoC_Test_Unrelated', poc_fixture:true})", nil)
-	before := guardGraphSnapshot(t, database)
+	// ESC1 contains unnamed graph reads. A newly seen kind cannot safely be
+	// treated as unrelated, so recalculate its chain while keeping the separate
+	// domain helper paused. Only the saved run record should change here.
+	snapshotEvidence := func() []runner.Rows {
+		result := guardGraphSnapshot(t, database)
+		result[0] = read(t, database, "MATCH (node) WHERE NOT node:PoC_Run RETURN id(node) AS id, labels(node) AS kinds, properties(node) AS properties ORDER BY id", nil)
+		return result
+	}
+	before := snapshotEvidence()
 	runOptions.BatchID = "unrelated-fixture-batch"
 	runOptions.Changes = runner.Changes{CoverageKnown: true, Nodes: []string{"UnrelatedFixture"}}
-	skipped, err := runner.Run(t.Context(), database, plan, runOptions)
-	if err != nil || !skipped.Skipped || skipped.Committed || len(skipped.Queries) != 0 || skipped.GraphObjectsChanged != 0 {
-		t.Fatalf("known unrelated change: %+v, %v", skipped, err)
+	conservative, err := runner.Run(t.Context(), database, plan, runOptions)
+	if err != nil || !conservative.Committed || conservative.Skipped || len(conservative.Queries) != len(plan.Queries)-1 || conservative.Unchanged != 1 || conservative.HelpersChanged != 0 {
+		t.Fatalf("conservative graph read: %+v, %v", conservative, err)
 	}
-	if after := guardGraphSnapshot(t, database); !reflect.DeepEqual(before, after) {
-		t.Fatal("skipped run wrote graph data or saved run state")
+	if after := snapshotEvidence(); !reflect.DeepEqual(before, after) {
+		t.Fatal("conservative recalculation changed existing graph evidence")
+	}
+
+	// Complete observation of no changes still permits a true skip.
+	runOptions.Changes = runner.Changes{CoverageKnown: true}
+	savedBefore := guardGraphSnapshot(t, database)
+	skipped, err := runner.Run(t.Context(), database, plan, runOptions)
+	if err != nil || !skipped.Skipped || skipped.Committed {
+		t.Fatalf("known empty changes: %+v, %v", skipped, err)
+	}
+	if after := guardGraphSnapshot(t, database); !reflect.DeepEqual(savedBefore, after) {
+		t.Fatal("skipped run changed the graph or run record")
 	}
 
 	// Empty change lists are inconclusive unless their coverage is known.

@@ -4,22 +4,7 @@ Give extension authors a clear path from an idea to working rules: create an ext
 
 Open items describe proposed improvements; completed work is listed under [Done](#done). Keep the engine's existing shared calculations, scope and identity checks, complete-result validation, and all-or-nothing saving. The interactive execution graph below replaces the earlier suggestion for a separate development-mode execution preview.
 
-Start with earlier validation and useful execution reports. Then build the interactive graph and its testing controls. Starter tooling and easier sharing build on those capabilities. Keep the completed authoring documentation current as the engine changes. Coordinate the Cypher work with the existing [implementation plan](CYPHER_IMPLEMENTATION_PLAN.md).
-
-## 2. Catch mistakes before rules are activated
-
-Checking filenames, declarations, and the final `RETURN` is not enough to establish that the complete query can run. Dependencies also determine when results are recalculated, so missing one can leave old results in place.
-
-- [ ] Parse the complete query during file validation using the same language checks as execution. Distinguish file validation, language support, and actual database execution in the results.
-- [ ] Report the filename, line, and useful explanation for each problem. Include the selected database and unsupported query feature when relevant.
-- [ ] Find graph kinds and prerequisite parameters that are visible in the query and check them against declared dependencies. Suggest corrections; handle uncertain cases conservatively.
-- [ ] Investigate automatically supplying dependencies that can be established reliably, while keeping exceptional dependencies explicit. Agree on any change to author requirements before implementing it.
-- [ ] Add regression cases for a misspelled `MATCH`, a query that reads `MemberOf` without declaring it, missing prerequisites, unsupported syntax, and incorrect output columns.
-- [ ] Add permanent automated tests for the quick-start files and shipped examples, including extracting each tutorial stage from Markdown and checking its expected results on both databases. Cover disabled and missing-property users, helper identities, property updates, and complete empty answers. Moved from #1; this requires approval for code changes.
-
-**Done when:** authors receive actionable feedback before activation, and a query cannot silently omit an input that validation can identify.
-
-Start in [the loader](internal/extension/extension.go), [output detection](internal/extension/output.go), and [the native execution adapter](internal/graphdb/native.go).
+Earlier validation and useful execution reports are implemented. Next, build the interactive graph and its testing controls. Starter tooling and easier sharing build on those capabilities. Keep the completed authoring documentation current as the engine changes. Coordinate the Cypher work with the existing [implementation plan](CYPHER_IMPLEMENTATION_PLAN.md).
 
 ## 3. Build an interactive execution graph, like Ghidra/IDA
 
@@ -43,20 +28,6 @@ Bring the details and actions currently available in the rule table into this gr
 **Done when:** an author can follow a chain, inspect its query and intermediate answers, understand a failure, manage the rules, and review the effects of a proposed change from the graph workspace. Activating rules remains a separate, explicit action.
 
 Start in [the rule page](internal/ruleservice/upload.html), [the existing plan details](internal/ruleservice/view.go), [change review](internal/ruleservice/changes.go), and [the runner](internal/runner).
-
-## 4. Make execution reports useful to the author
-
-The runner already records useful counts, but the persistent service mainly exposes a summary. A failure should give authors enough information to investigate without first finding application logs. These reports will also supply the execution graph.
-
-- [ ] Report the failing query, stage, and useful error details, without exposing secrets.
-- [ ] Include query row counts, durations, proposed and saved output counts, and the reason each query ran or was skipped.
-- [ ] Distinguish a successful calculation from a successful save, and identify when the displayed results still belong to an older revision.
-- [ ] Provide bounded recent execution history so authors can compare a changed rule with its previous run. Keep intermediate graph data available only through the appropriate inspection controls.
-- [ ] Make an uncertain save outcome or an unavailable report visibly different from a confirmed failure or success.
-
-**Done when:** the graph and report explain what ran, what happened, and which results are currently saved.
-
-Start in [the runner report](internal/runner/runner.go), [persistent reporting](postprocessing/service.go), and [stored status](internal/ruleservice/store.go).
 
 ## 5. Provide starter files and a simple development lab
 
@@ -108,9 +79,42 @@ Start in [the Cypher implementation plan](CYPHER_IMPLEMENTATION_PLAN.md) and [th
 
 ## Done
 
+### 2. Catch mistakes before rules are activated
+
+**Completed: 12 October 2026.** Full query checks and visible-input validation are shared with execution. Dependency declarations remain explicit; broad reads are recalculated conservatively. Tutorial stages and shipped examples have permanent checks on both databases.
+
+Checking filenames, declarations, and the final `RETURN` is not enough to establish that the complete query can run. Dependencies also determine when results are recalculated, so missing one can leave old results in place.
+
+- [x] Parse the complete query during file validation using the same language checks as execution. Distinguish file validation, language support, and actual database execution in the results.
+- [x] Report the filename, line, and useful explanation for each problem. Include the selected database and unsupported query feature when relevant.
+- [x] Find graph kinds and prerequisite parameters that are visible in the query and check them against declared dependencies. Suggest corrections; handle uncertain cases conservatively.
+- [x] Investigate automatically supplying dependencies that can be established reliably, while keeping exceptional dependencies explicit. Agree on any change to author requirements before implementing it.
+- [x] Add regression cases for a misspelled `MATCH`, a query that reads `MemberOf` without declaring it, missing prerequisites, unsupported syntax, and incorrect output columns.
+- [x] Add permanent automated tests for the quick-start files and shipped examples, including extracting each tutorial stage from Markdown and checking its expected results on both databases. Cover disabled and missing-property users, helper identities, property updates, and complete empty answers. Moved from #1 and implemented under the user’s request to execute #2.
+
+**Done when:** authors receive actionable feedback before activation, and a query cannot silently omit an input that validation can identify.
+
+Start in [the loader](internal/extension/extension.go), [output detection](internal/extension/output.go), and [the native execution adapter](internal/graphdb/native.go).
+
+### 4. Make execution reports useful to the author
+
+**Completed: 12 October 2026.** Reports distinguish calculations, confirmed saves, uncertain saves, and unavailable reports. They include per-query details, retain 20 recent attempts, and preserve the last confirmed saved revision.
+
+The runner already records useful counts, but the persistent service mainly exposes a summary. A failure should give authors enough information to investigate without first finding application logs. These reports will also supply the execution graph.
+
+- [x] Report the failing query, stage, and useful error details, without exposing secrets.
+- [x] Include query row counts, durations, proposed and saved output counts, and the reason each query ran or was skipped.
+- [x] Distinguish a successful calculation from a successful save, and identify when the displayed results still belong to an older revision.
+- [x] Provide bounded recent execution history so authors can compare a changed rule with its previous run. Keep intermediate graph data available only through the appropriate inspection controls.
+- [x] Make an uncertain save outcome or an unavailable report visibly different from a confirmed failure or success.
+
+**Done when:** the graph and report explain what ran, what happened, and which results are currently saved.
+
+Start in [the runner report](internal/runner/runner.go), [persistent reporting](postprocessing/service.go), and [stored status](internal/ruleservice/store.go).
+
 ### 1. Keep the authoring instructions and examples consistent
 
-**Completed: documentation work on 11 October 2026.** The remaining permanent automated tests are tracked under [#2](#2-catch-mistakes-before-rules-are-activated), pending approval for code changes.
+**Completed: documentation work on 11 October 2026.** Permanent automated tutorial and example tests were completed with [#2](#2-catch-mistakes-before-rules-are-activated) on 12 October 2026.
 
 - [x] Check the current guides and example documentation against the authoring rules. Remove obsolete instructions and unnecessary alternative ways to express the same thing; label historical formats as history.
 - [x] Provide one minimal starting example, followed by examples for shared answers, helper objects, and relationships with properties.

@@ -22,6 +22,9 @@ cmd/api/src/cmd/bhapi/bhapi
 # go tool binaries
 .bin
 
+# Local DAWGS checkout
+/tools/DAWGS/
+
 # ui builds
 **/build/*
 **/dist/*

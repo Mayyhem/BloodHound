@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // depends-on: query:ca_root_reach.cypher, query:ca_auth_reach.cypher,
-// node:Domain, relationship:TrustedForNTAuth, relationship:NTAuthStoreFor
+// node:EnterpriseCA, node:Domain, relationship:TrustedForNTAuth, relationship:NTAuthStoreFor
 
 // Native certificate reach permits all three root-chain kinds at every depth.
 // The shared primitive returns sets, so repeated routes cannot multiply rows.

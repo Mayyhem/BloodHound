@@ -120,7 +120,7 @@ func TestLoadRejectsInvalidExtensions(t *testing.T) {
 		{"missing prerequisite", "// depends-on: query:missing.cypher\nRETURN 1", "missing prerequisite"},
 		{"duplicate prerequisite", "// depends-on: node:Domain, node:Domain\nRETURN 1", "duplicate"},
 		{"none with dependencies", "// depends-on: none\n// depends-on: node:Domain\nRETURN 1", "cannot be combined"},
-		{"undeclared parameter", "// depends-on: node:Domain\nRETURN $missing", "declared query prerequisite"},
+		{"undeclared parameter", "// depends-on: node:Domain\nRETURN $missing", "add query:missing.cypher"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

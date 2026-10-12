@@ -136,7 +136,7 @@ func validateInputKinds(queries []Query, definitions []Definition) error {
 	for _, query := range queries {
 		for _, input := range query.Dependencies {
 			if input.Type != "query" && !known[input] {
-				return fmt.Errorf("%s: depends-on references unknown %s kind %q; include the schema that defines it, or correct the kind name", query.Name, input.Type, input.Name)
+				return fmt.Errorf("%s: line %d: depends-on references unknown %s kind %q; include the schema that defines it, or correct the kind name", query.Name, textLine(query.Text, input.Name), input.Type, input.Name)
 			}
 		}
 	}

@@ -29,6 +29,7 @@ import (
 // PlanView describes declared dependencies and the runner's existing execution
 // order. Threads are conservative connected groups, not running goroutines.
 type PlanView struct {
+	Validation ValidationView  `json:"validation"`
 	Revision   string          `json:"revision"`
 	Name       string          `json:"name"`
 	Threads    []ThreadView    `json:"threads"`
@@ -73,6 +74,7 @@ type ProcessingView struct {
 }
 
 type QueryView struct {
+	InputWarning   string             `json:"input_warning,omitempty"`
 	Name           string             `json:"name"`
 	Extension      string             `json:"extension"`
 	ExtensionName  string             `json:"extension_name"`
@@ -90,6 +92,13 @@ type QueryView struct {
 	Processing     ProcessingView     `json:"processing"`
 }
 
+// ValidationView describes checks already performed, not an execution preview.
+type ValidationView struct {
+	Files             string `json:"files"`
+	Language          string `json:"language"`
+	DatabaseExecution string `json:"database_execution"`
+}
+
 // BuildView keeps actual ordering from plan.Queries. Shared graph inputs, reachability kinds, endpoint kinds,
 // and managed producers join groups without inventing scheduling edges.
 func BuildView(bundle Bundle, plan extension.Plan) PlanView {
@@ -104,6 +113,10 @@ func BuildView(bundle Bundle, plan extension.Plan) PlanView {
 		producers     = make(map[string][]string)
 		threadIndexes = make(map[int]int)
 	)
+	view.Validation = ValidationView{Files: "passed", Language: "passed shared language checks for Neo4j and PostgreSQL", DatabaseExecution: "not run"}
+	if len(plan.Definitions) == 0 && len(plan.Queries) == 0 {
+		view.Validation.Files, view.Validation.Language = "not checked", "not checked"
+	}
 	for _, definition := range plan.Definitions {
 		view.Extensions = append(view.Extensions, ExtensionView{Name: definition.Schema.Name, DisplayName: definition.Schema.DisplayName})
 	}
@@ -134,6 +147,9 @@ func BuildView(bundle Bundle, plan extension.Plan) PlanView {
 		parents[index] = index
 		indexes[query.Name] = index
 		queries[index] = QueryView{Name: query.Name, Extension: query.Extension, ExtensionName: query.ExtensionName, DisabledReason: query.DisabledReason, Enabled: query.DisabledReason == "", Order: index + 1, Stage: 1, Parameter: query.Parameter, Text: query.Text, Inputs: []InputView{}, Prerequisites: []PrerequisiteView{}, Dependents: []string{}, Outputs: outputs[query.Name], Processing: ProcessingView{Reachability: query.Reach, GroupOverlap: query.Overlap, BatchDependency: query.BatchDependency}}
+		if query.BroadRead {
+			queries[index].InputWarning = "This query has graph reads without explicit kinds. It is recalculated conservatively because its declarations may not describe every input."
+		}
 		if addedAt := bundle.AddedAt[query.Name]; !addedAt.IsZero() {
 			queries[index].AddedAt = addedAt.UTC().Format(time.RFC3339)
 		}

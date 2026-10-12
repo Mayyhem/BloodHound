@@ -28,6 +28,8 @@ Existing settings give BloodHound the rule container's address and access secret
 ## The main safeguards and limits
 
 - The runner combines every producer’s complete answer before refreshing a relationship type within its declared endpoint scope. Existing edges in that scope participate regardless of their origin. A failed calculation before saving preserves the previous results.
+- File checks parse complete queries, suggest missing input declarations, and distinguish those checks from actual database execution.
+- Execution reports show query failures, counts, timings, save outcomes, the last confirmed saved revision, and up to 20 recent attempts.
 - Uploads are saved as inactive drafts. Missing schemas can be added later; the complete set must validate and be reviewed before activation.
 - Each producing query names its edge with a literal `kind` column. Schemas describe types and directed `compatible_kinds` pairs; they need no `post_processing` blocks.
 - Each query can choose whether a matching connection is replaced, has its supplied details updated, or is kept unchanged. Replacement is the default.
@@ -41,6 +43,7 @@ Existing settings give BloodHound the rule container's address and access secret
 
 | I want to… | Read |
 | --- | --- |
+| Use supplied extensions and understand what happens after uploads or rule changes | [End-user questions and answers](END_USERS.md) |
 | Write my first extension or look up the authoring rules | [Developer guide and quick start](DEVELOPERS.md) |
 | Extend the starter with shared answers, helpers, and properties | [Step-by-step examples](DEVELOPERS.md#continue-with-the-same-example) |
 | Review planned improvements to extension development | [Developer experience backlog](TODO.md) |

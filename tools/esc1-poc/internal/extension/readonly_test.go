@@ -64,21 +64,17 @@ func TestLoadRejectsWritesAndExternalReads(t *testing.T) {
 	}
 }
 
-func TestLoadAllowsReadOnlySubqueriesAndLiteralKeywords(t *testing.T) {
+func TestLoadAllowsLiteralKeywords(t *testing.T) {
 	var cases = []struct {
 		name  string
 		query string
 	}{
-		{"subquery", "CALL { RETURN 'user-id' AS source } RETURN source, 'domain-id' AS target"},
-		{"subquery with comment", "CALL /* CALL apoc.load.json('ignored'); CREATE */ { RETURN 1 AS value } RETURN value"},
-		{"nested subquery", "CALL { CALL { RETURN 1 AS value } RETURN value } RETURN value"},
 		{"literal keywords", "RETURN 'CREATE MERGE DELETE SET REMOVE LOAD CSV CALL EXPLAIN PROFILE' AS text"},
 		{"double quoted literal", "RETURN \"CALL db.labels() CREATE SET\" AS text"},
 		{"quoted identifiers", "MATCH (item) RETURN item.`SET` AS `CREATE`"},
 		{"line comment", "RETURN 1 AS value // SET node.name = 'ignored'; CALL db.labels()\n"},
 		{"block comment", "/* LOAD CSV FROM 'ignored'; PROFILE CREATE */ RETURN 1 AS value"},
 		{"escaped quote", "RETURN 'a\\'b CREATE CALL' AS text"},
-		{"doubled quote", "RETURN 'a''b CREATE CALL' AS text"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

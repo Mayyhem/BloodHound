@@ -18,8 +18,10 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
 )
@@ -27,14 +29,51 @@ import (
 // A finished query hands its closed answer file back to the coordinator. Only
 // the coordinator changes the plan's progress, releases files, or writes objects.
 type queryAnswer struct {
-	query extension.Query
-	file  *answerFile
+	query   extension.Query
+	file    *answerFile
+	elapsed time.Duration
+	err     error
 }
 
 // calculate starts ready queries whenever a place is free. A slow query does
 // not hold up the next step of an unrelated chain. Shared prerequisites run once
 // and their files stay available until every consumer has finished reading.
 func calculate(ctx context.Context, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report, stage func(extension.RelationshipBinding, *answerFile) error) (map[string]*answerFile, error) {
+	var currentQuery string
+	result, err := calculateQueries(ctx, database, transaction, plan, space, report, stage, &currentQuery)
+	if err != nil {
+		var failure *queryFailure
+		if errors.As(err, &failure) {
+			currentQuery = failure.query
+			report.Execution.Phase = "read-query"
+		}
+		report.Execution.fail(currentQuery, report.Execution.Phase, err)
+	}
+	return result, err
+}
+
+type queryFailure struct {
+	query string
+	cause error
+}
+
+func (s *queryFailure) Error() string { return "run " + s.query + ": " + s.cause.Error() }
+func (s *queryFailure) Unwrap() error { return s.cause }
+
+func recordRead(report *Report, answer queryAnswer) {
+	var detail = report.Execution.query(answer.query.Name)
+	detail.Elapsed = answer.elapsed
+	if answer.err != nil {
+		detail.State = "canceled"
+		return
+	}
+	if answer.file != nil {
+		rows := answer.file.rows
+		detail.Rows = &rows
+	}
+}
+
+func calculateQueries(ctx context.Context, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report, stage func(extension.RelationshipBinding, *answerFile) error, currentQuery *string) (map[string]*answerFile, error) {
 	var (
 		answers            = map[string]*answerFile{}
 		remaining          = map[string]int{}
@@ -57,7 +96,7 @@ func calculate(ctx context.Context, database Database, transaction Transaction, 
 		// all of them to close their readers before rollback or file removal.
 		cancel(nil)
 		for running > 0 {
-			<-finished
+			recordRead(report, <-finished)
 			running--
 		}
 	}()
@@ -141,12 +180,14 @@ func calculate(ctx context.Context, database Database, transaction Transaction, 
 					inputs[parameter] = answers[parameter]
 				}
 			}
+			report.Execution.query(query.Name).State = "running"
 			started[query.Name] = true
 			running++
 			separateReader := workers > 1 && !graphChangesStaged
 			go func() {
-				file := readQueryAnswers(ctx, database, transaction, separateReader, query, inputs, space, cancel)
-				finished <- queryAnswer{query: query, file: file}
+				started := time.Now()
+				file, err := readQueryAnswers(ctx, database, transaction, separateReader, query, inputs, space, cancel)
+				finished <- queryAnswer{query: query, file: file, err: err, elapsed: time.Since(started)}
 			}()
 			if helperQueries[query.Name] {
 				// A helper-producing query starts only when other readers have
@@ -162,10 +203,13 @@ func calculate(ctx context.Context, database Database, transaction Transaction, 
 		}
 		answer := <-finished
 		running--
+		recordRead(report, answer)
 		if err := context.Cause(ctx); err != nil {
 			return nil, err
 		}
 		query, file := answer.query, answer.file
+		*currentQuery = query.Name
+		report.Execution.Phase = "check-answers"
 		answers[query.Parameter] = file
 		report.Queries = append(report.Queries, query.Name)
 		report.QueryRows[query.Name] = int(file.rows)
@@ -190,6 +234,8 @@ func calculate(ctx context.Context, database Database, transaction Transaction, 
 			if err := sorted.remove(); err != nil {
 				return nil, err
 			}
+			count := file.rows
+			report.Execution.query(query.Name).Proposed = &count
 			graphChangesStaged = true
 		}
 		for _, binding := range plan.Schema.Relationships {
@@ -207,6 +253,8 @@ func calculate(ctx context.Context, database Database, transaction Transaction, 
 				produced[binding.Kind] = map[string]*answerFile{}
 			}
 			produced[binding.Kind][query.Name] = pairs
+			count := pairs.rows
+			report.Execution.query(query.Name).Proposed = &count
 		}
 		// Helpers are not committed yet. Later reads use this same database
 		// operation so they can see them. Publication still succeeds or fails
@@ -215,6 +263,9 @@ func calculate(ctx context.Context, database Database, transaction Transaction, 
 			workers = 1
 		}
 		completed[query.Name] = true
+		report.Execution.query(query.Name).State = "succeeded"
+		*currentQuery = ""
+		report.Execution.Phase = "calculation"
 		for _, dependency := range query.Dependencies {
 			if dependency.Type == "query" {
 				remaining[strings.TrimSuffix(dependency.Name, ".cypher")]--
@@ -314,14 +365,14 @@ func nextReadyQuery(plan extension.Plan, started, completed, helpers, staged map
 
 // This returns only after its independent database reader has closed. The
 // shared publication operation belongs to the coordinator and stays open.
-func readQueryAnswers(ctx context.Context, database Database, transaction Transaction, separateReader bool, query extension.Query, inputs map[string]*answerFile, space *answerSpace, stopPeers context.CancelCauseFunc) *answerFile {
+func readQueryAnswers(ctx context.Context, database Database, transaction Transaction, separateReader bool, query extension.Query, inputs map[string]*answerFile, space *answerSpace, stopPeers context.CancelCauseFunc) (*answerFile, error) {
 	ctx, cancel := context.WithTimeout(ctx, space.limits.QueryTimeout)
 	defer cancel()
 	if separateReader {
 		reader, err := database.Begin(ctx)
 		if err != nil {
-			stopPeers(fmt.Errorf("run %s: %w", query.Name, err))
-			return nil
+			stopPeers(&queryFailure{query: query.Name, cause: err})
+			return nil, err
 		}
 		defer rollback(reader)
 		transaction = reader
@@ -331,9 +382,9 @@ func readQueryAnswers(ctx context.Context, database Database, transaction Transa
 		// Stop peers before closing this connection, since closing can take
 		// time. CancelCause keeps this first explanation instead of replacing
 		// it with a peer's later cancellation message.
-		stopPeers(fmt.Errorf("run %s: %w", query.Name, err))
+		stopPeers(&queryFailure{query: query.Name, cause: err})
 	}
-	return file
+	return file, err
 }
 
 func calculateQuery(ctx context.Context, transaction Transaction, query extension.Query, answers map[string]*answerFile, space *answerSpace) (*answerFile, error) {

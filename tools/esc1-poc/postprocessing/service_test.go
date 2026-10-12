@@ -31,10 +31,11 @@ import (
 )
 
 type serviceTestClient struct {
-	bundle   ruleservice.Bundle
-	failure  error
-	fetches  int
-	statuses []ruleservice.Status
+	bundle        ruleservice.Bundle
+	failure       error
+	fetches       int
+	statuses      []ruleservice.Status
+	reportFailure error
 }
 
 func (s *serviceTestClient) Fetch(context.Context) (ruleservice.Bundle, error) {
@@ -42,6 +43,9 @@ func (s *serviceTestClient) Fetch(context.Context) (ruleservice.Bundle, error) {
 	return s.bundle, s.failure
 }
 func (s *serviceTestClient) Report(_ context.Context, status ruleservice.Status) error {
+	if s.reportFailure != nil {
+		return s.reportFailure
+	}
 	s.statuses = append(s.statuses, status)
 	return nil
 }
@@ -323,4 +327,22 @@ func TestServiceKnownRollbackKeepsOrdinaryWritesAvailable(t *testing.T) {
 		t.Fatalf("a confirmed rollback unnecessarily stopped ordinary writes: %v", err)
 	}
 	release()
+}
+
+func TestServiceRetriesReportDeliveryWithoutRepeatingSavedWork(t *testing.T) {
+	service, client, _, calls := newServiceTest(t)
+	client.reportFailure = errors.New("report service unavailable")
+	if committed, err := service.AfterAnalysis(t.Context()); err != nil || !committed {
+		t.Fatalf("graph save: %v %v", committed, err)
+	}
+	if len(client.statuses) != 0 || len(service.reports) != 2 {
+		t.Fatal("lost unsent reports")
+	}
+	client.reportFailure = nil
+	if _, err := service.Retry(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if *calls != 1 || len(client.statuses) != 2 || client.statuses[1].State != "success" || len(service.reports) != 0 {
+		t.Fatal("report retry recalculated or lost success")
+	}
 }

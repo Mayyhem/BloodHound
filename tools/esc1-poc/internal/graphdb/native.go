@@ -50,7 +50,7 @@ func RunNative(ctx context.Context, database graph.Database, backend string, pla
 			continue
 		}
 		if err := validatePostgresRead(statement.Text); err != nil {
-			return runner.Report{}, err
+			return runner.RejectedQueryReport(plan, options, statement.Name, err), fmt.Errorf("%s (%s): %w", statement.Name, backend, err)
 		}
 	}
 	var driver, postgres = graph.AsDriver[*pg.Driver](database)
@@ -228,12 +228,15 @@ func runNativeNeo4j(ctx context.Context, database graph.Database, plan extension
 	if err != nil {
 		report.GraphObjectsChanged = 0
 		if entered && callbackError == nil && borrowed.main.commitRequested {
-			return report, fmt.Errorf("%w: %w", runner.ErrCommitUncertain, err)
+			err = fmt.Errorf("%w: %w", runner.ErrCommitUncertain, err)
+			runner.ConfirmNativeSave(&report, err)
+			return report, err
 		}
 		return report, err
 	}
 	report.Committed = borrowed.main != nil && borrowed.main.commitRequested
 	report.Elapsed = time.Since(started)
+	runner.ConfirmNativeSave(&report, nil)
 	return report, nil
 }
 

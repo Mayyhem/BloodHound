@@ -36,7 +36,7 @@ func TestBuildViewEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(view.Threads) != 0 || string(contents) != `{"revision":"","name":"","threads":[],"queries":[],"extensions":[]}` {
+	if len(view.Threads) != 0 || string(contents) != `{"validation":{"files":"not checked","language":"not checked","database_execution":"not run"},"revision":"","name":"","threads":[],"queries":[],"extensions":[]}` {
 		t.Fatalf("empty plan should have an empty array: %s", contents)
 	}
 }

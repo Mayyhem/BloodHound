@@ -39,7 +39,7 @@ const (
 	MaxFiles       = 32
 	MaxFileBytes   = 1 << 20
 	MaxBundleBytes = 4 << 20
-	MaxStatusBytes = 16 << 10
+	MaxStatusBytes = 64 << 10
 )
 
 var (

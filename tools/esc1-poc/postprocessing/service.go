@@ -56,6 +56,7 @@ type pendingRun struct {
 	changeNumber uint64
 	bundle       ruleservice.Bundle
 	retryAt      time.Time
+	attempt      int
 }
 
 // Service is called by the single native import loop, never by an HTTP request
@@ -66,6 +67,7 @@ type Service struct {
 	client           ruleClient
 	configuration    Configuration
 	pending          *pendingRun
+	reports          []ruleservice.Status
 	clock            func() time.Time
 	registeredSchema []byte
 	changes          changeTracker
@@ -136,6 +138,7 @@ func (s *Service) AfterAnalysis(ctx context.Context) (bool, error) {
 func (s *Service) Retry(ctx context.Context) (bool, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	s.flushReports(ctx)
 	if s.pending == nil || s.clock().Before(s.pending.retryAt) {
 		return false, nil
 	}
@@ -149,6 +152,7 @@ func (s *Service) Retry(ctx context.Context) (bool, error) {
 
 func (s *Service) run(ctx context.Context) (bool, error) {
 	var pending = s.pending
+	pending.attempt++
 	pending.retryAt = s.clock().Add(time.Minute)
 	if pending.bundle.Revision == "" {
 		bundle, err := s.client.Fetch(ctx)
@@ -158,6 +162,7 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 			return false, nil
 		}
 		if err != nil {
+			s.report(ctx, "unavailable", "Could not fetch the active rules. No new calculation started; previous results were kept.")
 			return false, fmt.Errorf("fetch extension rules; old results retained: %w", err)
 		}
 		pending.bundle = bundle
@@ -228,24 +233,51 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 		return runError
 	})
 	if err != nil {
-		s.report(ctx, "failed", "Calculation failed. Check BloodHound's log; previous results may be out of date.")
+		state := "failed"
+		if errors.Is(err, runner.ErrCommitUncertain) {
+			state = "uncertain"
+		}
+		if report.Execution == nil {
+			report.Execution = &runner.Execution{Calculation: "failed", Save: "not-started", Phase: "preparation", Failure: &runner.Failure{Phase: "preparation", Message: runner.FailureMessage(err)}}
+		}
+		if state == "uncertain" {
+			report.Execution.Save = "uncertain"
+		}
+		s.report(ctx, state, runner.FailureMessage(err), report.Execution)
 		return false, err
 	}
 	if report.Skipped {
-		s.report(ctx, "success", "No rules depend on the changed data. Existing extension results were kept.")
+		s.report(ctx, "success", "No rules depend on the changed data. Existing extension results were kept.", report.Execution)
 	} else {
-		s.report(ctx, "success", fmt.Sprintf("Finished %d of %d queries: %d connections added, %d removed, %d updated.", len(report.Queries), len(plan.Queries), report.Added, report.Removed, report.Updated))
+		s.report(ctx, "success", fmt.Sprintf("Finished %d of %d queries: %d connections added, %d removed, %d updated.", len(report.Queries), len(plan.Queries), report.Added, report.Removed, report.Updated), report.Execution)
 	}
 	s.pending = nil
 	return report.Committed, nil
 }
 
-func (s *Service) report(ctx context.Context, state, message string) {
+func (s *Service) report(ctx context.Context, state, message string, execution ...*runner.Execution) {
 	// Reports contain counts and rule identifiers, never query answers or lab
 	// object names. A reporting outage cannot undo a committed graph change.
-	var status = ruleservice.Status{State: state, Event: s.pending.event, Revision: s.pending.bundle.Revision, Message: message, UpdatedAt: s.clock().UTC()}
-	if err := s.client.Report(ctx, status); err != nil {
-		slog.WarnContext(ctx, "Could not save extension status in the rule container", "error", err)
+	var status = ruleservice.Status{State: state, Event: s.pending.event, Revision: s.pending.bundle.Revision, Message: message, UpdatedAt: s.clock().UTC(), Backend: s.configuration.Backend, RunID: fmt.Sprintf("%s/%d", s.pending.event, s.pending.attempt)}
+	if len(execution) > 0 {
+		status.Execution = execution[0]
 	}
+	s.reports = append(s.reports, status)
+	if len(s.reports) > ruleservice.MaxRecentRuns {
+		s.reports = s.reports[len(s.reports)-ruleservice.MaxRecentRuns:]
+	}
+	s.flushReports(ctx)
 	slog.InfoContext(ctx, "Extension processing", "state", state, "event", status.Event, "revision", status.Revision, "message", message)
+}
+
+// Reporting can fail after the database has saved everything. Retry delivery
+// on idle ticks without repeating a calculation or claiming that it rolled back.
+func (s *Service) flushReports(ctx context.Context) {
+	for len(s.reports) > 0 {
+		if err := s.client.Report(ctx, s.reports[0]); err != nil {
+			slog.WarnContext(ctx, "Could not save extension status in the rule container", "error", err)
+			return
+		}
+		s.reports = s.reports[1:]
+	}
 }

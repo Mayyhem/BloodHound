@@ -79,6 +79,7 @@ type Options struct {
 // Report describes committed work. On an error, Committed remains false and
 // the caller must say that previously published results may be out of date.
 type Report struct {
+	Execution           *Execution        `json:"execution"`
 	ContainerImages     map[string]string `json:"container_images,omitempty"`
 	BatchID             string            `json:"batch_id"`
 	Committed           bool              `json:"committed"`
@@ -104,31 +105,37 @@ type Report struct {
 func Run(ctx context.Context, database Database, plan extension.Plan, options Options) (Report, error) {
 	var (
 		started = time.Now()
-		report  = Report{BatchID: options.BatchID, QueryRows: map[string]int{}, Desired: map[string][]Pair{}, DesiredCounts: map[string]int64{}}
+		report  = Report{BatchID: options.BatchID, QueryRows: map[string]int{}, Desired: map[string][]Pair{}, DesiredCounts: map[string]int64{}, Execution: newExecution(plan)}
 	)
+	err := run(ctx, database, plan, options, &report)
+	finishReport(&report, started, err)
+	return report, err
+}
+
+func run(ctx context.Context, database Database, plan extension.Plan, options Options, report *Report) error {
 	if options.BatchID == "" || !options.IngestionComplete {
-		return report, fmt.Errorf("a successfully completed ingestion batch is required; existing results were kept")
+		return fmt.Errorf("a successfully completed ingestion batch is required; existing results were kept")
 	}
 	if !options.WritersPaused {
-		return report, fmt.Errorf("other graph writers must be paused before calculation; existing results were kept")
+		return fmt.Errorf("other graph writers must be paused before calculation; existing results were kept")
 	}
 	limits, err := options.Limits.checked()
 	if err != nil {
-		return report, err
+		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, limits.RunTimeout)
 	defer cancel()
 	space, err := newAnswerSpace(options.TemporaryDirectory, limits)
 	if err != nil {
-		return report, err
+		return err
 	}
 	defer space.close()
 	if err := prepareDatabase(ctx, database, plan); err != nil {
-		return report, err
+		return err
 	}
 	transaction, err := database.Begin(ctx)
 	if err != nil {
-		return report, err
+		return err
 	}
 	// Rollback is harmless after a successful commit. Use a fresh, short-lived
 	// context so a canceled run still gets a chance to release its transaction.
@@ -138,17 +145,19 @@ func Run(ctx context.Context, database Database, plan extension.Plan, options Op
 	// checks part of it. A first run or any edit must establish a new baseline.
 	planHash := fingerprint(plan)
 	plan = runnablePlan(plan)
+	report.Execution.selectQueries(plan, "The rules are new or changed, or the complete set of input changes is unknown.")
 	if options.Changes.CoverageKnown {
 		previous, err := transaction.Read(ctx, "MATCH (run:PoC_Run {objectid: $id}) RETURN run.plan_hash AS plan_hash", map[string]any{"id": stateID(plan)})
 		if err != nil {
-			return report, err
+			return err
 		}
 		if len(previous) == 1 && previous[0]["plan_hash"] == planHash {
 			plan = affectedPlan(plan, options.Changes)
+			report.Execution.selectQueries(plan, "A confirmed input change affects this query or a connected calculation.")
 			if len(plan.Queries) == 0 && len(plan.RetiredRelationships) == 0 {
 				report.Skipped = true
-				report.Elapsed = time.Since(started)
-				return report, nil
+
+				return nil
 			}
 		}
 	}
@@ -160,10 +169,10 @@ func Run(ctx context.Context, database Database, plan extension.Plan, options Op
 	// only that exact standalone kind; any connection makes its identity required.
 	invalidIdentities, err := transaction.Read(ctx, "MATCH (item) WHERE NOT (labels(item) = ['MigrationData'] AND NOT (item)--()) WITH item.objectid AS objectid, count(item) AS matches WHERE objectid IS NULL OR trim(objectid) = '' OR matches <> 1 RETURN objectid LIMIT 1", nil)
 	if err != nil {
-		return report, fmt.Errorf("check graph identities: %w", err)
+		return fmt.Errorf("check graph identities: %w", err)
 	}
 	if len(invalidIdentities) != 0 {
-		return report, fmt.Errorf("graph contains missing, empty, or duplicate objectids; existing results were kept")
+		return fmt.Errorf("graph contains missing, empty, or duplicate objectids; existing results were kept")
 	}
 
 	var staged = map[string]bool{}
@@ -204,35 +213,39 @@ func Run(ctx context.Context, database Database, plan extension.Plan, options Op
 		}
 		return nil
 	}
-	desiredByKind, err := calculate(ctx, database, transaction, plan, space, &report, stage)
+	report.Execution.Phase, report.Execution.Calculation = "calculation", "running"
+	desiredByKind, err := calculate(ctx, database, transaction, plan, space, report, stage)
 	if err != nil {
-		return report, err
+		return err
 	}
+	report.Execution.Calculation = "succeeded"
+	report.Execution.Phase, report.Execution.Save = "saving", "saving"
 	// Only types read by later rules needed early writes. Save all remaining
 	// combined answers now, still within the same transaction.
 	for _, binding := range plan.Schema.Relationships {
 		if err := stage(binding, desiredByKind[binding.Kind]); err != nil {
-			return report, err
+			return err
 		}
 	}
 	if int64(report.Added+report.Removed+report.Updated+report.HelpersChanged+1) > limits.ChangedObjects {
-		return report, fmt.Errorf("combined graph changes exceed the %d-change transaction budget", limits.ChangedObjects)
+		return fmt.Errorf("combined graph changes exceed the %d-change transaction budget", limits.ChangedObjects)
 	}
 	report.TemporaryPeakBytes = space.peak
 
 	if err := saveRun(ctx, transaction, plan, options.BatchID, planHash); err != nil {
-		return report, err
+		return err
 	}
+	report.Execution.Phase = "commit"
 	if err := transaction.Commit(ctx); err != nil {
 		if errors.Is(err, ErrCommitRolledBack) {
-			return report, err
+			return err
 		}
-		return report, fmt.Errorf("%w: %w; inspect graph state and the saved batch ID before retrying", ErrCommitUncertain, err)
+		return fmt.Errorf("%w: %w; inspect graph state and the saved batch ID before retrying", ErrCommitUncertain, err)
 	}
 	report.Committed = true
 	report.GraphObjectsChanged = report.Added + report.Removed + report.Updated + report.HelpersChanged + 1
-	report.Elapsed = time.Since(started)
-	return report, nil
+
+	return nil
 }
 
 // Preparing type names and lookup indexes does not create graph evidence.

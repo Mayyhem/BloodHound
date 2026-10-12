@@ -43,6 +43,7 @@ developer-start/
 
 Save this as **`getting_started.schema.json`**:
 
+<!-- tested-example: 1 getting_started.schema.json -->
 ```json
 {
   "schema": {
@@ -81,6 +82,7 @@ The `PoC_Start_Note` declaration is present because current BloodHound schema re
 
 Save this as **`getting_started_memberships.cypher`**:
 
+<!-- tested-example: 1 getting_started_memberships.cypher -->
 ```cypher
 // depends-on: node:User, node:Group, relationship:MemberOf
 // existing-edge-policy: keep-existing
@@ -104,7 +106,7 @@ If you have the local Go tooling and dependencies from the setup guide, you can 
 
 Expect one planned query, `getting_started_memberships.cypher`, with role `relationship` and kind `PoC_Start_DirectMemberOf`.
 
-This checks the schema, filenames, declared prerequisites, output declarations, and basic query restrictions. It **does not execute the query, validate all query syntax, or prove database compatibility**. It also does not establish that you declared every graph kind the query reads. The script uses locally cached dependencies and does not download missing packages. If your dependencies are in another cache, set `POC_MODULE_CACHE` to that directory as described in the setup guide.
+This checks the schema, filenames, declarations, output columns, and the complete query using the same language reader used during execution. The result separates `validation` from the planned `queries`; database execution is explicitly **not run**. Mistakes include the filename and line where available. Named graph kinds and answer parameters must appear in `depends-on`; missing entries include a suggested correction. Passing these checks does not prove that database translation, actual data, or returned values will be valid. The script uses locally cached dependencies and does not download missing packages. If your dependencies are in another cache, set `POC_MODULE_CACHE` to that directory as described in the setup guide.
 
 ### 3. Activate the two files
 
@@ -162,7 +164,7 @@ Collector uploads facts
 | --- | --- |
 | Collector | Upload the facts: objects, properties, and observed relationships. |
 | Extension author | Describe the model and write the calculation queries. |
-| Rule service | Store schema/query files, review changes, and show the latest reported status. It does not run graph queries. |
+| Rule service | Store schema/query files, review changes, and show the latest report plus up to 20 recent runs. It does not run graph queries. |
 | BloodHound | Run native analysis, execute extension queries, and save validated results. |
 | DAWGS | Provide BloodHound's graph access and supported Cypher parsing/translation. |
 
@@ -229,10 +231,15 @@ Every query starts with a `depends-on` comment. Declare the node and relationshi
 
 These declarations do two jobs: order queries and decide which rules need to run after data changes. Include kinds used in filters and traversals, not just those in the final output. If a query has no inputs, write `// depends-on: none`.
 
+Visible labels such as `(person:User)`, relationship types such as `[:MemberOf]`, and parameters such as `$enabled_users` are checked against the declared inputs. Comments and quoted text do not count as graph reads. These reliable inputs could be supplied automatically in a future authoring format, but this change keeps the existing explicit declarations. They remain needed for reads that cannot be fully inferred and for special processing instructions.
+
+Queries with unnamed graph kinds or `labels()`/`type()` reads receive an input warning and are recalculated conservatively. This can do extra work; it prevents an uncertain input list from silently preserving stale results. Continue declaring the intended graph inputs, especially when another rule produces them: those declarations also determine execution order. The checker does not guess hidden relationships between queries.
+
 ### Pass rows from one query to another
 
 Continue from the quick start. Add **`getting_started_enabled_users.cypher`** beside the schema; it returns a reusable list of enabled users:
 
+<!-- tested-example: 2 getting_started_enabled_users.cypher -->
 ```cypher
 // depends-on: node:User
 MATCH (person:User)
@@ -242,6 +249,7 @@ RETURN person.objectid AS user_id
 
 Replace **`getting_started_memberships.cypher`** with the following query. Keep its name and the existing schema; the output kind is already declared there.
 
+<!-- tested-example: 2 getting_started_memberships.cypher -->
 ```cypher
 // depends-on: query:getting_started_enabled_users.cypher,
 // node:User, node:Group, relationship:MemberOf
@@ -288,6 +296,7 @@ Queries are read-only. Return ordinary strings, numbers, booleans, lists, and ma
 
 To add properties after the [shared-answer example](#pass-rows-from-one-query-to-another), replace **`getting_started_memberships.cypher`** with the following. Keep the enabled-user query, schema, and optional helper query. The `merge-properties` policy adds the evidence to existing connections too; `keep-existing` would leave their old properties unchanged.
 
+<!-- tested-example: 4 getting_started_memberships.cypher -->
 ```cypher
 // depends-on: query:getting_started_enabled_users.cypher,
 // node:User, node:Group, relationship:MemberOf
@@ -325,6 +334,7 @@ Declare a helper type in `node_kinds`, then return its literal name in the one-e
 
 The quick-start schema already declares `PoC_Start_Note`. To create one note per native user, add **`getting_started_notes.cypher`** beside the existing files. No schema change is needed:
 
+<!-- tested-example: 3 getting_started_notes.cypher -->
 ```cypher
 // depends-on: node:User
 MATCH (person:User)
@@ -368,7 +378,7 @@ The scope is the relationship type and its declared source/target kind pairs. Ex
 
 For example, A and B produce `CanAccess`, C reads that type, and D directly needs A’s returned rows. Disabling A also pauses B, C, and D so the previous shared graph answer stays intact. Deleting A removes D, keeps B and C, refreshes `CanAccess` from B, and then runs C against the refreshed graph. If B is also deleted, the scope is cleared and C can run with no matching edges. Enabling A removes its explicit disabled setting; other disabled dependencies can still keep related rules paused.
 
-None of these actions alone runs queries or changes graph output. An in-progress run keeps the revision it already fetched. The page's report shows the last reported attempt, not a live health check; compare its revision and time with your changes.
+None of these actions alone runs queries or changes graph output. An in-progress run keeps the revision it already fetched. The page shows the latest attempt and recent history. Compare the active revision with the last confirmed saved revision; a completed calculation does not by itself prove that saving succeeded.
 
 ### Updating older bundles
 
@@ -388,11 +398,11 @@ There are three separate checks:
 
 | Check | What it establishes |
 | --- | --- |
-| Upload/`plan` validation | File structure, dependencies, output assignments, and basic restrictions. |
-| Application query parsing | Whether the installed DAWGS frontend can understand the query. Persistent mode uses this check for both graph backends. |
+| File checks during upload/`plan` | File structure, declared dependencies, visible graph inputs and answer parameters, output assignments, and read-only restrictions. |
+| Language checks during upload/`plan` | Whether the complete query uses syntax understood by the same DAWGS reader used during execution on both databases. |
 | Database execution | Whether the query executes correctly on the selected backend, including PostgreSQL translation and result handling. |
 
-A query working in Neo4j Browser does not automatically work through this application. The current DAWGS implementation does not provide general `CASE`, `reduce`, list comprehension, list indexing, or `CALL` subquery support. The file loader permits read-only `CALL { ... }` syntax, but that is not a promise that runtime parsing supports it. Procedure calls, including APOC, and external loads are not available to extension rules. `EXPLAIN` and `PROFILE` are debugging tools to use separately where supported, not text to upload as a rule.
+A query working in Neo4j Browser does not automatically work through this application. The current DAWGS implementation does not provide general `CASE`, `reduce`, list comprehension, list indexing, or `CALL` subquery support. These unsupported forms are rejected during file validation, including `CALL { ... }`. Procedure calls, including APOC, and external loads are not available to extension rules. `EXPLAIN` and `PROFILE` are debugging tools to use separately where supported, not text to upload as a rule.
 
 ### When the language is missing something
 

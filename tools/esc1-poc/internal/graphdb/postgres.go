@@ -28,8 +28,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/specterops/bloodhound/tools/esc1-poc/internal/querycheck"
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
-	"github.com/specterops/dawgs/cypher/frontend"
 	"github.com/specterops/dawgs/drivers/pg"
 	"github.com/specterops/dawgs/graph"
 	"github.com/specterops/dawgs/ops"
@@ -215,11 +215,8 @@ func (s *PostgresDatabase) Begin(ctx context.Context) (runner.Transaction, error
 	return &postgresTransaction{transaction: transaction}, nil
 }
 func validatePostgresRead(query string) error {
-	var _, err = frontend.ParseCypher(frontend.NewContext(&frontend.UpdatingNotAllowedClauseFilter{}, &frontend.ExplicitProcedureInvocationFilter{}, &frontend.ImplicitProcedureInvocationFilter{}), query)
-	if err != nil {
-		return fmt.Errorf("analysis queries must only read the graph: %w", err)
-	}
-	return nil
+	var _, err = querycheck.Check(query)
+	return err
 }
 func (s *postgresTransaction) Read(ctx context.Context, query string, parameters map[string]any) (runner.Rows, error) {
 	if err := validatePostgresRead(query); err != nil {

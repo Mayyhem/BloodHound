@@ -40,7 +40,7 @@ type queryOutput struct {
 
 // Read only the outer RETURN projection using the Cypher lexer/parser. A
 // comment, quoted string, WITH alias, or nested RETURN cannot declare output.
-// The complete query still undergoes the adapter's normal runtime validation.
+// The loader separately checks the complete query with the shared language reader.
 func parseQueryOutput(contents string) (*queryOutput, error) {
 	var (
 		errorContext = frontend.NewContext()
@@ -156,6 +156,18 @@ func parseQueryOutput(contents string) (*queryOutput, error) {
 	if relationship && helper {
 		return nil, fmt.Errorf("a query cannot produce both nodes and relationships")
 	}
+	if helper && (expressions["id"] == nil || expressions["properties"] == nil) {
+		return nil, fmt.Errorf("helper output requires id, kinds, and properties")
+	}
+	var allowed = map[string]bool{"id": helper, "kinds": helper, "properties": true, "source": relationship, "target": relationship, "kind": relationship}
+	if relationship && expressions["source"] == nil {
+		allowed["left"], allowed["right"] = true, true
+	}
+	for column := range expressions {
+		if !allowed[column] {
+			return nil, fmt.Errorf("unexpected output column %q; check the final RETURN", column)
+		}
+	}
 	if relationship {
 		if expressions["target"] == nil || (expressions["source"] == nil && (expressions["left"] == nil || expressions["right"] == nil)) {
 			return nil, fmt.Errorf("relationship output requires source, target, and a literal kind (or left, right, target, kind for group-overlap)")
@@ -253,4 +265,39 @@ func QueryOutputKind(contents string) (string, bool, error) {
 		return "", false, err
 	}
 	return output.kind, output.node, nil
+}
+
+// Output-shape errors refer to the final RETURN instead of the file header.
+func finalReturnLine(contents string) int {
+	var lexer = parser.NewCypherLexer(antlr.NewInputStream(contents))
+	var line = 1
+	lexer.RemoveErrorListeners()
+	for _, token := range lexer.GetAllTokens() {
+		if token.GetTokenType() == parser.CypherLexerRETURN {
+			line = token.GetLine()
+		}
+	}
+	return line
+}
+
+// Locate a forbidden executable word without counting text inside a comment
+// or quoted value. This only runs when presenting an error to the author.
+func tokenLine(contents, word string) int {
+	var lexer = parser.NewCypherLexer(antlr.NewInputStream(contents))
+	lexer.RemoveErrorListeners()
+	for _, token := range lexer.GetAllTokens() {
+		if strings.EqualFold(token.GetText(), word) {
+			return token.GetLine()
+		}
+	}
+	return 1
+}
+
+func textLine(contents, needle string) int {
+	for index, line := range strings.Split(contents, "\n") {
+		if strings.Contains(line, needle) {
+			return index + 1
+		}
+	}
+	return 1
 }

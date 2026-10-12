@@ -113,6 +113,12 @@ func TestNativeCallbackReportsActualCommitFailure(t *testing.T) {
 		} else if report.Committed || report.GraphObjectsChanged != 0 || !errors.Is(err, runner.ErrCommitUncertain) || !errors.Is(err, failure) {
 			t.Fatalf("failed commit %+v, %v", report, err)
 		}
+		if commitError == nil && (report.Execution.Save != "succeeded" || report.Execution.Saved == nil) {
+			t.Fatal("callback success was not confirmed in report")
+		}
+		if commitError != nil && (report.Execution.Save != "uncertain" || report.Execution.Saved != nil || report.Execution.Failure.Phase != "commit") {
+			t.Fatal("lost commit confirmation claims saved results")
+		}
 		if database.timeout <= 0 || database.timeout > runner.DefaultLimits().RunTimeout {
 			t.Fatalf("server timeout %s", database.timeout)
 		}

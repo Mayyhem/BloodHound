@@ -20,12 +20,15 @@ SPDX-License-Identifier: Apache-2.0
 package extension
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/specterops/bloodhound/tools/esc1-poc/internal/querycheck"
 )
 
 // Schema is the small execution plan derived from the OpenGraph definition.
@@ -66,6 +69,9 @@ type Dependency struct {
 	Name string
 }
 type Query struct {
+	// BroadRead prevents unsafe skipping when graph inputs cannot be narrowed to named kinds.
+	BroadRead bool
+
 	// OutputKind is read from a literal final RETURN, before executing any rows.
 	OutputKind      string
 	Extension       string
@@ -156,12 +162,33 @@ func Load(directory string) (Plan, error) {
 		if err := checkReadOnlyText(query.Text); err != nil {
 			return Plan{}, fmt.Errorf("%s: %w", query.Name, err)
 		}
-		output, err := parseQueryOutput(query.Text)
+		checked, err := querycheck.Check(query.Text)
 		if err != nil {
 			return Plan{}, fmt.Errorf("%s: %w", query.Name, err)
 		}
+		query.BroadRead = checked.BroadRead
+		var missing []error
+		for _, input := range checked.Inputs {
+			declared := false
+			for _, dependency := range dependencies {
+				if dependency.Type == input.Type && dependency.Name == input.Name {
+					declared = true
+					break
+				}
+			}
+			if !declared {
+				missing = append(missing, fmt.Errorf("%s: line %d: missing dependency; add %s:%s to // depends-on", query.Name, input.Line, input.Type, input.Name))
+			}
+		}
+		if len(missing) > 0 {
+			return Plan{}, errors.Join(missing...)
+		}
+		output, err := parseQueryOutput(query.Text)
+		if err != nil {
+			return Plan{}, fmt.Errorf("%s: line %d: output: %w", query.Name, finalReturnLine(query.Text), err)
+		}
 		if err := bindQueryOutput(plan.Definitions, &query, output); err != nil {
-			return Plan{}, fmt.Errorf("%s: %w", query.Name, err)
+			return Plan{}, fmt.Errorf("%s: line %d: %w", query.Name, finalReturnLine(query.Text), err)
 		}
 		queries[entry.Name()] = query
 	}
@@ -240,7 +267,10 @@ func parseDependencies(contents string) ([]Dependency, error) {
 		continuation bool
 		none         bool
 	)
-	for _, line := range strings.Split(contents, "\n") {
+	for lineNumber, line := range strings.Split(contents, "\n") {
+		problem := func(format string, arguments ...any) error {
+			return fmt.Errorf("line %d: %s", lineNumber+1, fmt.Sprintf(format, arguments...))
+		}
 		comment := strings.TrimSpace(line)
 		if !strings.HasPrefix(comment, "//") {
 			continuation = false
@@ -270,31 +300,31 @@ func parseDependencies(contents string) ([]Dependency, error) {
 			} // A trailing comma can continue onto the next line.
 			parts := strings.Split(item, ":")
 			if len(parts) != 2 {
-				return nil, fmt.Errorf("malformed dependency %q", item)
+				return nil, problem("malformed dependency %q", item)
 			}
 			dependency := Dependency{Type: strings.TrimSpace(parts[0]), Name: strings.TrimSpace(parts[1])}
 			switch dependency.Type {
 			case "node", "relationship":
 				if !identifier.MatchString(dependency.Name) {
-					return nil, fmt.Errorf("invalid dependency kind %q", dependency.Name)
+					return nil, problem("invalid dependency kind %q", dependency.Name)
 				}
 			case "query":
 				if !queryFilename.MatchString(dependency.Name) {
-					return nil, fmt.Errorf("invalid prerequisite filename %q", dependency.Name)
+					return nil, problem("invalid prerequisite filename %q", dependency.Name)
 				}
 			default:
-				return nil, fmt.Errorf("unknown dependency type %q", dependency.Type)
+				return nil, problem("unknown dependency type %q", dependency.Type)
 			}
 			key := dependency.Type + ":" + dependency.Name
 			if seen[key] {
-				return nil, fmt.Errorf("duplicate dependency %q", key)
+				return nil, problem("duplicate dependency %q", key)
 			}
 			seen[key] = true
 			dependencies = append(dependencies, dependency)
 		}
 	}
 	if !declared {
-		return nil, fmt.Errorf("missing // depends-on declaration")
+		return nil, fmt.Errorf("line 1: missing // depends-on declaration")
 	}
 	if none && len(dependencies) != 0 {
 		return nil, fmt.Errorf("depends-on: none cannot be combined with dependencies")
@@ -403,7 +433,7 @@ func orderQueries(queries map[string]Query, schema Schema) ([]Query, error) {
 				continue
 			}
 			if _, exists := queries[dependency.Name]; !exists {
-				return nil, fmt.Errorf("%s: missing prerequisite %s", name, dependency.Name)
+				return nil, fmt.Errorf("%s: line %d: missing prerequisite %s; upload that file with this draft", name, textLine(query.Text, dependency.Name), dependency.Name)
 			}
 			used[dependency.Name] = true
 			declaredParameters[strings.TrimSuffix(dependency.Name, ".cypher")] = true
@@ -466,11 +496,11 @@ func checkReadOnlyText(contents string) error {
 		calls     = regexp.MustCompile(`\bCALL\s*`)
 	)
 	if word := forbidden.FindString(text); word != "" {
-		return fmt.Errorf("analysis files cannot use %s; only the runner may write graph data", word)
+		return fmt.Errorf("line %d: analysis files cannot use %s; only the runner may write graph data", tokenLine(contents, word), word)
 	}
 	for _, location := range calls.FindAllStringIndex(text, -1) {
 		if location[1] == len(text) || text[location[1]] != '{' {
-			return fmt.Errorf("analysis files cannot call procedures; a read-only CALL { ... } subquery is allowed")
+			return fmt.Errorf("line %d: analysis files cannot call procedures or contact external services", tokenLine(contents, "CALL"))
 		}
 	}
 	return nil
@@ -515,7 +545,7 @@ func (s Plan) Affected(changedNodes, changedRelationships []string, coverageKnow
 		}
 	}
 	for _, query := range s.Queries {
-		if !coverageKnown {
+		if !coverageKnown || query.BroadRead && (len(changedNodes) != 0 || len(changedRelationships) != 0) {
 			affected[query.Name] = true
 		}
 		for _, dependency := range query.Dependencies {
