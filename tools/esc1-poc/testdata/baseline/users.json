@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "methods": 328257,
+    "type": "users",
+    "count": 1,
+    "version": 6
+  },
+  "data": [
+    {
+      "ObjectIdentifier": "S-1-5-21-111111111-222222222-333333333-1001",
+      "Properties": {
+        "domain": "ESC1-EXPERIMENT.TEST",
+        "name": "ALICE@ESC1-EXPERIMENT.TEST",
+        "domainsid": "S-1-5-21-111111111-222222222-333333333",
+        "distinguishedname": "CN=ALICE,DC=ESC1-EXPERIMENT,DC=TEST",
+        "enabled": true,
+        "samaccountname": "alice",
+        "sidhistory": [],
+        "unconstraineddelegation": false,
+        "trustedtoauth": false
+      },
+      "Aces": [],
+      "IsDeleted": false,
+      "IsACLProtected": false,
+      "ContainedBy": null,
+      "AllowedToDelegate": [],
+      "SPNTargets": [],
+      "PrimaryGroupSID": "",
+      "HasSIDHistory": []
+    }
+  ]
+}

@@ -18,8 +18,10 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -28,6 +30,7 @@ import (
 	"github.com/specterops/bloodhound/cmd/api/src/api/middleware"
 	"github.com/specterops/bloodhound/cmd/api/src/api/registration"
 	"github.com/specterops/bloodhound/cmd/api/src/api/router"
+	"github.com/specterops/bloodhound/cmd/api/src/api/tools"
 	"github.com/specterops/bloodhound/cmd/api/src/auth"
 	"github.com/specterops/bloodhound/cmd/api/src/bootstrap"
 	"github.com/specterops/bloodhound/cmd/api/src/config"
@@ -53,6 +56,7 @@ import (
 	"github.com/specterops/bloodhound/packages/go/storage"
 	"github.com/specterops/bloodhound/server/alerts"
 	"github.com/specterops/bloodhound/server/modules"
+	"github.com/specterops/bloodhound/tools/esc1-poc/postprocessing"
 	"github.com/specterops/dawgs/graph"
 )
 
@@ -185,6 +189,32 @@ func Entrypoint(ctx context.Context, cfg config.Configuration, connections boots
 		)
 
 		registration.RegisterFossGlobalMiddleware(&routerInst, cfg, auth.NewIdentityResolver(), authenticator, connections.RDMS)
+		if cfg.PostProcessing.URL != "" {
+			driverName, err := tools.ResolveGraphDriver(ctx, cfg)
+			if err != nil {
+				return nil, err
+			}
+			extensions, err := postprocessing.New(postprocessing.Configuration{
+				URL: cfg.PostProcessing.URL, Token: cfg.PostProcessing.Token,
+				Directory: filepath.Join(cfg.WorkDir, "postprocessing"), Backend: driverName,
+				RegisterSchema: func(schemaContext context.Context, contents []byte) error {
+					var payload model.GraphExtensionPayload
+					if err := json.Unmarshal(contents, &payload); err != nil {
+						return err
+					}
+					definition, err := payload.ToGraphExtensionInput()
+					if err != nil {
+						return err
+					}
+					_, err = openGraphSchemaService.UpsertOpenGraphExtension(schemaContext, definition)
+					return err
+				},
+			}, connections.Graph)
+			if err != nil {
+				return nil, fmt.Errorf("configure extension processing: %w", err)
+			}
+			pipeline.ExtensionAnalysis = extensions
+		}
 		registration.RegisterFossRoutes(&routerInst, cfg, connections.RDMS, connections.Graph, graphQuery, apiCache, collectorManifests, authenticator, authorizer, ingestSchema, dependencies.FileServiceResolver, dogtagsService, openGraphSchemaService, alertPublisher)
 
 		modules.Register(modules.Deps{

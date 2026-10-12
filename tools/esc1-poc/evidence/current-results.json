@@ -1,0 +1,118 @@
+{
+  "checked_on": "2026-10-08",
+  "scope": "Scaling, local DAWGS PostgreSQL support, and existing_edge_policy in the standalone experiment; no native BloodHound source changes.",
+  "native_reference_commit": "2cb6dbd37738ffe31e34e1729b3638f3887a93e9",
+  "dawgs_baseline_commit": "1d7915c65f5fb40933016f3be2a09933caf4c158",
+  "existing_edge_policy": {
+    "default": "replace-existing",
+    "choices": [
+      "replace-existing",
+      "merge-properties",
+      "keep-existing"
+    ],
+    "optional_properties": true,
+    "owner_field_reserved": true,
+    "stale_owned_edges_removed_in_all_modes": true
+  },
+  "checks": {
+    "full_poc_unit_and_race": "passed",
+    "full_runner_race_after_empty_list_fix": "passed",
+    "full_poc_integration_both_databases": "passed; graphdb package 102.324 seconds",
+    "vet_with_integration_tag": "passed",
+    "model_browser": "passed; no network requests or browser errors",
+    "policies_on_both_databases": [
+      "replacement changes IDs and discards old ordinary properties",
+      "merge preserves IDs and unmentioned properties",
+      "keep preserves matching edge properties",
+      "exact integers larger than 2^53 and ordinary decimal values",
+      "empty arrays and text arrays preserved",
+      "explicit null removes named properties",
+      "no-op merge avoids updates",
+      "late second-batch ownership mismatch rolls back prior changes"
+    ],
+    "dawgs_regression_scope": "Unchanged baseline full suites on both databases; edited pre-policy full Neo4j suite; edited fresh PostgreSQL semantic suite plus repaired map fixture group and BDD checks. Final additive APIs have focused unit/race and live checks. No claim of a fresh whole DAWGS suite after the additive API changes.",
+    "final_empty_array_map_fixture": "passed on both databases; no translator fix required",
+    "source_inventory_and_syntax": "passed: all 146 maintained files listed; README links, Go formatting, JSON/Python/shell syntax, whitespace, empty staging areas",
+    "focused_policy_log": "work/dawgs-validation/edge-policy-arrays-final-live.log; passed 22.837 seconds",
+    "dawgs_cumulative_coverage": {
+      "pg_percent": 62.45186,
+      "neo4j_percent": 61.5258,
+      "baseline_pg_percent": 62.16697,
+      "baseline_neo4j_percent": 60.59159,
+      "method": "Current changed-file coverage plus prior unchanged source coverage verified by file hashes; earlier full runs plus final focused checks, not a fresh whole-project coverage run."
+    }
+  },
+  "native_agreement": {
+    "direct_esc1_cases_per_backend": 26,
+    "uploaded_synthetic_scenarios_per_backend": 18,
+    "synthetic_exact_pairs_per_backend": 11,
+    "private_zip": {
+      "files": 13,
+      "collected_records": 397,
+      "exact_pairs_per_backend": 2,
+      "note": "Private identifiers stay under ignored work/. Archive ingestion comparisons preceded the edge-policy change; current final container checks reuse the synthetic collection."
+    }
+  },
+  "container": {
+    "image_id": "sha256:5d67617a1ed5d07019a865ad7efd0c36d91e907a3e1aefba6295f9359e0b0b09",
+    "published_repo_digest": null,
+    "binary_sha256": "328988f795299206d5f971e491773d61f7270a95dbffc4e42c03d1fed2dfb794",
+    "checks": {
+      "neo": {
+        "passed": true,
+        "desired_pairs": 11,
+        "added": 11,
+        "removed": 11,
+        "unchanged": 0,
+        "actual_identifiers_replaced": 11,
+        "ordinary_properties_before": 0,
+        "plan_queries": 13,
+        "elapsed_nanoseconds": 10915829886,
+        "peak_process_memory_kib": 18532,
+        "temporary_peak_bytes": 25910,
+        "container_images": {
+          "bloodhound": "sha256:f717a1d92bd7a44e04cee88c15df013e0143e303f514eaf8aeacce5494c71f1a",
+          "neo4j": "sha256:c3d8ad3b006d7822b29e0180bb36e0543b420ed4ed2e0cff62fa5af7a3059ec7"
+        }
+      },
+      "pg": {
+        "passed": true,
+        "desired_pairs": 11,
+        "added": 11,
+        "removed": 11,
+        "unchanged": 0,
+        "actual_identifiers_replaced": 11,
+        "ordinary_properties_before": 0,
+        "plan_queries": 13,
+        "elapsed_nanoseconds": 797088326,
+        "peak_process_memory_kib": 33284,
+        "temporary_peak_bytes": 25910,
+        "container_images": {
+          "bloodhound": "sha256:5f80433e71e836a365adfb16ce870c7ab9cb46758003c45d1f6c5060dd6d9772",
+          "pg": "sha256:29754c7520f4b9654cf8ff98e19ac73b88e255c3a53f6236ebe9d52249bb6df3"
+        }
+      }
+    }
+  },
+  "corrected_findings": [
+    "Helper publication uses one prefix scan per definition instead of a repeated full lookup for each helper.",
+    "Stored answer files are checked for completion and content corruption before commit.",
+    "Temporary decoding preserves empty lists instead of sending them as JSON null.",
+    "Container executable permissions no longer depend on the build user umask."
+  ],
+  "limits": [
+    "BloodHound is stopped during calculation and publication; application queries are unavailable then.",
+    "No 100-million-edge demonstration. Resource budgets fail safely but are not a hard total-memory cap.",
+    "The final publication is one transaction; batching does not remove database transaction costs.",
+    "Container times are small-fixture measurements, exclude database memory, and are not a controlled backend performance comparison.",
+    "Helpers are not automatically deleted. A lost commit acknowledgement requires inspection."
+  ],
+  "local_logs": {
+    "unit_race": "work/final-policy-unit-race.log",
+    "runner_race": "work/empty-list-fixed-runner-race.log",
+    "integration": "work/final-policy-integration.log",
+    "vet": "work/final-policy-vet-complete.log",
+    "containers": "work/policy-container-final",
+    "model": "work/policy-model-viewer/checks.json"
+  }
+}

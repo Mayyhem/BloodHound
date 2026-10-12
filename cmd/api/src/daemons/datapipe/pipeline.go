@@ -46,6 +46,8 @@ import (
 var ErrAnalysisDisabled = errors.New("analysis is disabled by configuration")
 
 type BHCEPipeline struct {
+	// Optional. A nil value preserves normal BloodHound processing.
+	ExtensionAnalysis   ExtensionAnalysis
 	db                  database.Database
 	graphdb             graph.Database
 	cache               cache.Cache
@@ -277,9 +279,14 @@ func (s *BHCEPipeline) Analyze(ctx context.Context) error {
 	}
 
 	if analysisSteps.IsEmpty() {
-		return nil
+		return s.retryExtensions(ctx)
 	}
 
+	if s.ExtensionAnalysis != nil {
+		return s.ExtensionAnalysis.WithAnalysis(ctx, func(analysisContext context.Context) error {
+			return s.analyze(analysisContext, analysisSteps)
+		})
+	}
 	return s.analyze(ctx, analysisSteps)
 }
 
@@ -317,6 +324,14 @@ func (s *BHCEPipeline) analyze(ctx context.Context, analysisSteps model.Analysis
 		return fmt.Errorf("update last analysis completion time: %v", err)
 	} else {
 		s.jobService.CompleteAnalyzedIngestJobs()
+
+		// Native analysis has succeeded. Extension failure must not relabel
+		// a successfully imported collection as a failed native analysis.
+		if s.ExtensionAnalysis != nil {
+			if _, err := s.ExtensionAnalysis.AfterAnalysis(ctx); err != nil {
+				slog.ErrorContext(ctx, "Extension results may be out of date", attr.Error(err))
+			}
+		}
 
 		// This is cacheclearing. The analysis is still successful here
 		if _, err := s.db.GetFlagByKey(ctx, appcfg.FeatureEntityPanelCaching); err != nil {

@@ -1,0 +1,137 @@
+{
+  "scope": "Separate command container against the pinned CE Neo4j lab; synthetic fixtures only. No compatibility claim for other BloodHound versions, PostgreSQL graphs, Enterprise, or uninterrupted production processing.",
+  "reports_directory": "work/container-demo",
+  "checks_log": "work/container-checks.log",
+  "runtime_images": {
+    "bloodhound": "sha256:f717a1d92bd7a44e04cee88c15df013e0143e303f514eaf8aeacce5494c71f1a",
+    "neo4j": "sha256:c3d8ad3b006d7822b29e0180bb36e0543b420ed4ed2e0cff62fa5af7a3059ec7"
+  },
+  "final_runner_image": {
+    "validated_commands": [
+      "compare",
+      "run"
+    ],
+    "processing_image_note": "The full changed-support and rollback demonstrations used the preceding build. The final image additionally tightens graph-hostname alias checks across application networks and passed exact native comparison and an unchanged vault publication. The complete support/failure sequence was not repeated on that exact image; plan passed on an earlier build.",
+    "id": "sha256:259cb5b3fa6ab3a136bbc70a697f346872293b990de389b776553043d370cbc1",
+    "size_bytes": 11858724
+  },
+  "assertions": {
+    "schema_registered": true,
+    "vault_exact_pairs_and_support_counts": true,
+    "unchanged_pair_identity_retained": true,
+    "zero_support_removed_owned_pair": true,
+    "restoration_added_owned_pair": true,
+    "failed_final_query_after_staged_helper_kept_snapshot_identical": true,
+    "esc1_native_pairs_exact": true,
+    "esc1_run_preserved_vault_state": true,
+    "final_native_comparison_exact": true,
+    "final_image_vault_publication_kept_exact_pair": true,
+    "final_image_vault_relationship_identity_retained": true
+  },
+  "maintenance_validation_reported_by_operator": {
+    "unit_tests": "passed",
+    "real_neo4j_integration_tests_count_1": "passed",
+    "vet": "passed",
+    "focused_container_unit_tests": "passed",
+    "final_application_http_status": 200,
+    "original_services_running": [
+      "bloodhound",
+      "app-db",
+      "graph-db",
+      "test-graph"
+    ],
+    "ephemeral_runner_containers_removed": true
+  },
+  "measurements": [
+    {
+      "scenario": "baseline",
+      "desired_pair_count": 1,
+      "support_count": 1,
+      "relationships_added": 0,
+      "relationships_removed": 0,
+      "relationships_unchanged": 1,
+      "helpers_changed": 0,
+      "graph_objects_changed": 1,
+      "query_count": 2,
+      "elapsed_nanoseconds": 482358366,
+      "peak_process_memory_kib": 12792
+    },
+    {
+      "scenario": "two-supports",
+      "desired_pair_count": 1,
+      "support_count": 2,
+      "relationships_added": 0,
+      "relationships_removed": 0,
+      "relationships_unchanged": 1,
+      "helpers_changed": 1,
+      "graph_objects_changed": 2,
+      "query_count": 2,
+      "elapsed_nanoseconds": 206859947,
+      "peak_process_memory_kib": 12504
+    },
+    {
+      "scenario": "one-support",
+      "desired_pair_count": 1,
+      "support_count": 1,
+      "relationships_added": 0,
+      "relationships_removed": 0,
+      "relationships_unchanged": 1,
+      "helpers_changed": 1,
+      "graph_objects_changed": 2,
+      "query_count": 2,
+      "elapsed_nanoseconds": 52537943,
+      "peak_process_memory_kib": 11956
+    },
+    {
+      "scenario": "no-support",
+      "desired_pair_count": 0,
+      "support_count": 0,
+      "relationships_added": 0,
+      "relationships_removed": 1,
+      "relationships_unchanged": 0,
+      "helpers_changed": 1,
+      "graph_objects_changed": 3,
+      "query_count": 2,
+      "elapsed_nanoseconds": 101177780,
+      "peak_process_memory_kib": 12408
+    },
+    {
+      "scenario": "restored",
+      "desired_pair_count": 1,
+      "support_count": 1,
+      "relationships_added": 1,
+      "relationships_removed": 0,
+      "relationships_unchanged": 0,
+      "helpers_changed": 1,
+      "graph_objects_changed": 3,
+      "query_count": 2,
+      "elapsed_nanoseconds": 112484480,
+      "peak_process_memory_kib": 11972
+    },
+    {
+      "scenario": "esc1",
+      "desired_pair_count": 1,
+      "relationships_added": 0,
+      "relationships_removed": 0,
+      "relationships_unchanged": 1,
+      "helpers_changed": 0,
+      "graph_objects_changed": 1,
+      "query_count": 5,
+      "elapsed_nanoseconds": 1319860774,
+      "peak_process_memory_kib": 12424
+    },
+    {
+      "scenario": "final-vault",
+      "desired_pair_count": 1,
+      "relationships_added": 0,
+      "relationships_removed": 0,
+      "relationships_unchanged": 1,
+      "helpers_changed": 0,
+      "graph_objects_changed": 1,
+      "query_count": 2,
+      "elapsed_nanoseconds": 35935627,
+      "peak_process_memory_kib": 12484
+    }
+  ],
+  "measurement_limits": "Elapsed times cover calculation/publication, and memory is peak runner process memory. These are small-fixture observations, not end-to-end latency or scale results."
+}

@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1" name="viewport"/>
+  <title>
+   OpenGraph model explorer
+  </title>
+  <style>
+   :root {
+  color-scheme:dark;
+  --bg:#0b1018;
+  --panel:#131c29;
+  --border:#2b394b;
+  --text:#e5edf7;
+  --muted:#9dacbf;
+  --green:#66e5ab;
+  --red:#ff7f8f;
+  --accent:#80bfff;
+}
+
+* {
+  box-sizing:border-box;
+}
+
+body {
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font:14px system-ui,sans-serif;
+}
+
+header {
+  padding:22px 28px 18px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:20px;
+}
+
+h1 {
+  font-size:24px;
+  margin:0 0 7px;
+  letter-spacing:-.4px;
+}
+
+p {
+  margin:6px 0;
+  color:var(--muted);
+  line-height:1.5;
+}
+
+.eyebrow {
+  font-size:11px;
+  letter-spacing:1.7px;
+  text-transform:uppercase;
+  color:var(--accent);
+  margin-bottom:8px;
+}
+
+.toolbar {
+  padding:14px 28px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:center;
+  border-bottom:1px solid var(--border);
+}
+
+input,select,button,.file-label {
+  font:inherit;
+  color:var(--text);
+  background:#1a2636;
+  border:1px solid #394b63;
+  border-radius:7px;
+  padding:9px 12px;
+}
+
+button,.file-label {
+  cursor:pointer;
+}
+
+button:hover,.file-label:hover {
+  background:#26394f;
+}
+
+input[type=search] {
+  min-width:240px;
+}
+
+input[type=file] {
+  max-width:230px;
+  padding:7px;
+}
+
+label {
+  color:var(--muted);
+  font-size:12px;
+}
+
+.toolbar label {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.stats {
+  margin-left:auto;
+  color:var(--muted);
+}
+
+main {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 310px;
+  min-height:520px;
+}
+
+.canvas-wrap {
+  position:relative;
+  overflow:hidden;
+  height:66vh;
+  min-height:490px;
+  background-image:radial-gradient(#223044 1px,transparent 1px);
+  background-size:22px 22px;
+}
+
+#model-graph {
+  display:block;
+  width:100%;
+  height:100%;
+  touch-action:none;
+  cursor:grab;
+}
+
+#model-graph:active {
+  cursor:grabbing;
+}
+
+.canvas-tools {
+  position:absolute;
+  top:16px;
+  left:16px;
+  display:flex;
+  gap:6px;
+}
+
+.canvas-tools button {
+  padding:7px 11px;
+}
+
+.legend {
+  position:absolute;
+  bottom:15px;
+  left:16px;
+  background:#101925e8;
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:10px 13px;
+  display:flex;
+  gap:18px;
+  font-size:12px;
+  pointer-events:none;
+}
+
+.green {
+  color:var(--green);
+}
+
+.red {
+  color:var(--red);
+}
+
+aside {
+  padding:22px;
+  border-left:1px solid var(--border);
+  background:var(--panel);
+  max-height:66vh;
+  overflow:auto;
+}
+
+aside h2 {
+  font-size:17px;
+  margin:0 0 12px;
+}
+
+aside h3 {
+  font-size:14px;
+  margin:20px 0 6px;
+}
+
+aside .kind-name {
+  overflow-wrap:anywhere;
+  color:var(--accent);
+}
+
+.badge {
+  display:inline-block;
+  font-size:11px;
+  padding:4px 7px;
+  border:1px solid var(--border);
+  border-radius:5px;
+  margin:4px 4px 4px 0;
+  color:var(--muted);
+}
+
+.detail-edge {
+  padding:12px 0;
+  border-top:1px solid var(--border);
+}
+
+.detail-edge strong {
+  overflow-wrap:anywhere;
+}
+
+#error {
+  display:none;
+  color:#ffd2d8;
+  background:#48202b;
+  padding:15px 28px;
+  border-bottom:1px solid #9a4455;
+}
+
+section.table-section {
+  border-top:1px solid var(--border);
+  padding:22px 28px 30px;
+}
+
+section h2 {
+  font-size:18px;
+  margin:0 0 8px;
+}
+
+.table-scroll {
+  overflow:auto;
+  max-height:500px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  margin-top:15px;
+}
+
+table {
+  border-collapse:collapse;
+  width:100%;
+  text-align:left;
+  font-size:13px;
+}
+
+th {
+  position:sticky;
+  top:0;
+  background:#192536;
+  color:#c4d2e4;
+  font-weight:600;
+}
+
+th,td {
+  padding:12px 15px;
+  border-bottom:1px solid #243143;
+}
+
+td {
+  overflow-wrap:anywhere;
+}
+
+tbody tr {
+  cursor:pointer;
+}
+
+tbody tr:hover,tbody tr.selected {
+  background:#1e3047;
+}
+
+.edge-path {
+  fill:none;
+  stroke-width:1.7;
+  opacity:.65;
+  cursor:pointer;
+}
+
+.edge-hit {
+  fill:none;
+  stroke:transparent;
+  stroke-width:16;
+  cursor:pointer;
+}
+
+.edge-label {
+  font:11px system-ui,sans-serif;
+  paint-order:stroke;
+  stroke:#0b1018;
+  stroke-width:5px;
+  stroke-linejoin:round;
+  cursor:pointer;
+}
+
+.node {
+  cursor:move;
+}
+
+.node text {
+  font:12px system-ui,sans-serif;
+  fill:#e5edf7;
+  text-anchor:middle;
+  paint-order:stroke;
+  stroke:#0b1018;
+  stroke-width:5px;
+  stroke-linejoin:round;
+}
+
+.node .disc {
+  stroke-width:2;
+}
+
+.node.external .disc {
+  stroke-dasharray:5 4;
+}
+
+.node.selected .disc {
+  stroke:#fff;
+  stroke-width:4;
+}
+
+.empty-message {
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  color:var(--muted);
+  pointer-events:none;
+}
+
+footer {
+  padding:0 28px 22px;
+  color:var(--muted);
+  font-size:12px;
+}
+
+@media(max-width:850px) {
+  header {
+    padding:18px;
+    flex-direction:column;
+  }
+
+  .toolbar {
+    padding:12px 18px;
+  }
+
+  .stats {
+    width:100%;
+    margin:0;
+  }
+
+  main {
+    grid-template-columns:1fr;
+  }
+
+  .canvas-wrap {
+    height:60vh;
+  }
+
+  aside {
+    border-left:0;
+    border-top:1px solid var(--border);
+    max-height:350px;
+  }
+
+  .legend {
+    gap:10px;
+    font-size:10px;
+  }
+
+  section.table-section {
+    padding:20px 18px;
+  }
+
+}
+  </style>
+ </head>
+ <body>
+  <header>
+   <div>
+    <div class="eyebrow">
+     Proposed OpenGraph schema · offline explorer
+    </div>
+    <h1 id="model-title">
+     OpenGraph model
+    </h1>
+    <p id="model-subtitle">
+    </p>
+    <p>
+     This diagram shows allowed
+     <strong>
+      model types
+     </strong>
+     and directed relationships, rather than collected objects.
+    </p>
+   </div>
+   <div>
+    <label for="schema-file">
+     Open another local model definition
+    </label>
+    <br/>
+    <input accept=".json,application/json" id="schema-file" type="file"/>
+   </div>
+  </header>
+  <div id="error" role="alert">
+  </div>
+  <div class="toolbar">
+   <label for="search">
+    Search
+    <input id="search" placeholder="Kind or relationship name" type="search"/>
+   </label>
+   <label for="traversability">
+    Relationships
+    <select id="traversability">
+     <option value="all">
+      All relationships
+     </option>
+     <option value="true">
+      Traversable only
+     </option>
+     <option value="false">
+      Nontraversable only
+     </option>
+    </select>
+   </label>
+   <span aria-live="polite" class="stats" id="counts">
+   </span>
+  </div>
+  <main>
+   <div class="canvas-wrap">
+    <svg aria-label="Directed OpenGraph type model" id="model-graph" role="img" xmlns="http://www.w3.org/2000/svg">
+     <defs>
+      <marker id="arrow-true" markerHeight="7" markerWidth="7" orient="auto-start-reverse" refX="9" refY="5" viewBox="0 0 10 10">
+       <path d="M 0 0 L 10 5 L 0 10 z" fill="#66e5ab">
+       </path>
+      </marker>
+      <marker id="arrow-false" markerHeight="7" markerWidth="7" orient="auto-start-reverse" refX="9" refY="5" viewBox="0 0 10 10">
+       <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff7f8f">
+       </path>
+      </marker>
+     </defs>
+     <g id="viewport">
+      <g id="edges">
+      </g>
+      <g id="nodes">
+      </g>
+     </g>
+    </svg>
+    <div class="canvas-tools">
+     <button id="fit" title="Fit all visible types">
+      Fit
+     </button>
+     <button aria-label="Zoom in" id="zoom-in">
+      +
+     </button>
+     <button aria-label="Zoom out" id="zoom-out">
+      −
+     </button>
+     <button id="download-svg">
+      Download SVG
+     </button>
+    </div>
+    <div class="legend">
+     <span class="green">
+      → Traversable
+     </span>
+     <span class="red">
+      → Nontraversable
+     </span>
+     <span>
+      ◌ External type
+     </span>
+    </div>
+    <div class="empty-message" hidden="" id="empty">
+     No types match the current filters.
+    </div>
+   </div>
+   <aside aria-live="polite" id="details">
+   </aside>
+  </main>
+  <section class="table-section">
+   <h2>
+    Every allowed directed relationship
+   </h2>
+   <p id="table-caption">
+    Each row is one explicit source → relationship → target combination. Parallel relationships and self-loops are included.
+   </p>
+   <div class="table-scroll">
+    <table id="relationship-table">
+     <thead>
+      <tr>
+       <th scope="col">
+        Source type
+       </th>
+       <th scope="col">
+        Relationship
+       </th>
+       <th scope="col">
+        Target type
+       </th>
+       <th scope="col">
+        Traversal
+       </th>
+       <th scope="col">
+        Existing edge policy
+       </th>
+      </tr>
+     </thead>
+     <tbody>
+     </tbody>
+    </table>
+   </div>
+  </section>
+  <footer>
+   Drag a type to move it. Drag the canvas to pan; use the wheel or + / − to zoom. Select a type,
+   arrow, or table row for details. Arrows sharing endpoints and traversal status are bundled; their
+   complete relationship list appears in the details and table. All processing metadata stays in the
+   source definition. No network connection is used.
+  </footer>
+  <script id="model-definition" type="application/json">
+   {"external_node_kinds":["Computer","Domain","Group","LocalGroup","User"],"node_kinds":[{"color":"#5965D8","description":"A separate helper used to demonstrate safe publication. The native domain is unchanged.","display_name":"Experimental domain helper","icon":"flask","is_display_kind":true,"name":"PoC_DomainHelper"},{"color":"#5965D8","description":"Records the last committed batch and the exact analysis files used.","display_name":"Last successful experiment run","icon":"clock","is_display_kind":true,"name":"PoC_Run"}],"relationship_kinds":[{"description":"Independently calculated experimental ESC1 connection, checked against native BloodHound results.","endpoints":[{"source_kind":"User","target_kind":"Domain"},{"source_kind":"Group","target_kind":"Domain"},{"source_kind":"Computer","target_kind":"Domain"},{"source_kind":"LocalGroup","target_kind":"Domain"}],"is_traversable":true,"name":"PoC_ADCSESC1"}],"schema":{"display_name":"ESC1 processing experiment","name":"esc1_poc","namespace":"PoC","version":"v1.0.0"}}
+  </script>
+  <script>
+   'use strict';
+// Keep validation separate from drawing: every displayed triple comes from one
+// explicit endpoint pair, including parallel relationships and self-loops.
+function parseModel(definition) {
+    if (!definition || typeof definition !== 'object' || !definition.schema || typeof definition.schema.name !== 'string' || !definition.schema.name) {
+        throw new Error('The definition requires schema metadata with a name.');
+    }
+    if (!Array.isArray(definition.node_kinds) || !Array.isArray(definition.relationship_kinds)) {
+        throw new Error('The definition requires node_kinds and relationship_kinds arrays.');
+    }
+    const nodes = [];
+    const byName = new Map();
+    const edges = [];
+    const relationshipNames = new Set();
+    function addNode(kind, external) {
+        if (!kind || typeof kind.name !== 'string' || !kind.name || byName.has(kind.name)) {
+            throw new Error('Node kinds must have unique, nonempty names; external types must be distinct from types defined here.');
+        }
+        const node = {
+            ...kind, external, x: 0, y: 0
+        };
+        nodes.push(node);
+        byName.set(node.name, node);
+    }
+    definition.node_kinds.forEach(kind => addNode(kind, false));
+    if (definition.external_node_kinds !== undefined && !Array.isArray(definition.external_node_kinds)) {
+        throw new Error('external_node_kinds must be an array.');
+    }
+    (definition.external_node_kinds || []).forEach(name => addNode({
+        name, description: 'Referenced native or other extension type; not defined by this schema.'
+    }, true));
+    definition.relationship_kinds.forEach((kind, kindIndex) => {
+        if (!kind || typeof kind.name !== 'string' || !kind.name || (kind.is_traversable !== undefined && typeof kind.is_traversable !== 'boolean')) {
+            throw new Error('Every relationship kind requires a name; is_traversable must be boolean when present.');
+        }
+        if (relationshipNames.has(kind.name)) {
+            throw new Error('Duplicate relationship kind "' + kind.name + '".');
+        }
+        relationshipNames.add(kind.name);
+        const policy = Object.prototype.hasOwnProperty.call(kind, 'existing_edge_policy') ? kind.existing_edge_policy : 'Defined by the producing query';
+        if (Object.prototype.hasOwnProperty.call(kind, 'existing_edge_policy') && !['replace-existing', 'merge-properties', 'keep-existing'].includes(policy)) {
+            throw new Error('existing_edge_policy must be replace-existing, merge-properties, or keep-existing.');
+        }
+        const endpointPairs = new Set();
+        if (!Array.isArray(kind.endpoints) || kind.endpoints.length === 0) {
+            throw new Error('Relationship "' + kind.name + '" requires explicit nonempty endpoints. No endpoint pairs are inferred.');
+        }
+        kind.endpoints.forEach((pair, pairIndex) => {
+            if (!pair || !byName.has(pair.source_kind) || !byName.has(pair.target_kind)) {
+                throw new Error('Relationship "' + kind.name + '" has an invalid or undeclared endpoint.');
+            }
+            const pairKey = JSON.stringify([pair.source_kind, pair.target_kind]);
+            if (endpointPairs.has(pairKey)) {
+                throw new Error('Relationship "' + kind.name + '" repeats an endpoint pair.');
+            }
+            endpointPairs.add(pairKey);
+            edges.push({
+                id: kindIndex + ':' + pairIndex,
+                name: kind.name,
+                description: kind.description || '',
+                source: pair.source_kind,
+                target: pair.target_kind,
+                traversable: kind.is_traversable === true,
+                existingEdgePolicy: policy
+            });
+        });
+    });
+    return {
+        schema: definition.schema,
+        nodes,
+        byName,
+        edges,
+        relationshipCount: definition.relationship_kinds.length
+    };
+}
+const $ = id => document.getElementById(id);
+const svg = $('model-graph');
+const viewport = $('viewport');
+const NS = 'http://www.w3.org/2000/svg';
+let model;
+let visibleNodes = [];
+let visibleEdges = [];
+let groups = [];
+let selected = null;
+let camera = {
+    x: 0, y: 0, scale: 1
+};
+let gesture = null;
+function element(tag, attributes = {}, value) {
+    const result = document.createElementNS(NS, tag);
+    Object.entries(attributes).forEach(([key, val]) => result.setAttribute(key, String(val)));
+    if (value !== undefined) {
+        result.textContent = value;
+    }
+    return result;
+}
+function text(tag, value, parent, className) {
+    const result = document.createElement(tag);
+    result.textContent = value;
+    if (className) {
+        result.className = className;
+    }
+    parent.append(result);
+    return result;
+}
+function color(node) {
+    return /^#[0-9a-f]{6}$/i.test(node.color || '') ? node.color : node.external ? '#a4b3c7' : node.is_display_kind ? '#80bfff' : '#c3a2ff';
+}
+function traversal(edge) {
+    return edge.traversable ? 'Traversable' : 'Nontraversable';
+}
+function showError(message) {
+    $('error').textContent = message;
+    $('error').style.display = message ? 'block' : 'none';
+}
+function loadDefinition(definition) {
+    const nextModel = parseModel(definition);
+    model = nextModel;
+    selected = null;
+    // New files start with the full model, without filters from the last file.
+    $('search').value = '';
+    $('traversability').value = 'all';
+    const count = model.nodes.length;
+    const columns = Math.max(1, Math.ceil(Math.sqrt(count * 1.6)));
+    model.nodes.forEach((node, index) => {
+        node.x = 150 + (index % columns) * 245;
+        node.y = 120 + Math.floor(index / columns) * 180;
+    });
+    $('model-title').textContent = model.schema.display_name || model.schema.name;
+    $('model-subtitle').textContent = [model.schema.namespace, model.schema.version ? 'Version ' + model.schema.version : ''].filter(Boolean).join(' · ');
+    showError('');
+    refresh();
+    fit();
+}
+// Search limits triples to matching types or relationships. Declared isolated
+// types remain visible when their own names match, even without any triples.
+function refresh() {
+    if (!model) {
+        return;
+    }
+    const query = $('search').value.trim().toLowerCase();
+    const mode = $('traversability').value;
+    visibleEdges = model.edges.filter(edge => {
+        const matchesTraversal = mode === 'all' || String(edge.traversable) === mode;
+        const searchableValues = [edge.name, edge.source, edge.target, edge.description, edge.existingEdgePolicy];
+        const matchesSearch = !query || searchableValues.some(value =>
+            String(value).toLowerCase().includes(query));
+        return matchesTraversal && matchesSearch;
+    });
+    const connected = new Set(visibleEdges.flatMap(edge => [edge.source, edge.target]));
+    visibleNodes = model.nodes.filter(node => {
+        const searchableValues = [node.name, node.display_name, node.description];
+        return !query || connected.has(node.name) || searchableValues.some(value =>
+            String(value || '').toLowerCase().includes(query));
+    });
+    const grouped = new Map();
+    visibleEdges.forEach(edge => {
+        const key = JSON.stringify([edge.source, edge.target, edge.traversable]);
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                key, source: edge.source, target: edge.target, traversable: edge.traversable, edges: []
+            });
+        }
+        grouped.get(key).edges.push(edge);
+    });
+    groups = Array.from(grouped.values());
+    $('counts').textContent =
+        visibleNodes.length + ' / ' + model.nodes.length + ' types · ' +
+        visibleEdges.length + ' / ' + model.edges.length + ' directed combinations · ' +
+        model.relationshipCount + ' relationship kinds';
+    $('table-caption').textContent = 'Showing ' + visibleEdges.length + ' of ' + model.edges.length +
+        ' explicit source → relationship → target combinations. ' +
+        'Parallel relationships and self-loops are included.';
+    $('empty').hidden = visibleNodes.length > 0;
+    draw();
+    drawTable();
+    showDetails();
+}
+// Curved directed paths separate reciprocal arrows and traversal statuses.
+// Multiple relationships on the same directed pair remain in a labeled bundle.
+function geometry(group) {
+    const source = model.byName.get(group.source);
+    const target = model.byName.get(group.target);
+    const siblings = groups.filter(item => item.source === group.source && item.target === group.target);
+    const lane = siblings.indexOf(group);
+    if (source === target) {
+        const spread = 48 + lane * 26;
+        return {
+            path: [
+                'M', source.x - 20, source.y - 20,
+                'C', source.x - spread - 45, source.y - spread - 70,
+                source.x + spread + 45, source.y - spread - 70,
+                source.x + 20, source.y - 20
+            ].join(' '),
+            x: source.x,
+            y: source.y - spread - 60
+        };
+    }
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    const ux = dx / distance;
+    const uy = dy / distance;
+    const bend = 45 + lane * 36;
+    const cx = (source.x + target.x) / 2 - uy * bend;
+    const cy = (source.y + target.y) / 2 + ux * bend;
+    const startAngle = Math.atan2(cy - source.y, cx - source.x);
+    const endAngle = Math.atan2(cy - target.y, cx - target.x);
+    const sx = source.x + Math.cos(startAngle) * 31;
+    const sy = source.y + Math.sin(startAngle) * 31;
+    const tx = target.x + Math.cos(endAngle) * 33;
+    const ty = target.y + Math.sin(endAngle) * 33;
+    return {
+        path: 'M ' + sx + ' ' + sy + ' Q ' + cx + ' ' + cy + ' ' + tx + ' ' + ty,
+        x: (sx + 2 * cx + tx) / 4,
+        y: (sy + 2 * cy + ty) / 4 - 5
+    };
+}
+// Rebuild SVG elements after filtering or moving a type. Untrusted labels
+// always become text nodes; schema colors must be six-digit hex values.
+function draw() {
+    $('edges').replaceChildren();
+    $('nodes').replaceChildren();
+    groups.forEach(group => {
+        const shape = geometry(group);
+        const stroke = group.traversable ? '#66e5ab' : '#ff7f8f';
+        const container = element('g', {
+            'data-source': group.source,
+            'data-target': group.target,
+            'data-traversable': group.traversable,
+            'data-count': group.edges.length
+        });
+        const path = element('path', {
+            d: shape.path, class: 'edge-path', stroke, 'marker-end': 'url(#arrow-' + group.traversable + ')'
+        });
+        const hit = element('path', {
+            d: shape.path, class: 'edge-hit'
+        });
+        const label = element('text', {
+            x: shape.x, y: shape.y, class: 'edge-label', fill: stroke
+        }, group.edges.length === 1 ? group.edges[0].name : group.edges.length + ' relationships');
+        const title = element('title', {}, group.edges.map(edge => edge.source + ' → ' + edge.name + ' → ' + edge.target + ' (' + traversal(edge) + ')').join('\n'));
+        container.append(path, hit, label, title);
+        container.addEventListener('click', event => {
+            event.stopPropagation();
+            selected = {
+                type: 'group', group
+            };
+            showDetails();
+            drawTable();
+        });
+        $('edges').append(container);
+    });
+    visibleNodes.forEach(node => {
+        const container = element('g', {
+            class: 'node' + (node.external ? ' external' : '') + (selected && selected.type === 'node' && selected.node === node ? ' selected' : ''),
+            transform: 'translate(' + node.x + ' ' + node.y + ')',
+            'data-kind': node.name,
+            tabindex: 0,
+            role: 'button',
+            'aria-label': node.name + (node.external ? ' (external type)' : '')
+        });
+        container.append(element('circle', {
+            r: 27, class: 'disc', fill: '#172536', stroke: color(node)
+        }));
+        container.append(element('text', {
+            y: 5
+        }, node.external ? '↗' : node.is_display_kind ? '●' : '◇'));
+        container.append(element('text', {
+            y: 49
+        }, node.name));
+        if (node.external) {
+            container.append(element('text', {
+                y: 66, style: 'font-size:10px;fill:#9dacbf'
+            }, 'external reference'));
+        }
+        container.append(element('title', {}, node.name + '\n' + (node.description || '')));
+        container.addEventListener('pointerdown', event => {
+            event.stopPropagation();
+            selected = {
+                type: 'node', node
+            };
+            showDetails();
+            gesture = {
+                type: 'node',
+                node,
+                startX: event.clientX,
+                startY: event.clientY,
+                x: node.x,
+                y: node.y,
+                moved: false
+            };
+            svg.setPointerCapture(event.pointerId);
+            drawTable();
+        });
+        container.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                selected = {
+                    type: 'node', node
+                };
+                showDetails();
+                draw();
+                drawTable();
+            }
+        });
+        $('nodes').append(container);
+    });
+}
+function drawTable() {
+    const body = $('relationship-table').querySelector('tbody');
+    body.replaceChildren();
+    visibleEdges.forEach(edge => {
+        const row = document.createElement('tr');
+        row.dataset.edgeId = edge.id;
+        row.tabIndex = 0;
+        const isSelected = selected && (
+            (selected.type === 'edge' && selected.edge.id === edge.id) ||
+            (selected.type === 'group' && selected.group.edges.some(item => item.id === edge.id)) ||
+            (selected.type === 'node' && (
+                edge.source === selected.node.name || edge.target === selected.node.name))
+        );
+        if (isSelected) {
+            row.classList.add('selected');
+        }
+        [edge.source, edge.name, edge.target, traversal(edge), edge.existingEdgePolicy].forEach((value, index) => text('td', value, row, index === 3 ? (edge.traversable ? 'green' : 'red') : undefined));
+        function select() {
+            selected = {
+                type: 'edge', edge
+            };
+            showDetails();
+            drawTable();
+        }
+        row.addEventListener('click', select);
+        row.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                select();
+            }
+        });
+        body.append(row);
+    });
+}
+function edgeDetails(edge, parent) {
+    const section = document.createElement('div');
+    section.className = 'detail-edge';
+    parent.append(section);
+    text('strong', edge.name, section);
+    text('p', edge.source + ' → ' + edge.target, section);
+    text('span', traversal(edge), section, 'badge ' + (edge.traversable ? 'green' : 'red'));
+    text('p', 'Existing edge policy: ' + edge.existingEdgePolicy, section);
+    if (edge.description) {
+        text('p', String(edge.description), section);
+    }
+}
+// Selection displays the complete definition behind a node or arrow bundle.
+// A table row selects exactly one source–relationship–target combination.
+function showDetails() {
+    const panel = $('details');
+    panel.replaceChildren();
+    if (!selected) {
+        text('h2', 'Explore the full model', panel);
+        text('p', 'Select a type or directed relationship to inspect its definition.', panel);
+        text('h3', 'Declared type coverage', panel);
+        const localCount = model.nodes.filter(node => !node.external).length;
+        const externalCount = model.nodes.filter(node => node.external).length;
+        text('p', localCount + ' types defined here and ' + externalCount +
+            ' external references. Isolated helper, base, and run types are included.', panel);
+        text('h3', 'Explicit endpoints', panel);
+        text('p', 'Each permitted pair is listed in the table below. ' +
+            'No source–target combinations are inferred. Green arrows permit traversal; ' +
+            'red arrows carry nontraversable relationships.', panel);
+        return;
+    }
+    if (selected.type === 'node') {
+        const node = selected.node;
+        const incident = model.edges.filter(edge => edge.source === node.name || edge.target === node.name);
+        text('h2', node.name, panel, 'kind-name');
+        if (node.display_name && node.display_name !== node.name) {
+            text('p', String(node.display_name), panel);
+        }
+        text('span', node.external ? 'External reference' : node.is_display_kind ? 'Display type' : 'Helper / structural type', panel, 'badge');
+        if (node.description) {
+            text('p', String(node.description), panel);
+        }
+        if (node.external) {
+            text('p', 'This type is referenced here and is not defined as a local type by this schema.', panel);
+        }
+        text('h3', incident.length + ' allowed incoming / outgoing combinations', panel);
+        if (!incident.length) {
+            text('p', 'Declared type with no relationship endpoints in this definition.', panel);
+        }
+        incident.forEach(edge => edgeDetails(edge, panel));
+    }
+    else {
+        const edges = selected.type === 'edge' ? [selected.edge] : selected.group.edges;
+        text('h2', edges.length === 1 ? 'Directed relationship' : edges.length + ' parallel relationships', panel);
+        edges.forEach(edge => edgeDetails(edge, panel));
+    }
+}
+function applyCamera() {
+    viewport.setAttribute('transform', 'translate(' + camera.x + ' ' + camera.y + ') scale(' + camera.scale + ')');
+}
+function fit() {
+    if (!visibleNodes.length) {
+        return;
+    }
+    const width = svg.clientWidth;
+    const height = svg.clientHeight;
+    const xs = visibleNodes.map(node => node.x);
+    const ys = visibleNodes.map(node => node.y);
+    const minX = Math.min(...xs) - 135;
+    const maxX = Math.max(...xs) + 135;
+    const minY = Math.min(...ys) - 150;
+    const maxY = Math.max(...ys) + 100;
+    camera.scale = Math.min(width / (maxX - minX), height / (maxY - minY), 1.5);
+    camera.x = width / 2 - (minX + maxX) / 2 * camera.scale;
+    camera.y = height / 2 - (minY + maxY) / 2 * camera.scale;
+    applyCamera();
+}
+function zoom(factor, x = svg.clientWidth / 2, y = svg.clientHeight / 2) {
+    const next = Math.min(4, Math.max(.08, camera.scale * factor));
+    const ratio = next / camera.scale;
+    camera.x = x - (x - camera.x) * ratio;
+    camera.y = y - (y - camera.y) * ratio;
+    camera.scale = next;
+    applyCamera();
+}
+svg.addEventListener('wheel', event => {
+    event.preventDefault();
+    const rect = svg.getBoundingClientRect();
+    zoom(event.deltaY < 0 ? 1.12 : 1 / 1.12, event.clientX - rect.left, event.clientY - rect.top);
+}, {
+    passive: false
+});
+svg.addEventListener('pointerdown', event => {
+    gesture = {
+        type: 'pan', startX: event.clientX, startY: event.clientY, x: camera.x, y: camera.y, moved: false
+    };
+    svg.setPointerCapture(event.pointerId);
+});
+svg.addEventListener('pointermove', event => {
+    if (!gesture) {
+        return;
+    }
+    const dx = event.clientX - gesture.startX;
+    const dy = event.clientY - gesture.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) {
+        gesture.moved = true;
+    }
+    if (gesture.type === 'node') {
+        gesture.node.x = gesture.x + dx / camera.scale;
+        gesture.node.y = gesture.y + dy / camera.scale;
+        draw();
+    }
+    else {
+        camera.x = gesture.x + dx;
+        camera.y = gesture.y + dy;
+        applyCamera();
+    }
+});
+svg.addEventListener('pointerup', () => {
+    const previous = gesture;
+    gesture = null;
+    if (previous && previous.type === 'pan' && !previous.moved) {
+        selected = null;
+        showDetails();
+        drawTable();
+    }
+    draw();
+});
+svg.addEventListener('pointercancel', () => {
+    gesture = null;
+});
+$('search').addEventListener('input', () => {
+    refresh();
+});
+$('traversability').addEventListener('change', refresh);
+$('fit').addEventListener('click', fit);
+$('zoom-in').addEventListener('click', () => zoom(1.25));
+$('zoom-out').addEventListener('click', () => zoom(.8));
+$('schema-file').addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+        return;
+    }
+    try {
+        const definition = JSON.parse(await file.text());
+        loadDefinition(definition);
+    }
+    catch (error) {
+        showError('Unable to load ' + file.name + ': ' + error.message + ' The previous model remains visible.');
+    }
+});
+// Export the visible diagram with its stylesheet and arrows embedded. The
+// export fits all visible types independently of the current pan or zoom.
+$('download-svg').addEventListener('click', () => {
+    const exported = svg.cloneNode(true);
+    const xs = visibleNodes.map(node => node.x);
+    const ys = visibleNodes.map(node => node.y);
+    const minX = xs.length ? Math.min(...xs) - 150 : 0;
+    const minY = ys.length ? Math.min(...ys) - 160 : 0;
+    const width = xs.length ? Math.max(...xs) - minX + 150 : 900;
+    const height = ys.length ? Math.max(...ys) - minY + 110 : 600;
+    exported.setAttribute('viewBox', [minX, minY, width, height].join(' '));
+    exported.setAttribute('width', width);
+    exported.setAttribute('height', height);
+    exported.querySelector('#viewport').removeAttribute('transform');
+    const styles = element('style', {}, document.querySelector('style').textContent);
+    exported.insertBefore(styles, exported.firstChild);
+    const background = element('rect', {
+        x: minX, y: minY, width, height, fill: '#0b1018'
+    });
+    exported.insertBefore(background, exported.querySelector('#viewport'));
+    const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(exported)], {
+        type: 'image/svg+xml'
+    }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'opengraph-model.svg';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+window.addEventListener('resize', fit);
+try {
+    loadDefinition(JSON.parse($('model-definition').textContent));
+}
+catch (error) {
+    showError(error.message);
+}
+</script>
+ </body>
+</html>

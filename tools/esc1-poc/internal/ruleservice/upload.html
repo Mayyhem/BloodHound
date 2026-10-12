@@ -1,0 +1,1037 @@
+<!--
+Copyright 2026 Specter Ops, Inc.
+
+Licensed under the Apache License, Version 2.0
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+SPDX-License-Identifier: Apache-2.0
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Post-processing rules</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17212b;
+        --muted: #526270;
+        --line: #d5dde5;
+        --wash: #eef2f5;
+        --accent: #2455a4;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font: 16px/1.5 system-ui;
+        margin: 32px auto;
+        padding: 0 24px;
+        max-width: 1440px;
+        color: var(--ink);
+      }
+      h1, h2 {
+        line-height: 1.2;
+      }
+      p {
+        max-width: 100ch;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      button, input, select {
+        font: inherit;
+        padding: 8px;
+      }
+      button {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: white;
+        color: var(--ink);
+        margin: 4px;
+      }
+      button.primary {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+      }
+      button:disabled {
+        opacity: .5;
+        cursor: default;
+      }
+      section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+      }
+      label {
+        display: inline-block;
+        margin: 8px;
+      }
+      input[type=password] {
+        width: min(100%,680px);
+      }
+      .notice {
+        background: var(--wash);
+        padding: 14px;
+        border-radius: 5px;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        padding: 12px 8px;
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+        /* Center each row's text and controls beside its action buttons. */
+        vertical-align: middle;
+      }
+      th button {
+        margin: 0;
+        padding: 3px;
+        border: 0;
+        font-weight: 600;
+        text-align: left;
+      }
+      td:first-child, th:first-child {
+        width: 44px;
+      }
+      table input[type=checkbox] {
+        display: block;
+        margin: 0;
+      }
+      td:last-child {
+        white-space: nowrap;
+      }
+      .rule-name {
+        display: block;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+      }
+      .rule-state {
+        font-size: 14px;
+        color: var(--muted);
+        max-width: 320px;
+      }
+      /* Keep each action in the same position, including rows with an Enable button. */
+      .rule-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .rule-actions button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 38px;
+        margin: 0;
+      }
+      .rule-actions button:first-child {
+        width: 82px;
+      }
+      .paused-rules {
+        padding-left: 24px;
+      }
+      .paused-rules li {
+        margin: 12px 0;
+        overflow-wrap: anywhere;
+      }
+      .paused-rules .muted {
+        display: block;
+      }
+      .detail-cell {
+        background: #f8fafc;
+      }
+      .detail-cell pre, pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        background: var(--wash);
+        padding: 14px;
+        font-size: 14px;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        gap: 8px;
+      }
+      dt {
+        font-weight: 600;
+      }
+      dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .revision {
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+      .spinner {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid #91a2b4;
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+        margin-right: 8px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .status-light {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        background: #62846c;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+      .status-light.running {
+        background: #be7b13;
+      }
+      .trash {
+        width: 38px;
+        height: 38px;
+        padding: 8px;
+      }
+      .trash svg {
+        width: 20px;
+        height: 20px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.7;
+      }
+      dialog {
+        width: min(640px,calc(100% - 32px));
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 24px;
+      }
+      dialog::backdrop {
+        background: #17212b88;
+      }
+      details {
+        margin: 12px 0;
+      }
+      [hidden] {
+        display: none!important;
+      }
+      @media(max-width:650px) {
+        body {
+          padding: 0 12px;
+        }
+        section {
+          padding: 12px;
+        }
+        dl {
+          grid-template-columns: 1fr;
+        }
+        th, td {
+          padding: 8px;
+        }
+        .toolbar {
+          gap: 4px;
+        }
+      }
+      @media(prefers-reduced-motion:reduce) {
+        .spinner {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Post-processing rules</h1>
+    <p>Upload rules for Active Directory, CyberArk, or another extension. Review changes before activating them. An analysis already running keeps its current rules; new settings apply to the next analysis.</p>
+    <div id="auth" hidden>
+      <label for="token">Bearer token</label>
+      <input id="token" type="password" autocomplete="off">
+      <p class="muted">The token stays in this page’s memory. Enter it, then refresh.</p>
+    </div>
+    <p id="message" class="notice" role="status" aria-live="polite">Connecting to the rule service…</p>
+    <div class="toolbar">
+      <button id="refresh">Refresh rules and status</button>
+      <button id="run-analysis" class="primary" disabled>Run Analysis</button>
+      <span id="analysis-state" role="status" aria-live="polite">Extension status has not loaded.</span>
+    </div>
+    <p class="muted">Run BloodHound analysis now, then check enabled extension rules. Uploading collection data also triggers this automatically.</p>
+    <p id="analysis-request-state" role="status" aria-live="polite">BloodHound analysis status has not loaded.</p>
+    <section>
+      <details id="upload-controls">
+        <summary>Upload rules and download schemas</summary>
+        <label for="files">Schema definitions and .cypher files</label>
+        <input id="files" type="file" multiple accept=".json,.cypher">
+        <p class="muted">Use schema.json or extension_name.schema.json, plus uniquely named snake_case.cypher files. Upload a complete extension to begin; later, upload only changed files. Each changed existing file requires its own overwrite choice. Maximum: 32 files, 1 MiB per file, 4 MiB in total.</p>
+        <div id="schema-downloads"></div>
+        <button id="preview" class="primary">Review uploaded changes</button>
+      </details>
+      <h2 id="table-title">Rules</h2>
+      <p id="active-revision" class="revision">No active revision loaded.</p>
+      <p class="muted">Stage 1 rules have no earlier rule to wait for. Stage 2 waits for the rules it needs in stage 1, and later stages work the same way. Order shows the complete execution plan. Rules in the same stage may be eligible together, but their order numbers do not promise exact start times or simultaneous execution. Disabled rules keep their files and existing graph results. Rules that need them pause too.</p>
+      <div id="review" class="notice" hidden>
+        <h2>Review proposed changes</h2>
+        <p id="review-revisions" class="revision"></p>
+        <dl id="review-changes">
+        </dl>
+        <button id="activate" class="primary">Activate reviewed revision</button>
+        <button id="cancel-preview">Discard preview</button>
+      </div>
+      <div class="toolbar">
+        <label for="extension-filter">Extension <select id="extension-filter">
+            <option value="">All extensions</option>
+          </select>
+        </label>
+        <span id="rule-count" class="muted">
+        </span>
+        <span id="selected-count" class="muted">
+        </span>
+      </div>
+      <div class="table-wrap">
+        <table id="rules-table">
+          <caption class="muted" style="text-align:left">Expand a rule to see its full query, inputs, and outputs.</caption>
+          <thead>
+            <tr>
+              <th>
+                <input id="select-all" type="checkbox" aria-label="Select all visible rules">
+              </th>
+              <th aria-sort="ascending">
+                <button data-sort="order">Order</button>
+              </th>
+              <th aria-sort="none">
+                <button data-sort="name">Name</button>
+              </th>
+              <th aria-sort="none">
+                <button data-sort="stage">Stage</button>
+              </th>
+              <th aria-sort="none">
+                <button data-sort="added_at">Date added</button>
+              </th>
+              <th aria-sort="none">
+                <button data-sort="extension">Extension</button>
+              </th>
+              <th>State</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rule-rows"></tbody>
+        </table>
+      </div>
+      <div class="toolbar">
+        <button id="delete-selected">Delete Selected</button>
+        <button id="disable-selected">Disable Selected</button>
+        <button id="enable-selected">Enable Selected</button>
+        <span class="muted">Select all applies only to the visible rows.</span>
+      </div>
+    </section>
+    <details>
+      <summary>Latest analysis report</summary>
+      <pre id="status">No report loaded.</pre>
+    </details>
+    <dialog id="overwrite-dialog" aria-labelledby="overwrite-title">
+      <h2 id="overwrite-title">Choose whether to overwrite</h2>
+      <p id="overwrite-name"></p>
+      <p>The uploaded contents differ from the active file. Choose an action for this file.</p>
+      <p id="overwrite-effect"></p>
+      <button id="overwrite-file" class="primary">Overwrite this file</button>
+      <button id="skip-file">Skip this file</button>
+      <button id="cancel-upload">Cancel upload review</button>
+    </dialog>
+    <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-description"></p>
+      <p id="confirm-names"></p>
+      <div id="confirm-paused" hidden>
+        <h3>Rules that will be disabled or paused</h3>
+        <ul id="confirm-paused-rules" class="paused-rules"></ul>
+      </div>
+      <button id="confirm-change" class="primary">Confirm</button>
+      <button id="cancel-change">Cancel</button>
+    </dialog>
+    <script>
+      'use strict';
+      const byID = id => document.getElementById(id);
+      let localUI = false;
+      let busy = false;
+      let loaded = false;
+      let polling = false;
+      let statusRequest = null;
+      let nativeAnalysis = null;
+      let nativeStatusRequest = null;
+
+      // Active is the saved bundle. Pending holds a proposed change until confirmation.
+      let active = { revision: '', files: {}, disabled: [] };
+      let activePlan = { queries: [], extensions: [] };
+      let pending = null;
+
+      let selected = new Set();
+      let expanded = new Set();
+      let sortKey = 'order';
+      let sortDirection = 1;
+
+      // Set textContent so uploaded queries appear as text; never execute them or insert HTML.
+      function element(tag, text, className) {
+        const node = document.createElement(tag);
+        if (text !== undefined) {
+          node.textContent = text;
+        }
+        if (className) {
+          node.className = className;
+        }
+        return node;
+      }
+
+      function describe(list) {
+        return list && list.length ? list.join(', ') : 'None';
+      }
+
+      function entry(list, label, value) {
+        list.append(element('dt', label), element('dd', value));
+      }
+
+      function message(text, inProgress = false) {
+        byID('message').replaceChildren();
+        if (inProgress) {
+          byID('message').append(element('span', undefined, 'spinner'));
+        }
+        byID('message').append(document.createTextNode(text));
+        byID('message').setAttribute('aria-busy', String(inProgress));
+      }
+
+      function displayedPlan() {
+        return pending ? pending.review.plan : activePlan;
+      }
+
+      function queries(plan) {
+        return plan.queries || (plan.threads || []).flatMap(thread => thread.queries);
+      }
+
+      function visibleQueries() {
+        const filter = byID('extension-filter').value;
+        return queries(displayedPlan()).filter(query => !filter || query.extension === filter).sort((first, second) => {
+          const a = sortKey === 'extension' ? first.extension_name || first.extension || '' : first[sortKey] || '';
+          const b = sortKey === 'extension' ? second.extension_name || second.extension || '' : second[sortKey] || '';
+          const comparison = typeof a === 'number' ? a - b : String(a).localeCompare(String(b));
+          return comparison * sortDirection || first.order - second.order;
+        });
+      }
+
+      function updateButtons() {
+        for (const id of ['refresh', 'cancel-preview', 'preview']) {
+          byID(id).disabled = busy || (id === 'preview' && (!loaded || !!pending));
+        }
+        byID('activate').disabled = busy || !pending;
+        byID('run-analysis').disabled = busy || polling || !loaded || !!pending || !nativeAnalysis || !nativeAnalysis.available || nativeAnalysis.pending || nativeAnalysis.running;
+        byID('files').disabled = busy || !!pending;
+        byID('token').disabled = busy;
+        for (const id of ['delete-selected', 'disable-selected', 'enable-selected']) {
+          byID(id).disabled = busy || !loaded || !!pending || selected.size === 0;
+        }
+        for (const control of document.querySelectorAll('[data-rule-action], [data-select-rule], #select-all')) {
+          control.disabled = busy || !loaded || !!pending;
+        }
+        for (const checkbox of document.querySelectorAll('[data-select-rule]')) {
+          checkbox.checked = selected.has(checkbox.dataset.selectRule);
+        }
+        const visible = visibleQueries();
+        byID('select-all').checked = visible.length > 0 && visible.every(query => selected.has(query.name));
+        byID('select-all').indeterminate = visible.some(query => selected.has(query.name)) && !byID('select-all').checked;
+        byID('selected-count').textContent = selected.size ? selected.size + ' selected' : '';
+        byID('rules-table').setAttribute('aria-busy', String(busy));
+      }
+
+      function discardPreview() {
+        pending = null;
+        byID('review').hidden = true;
+        byID('table-title').textContent = 'Rules';
+        renderFilter();
+        renderTable();
+        updateButtons();
+      }
+
+      async function call(path, method = 'GET', body) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (!localUI) {
+          headers.Authorization = 'Bearer ' + byID('token').value;
+        }
+        const response = await fetch((localUI ? '/ui/' : '/v1/') + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+        const value = await response.json();
+        if (!response.ok) {
+          const error = Error(value.error || 'HTTP ' + response.status);
+          error.status = response.status;
+          throw error;
+        }
+        return value;
+      }
+      // Manual refresh and polling share a pending status request to avoid overlapping fetches.
+      function loadStatus() {
+        if (!statusRequest) {
+          statusRequest = call('status').finally(() => {
+            statusRequest = null;
+          });
+        }
+        return statusRequest;
+      }
+
+      // Keep native analysis separate from the extension report: native idle does not prove extension success.
+      async function refreshNativeStatus() {
+        if (!nativeStatusRequest) {
+          nativeStatusRequest = call('analysis').then(renderNativeStatus).catch(error => {
+            nativeAnalysis = null;
+            byID('analysis-request-state').textContent = 'Cannot read BloodHound analysis status: ' + error.message + ' Refresh to check again.';
+            updateButtons();
+          }).finally(() => {
+            nativeStatusRequest = null;
+          });
+        }
+        return nativeStatusRequest;
+      }
+
+      function renderNativeStatus(status) {
+        nativeAnalysis = status;
+        const state = !status.available ? 'Unavailable' : status.running ? 'Running' : status.pending ? 'Requested; waiting for BloodHound' : 'Ready to request analysis';
+        const details = [status.native_status ? 'BloodHound reported status: ' + status.native_status + '.' : '', status.message || ''].filter(Boolean).join(' ');
+        byID('analysis-request-state').textContent = 'BloodHound analysis: ' + state + '.' + (details ? ' ' + details : '');
+        updateButtons();
+      }
+
+      async function runAnalysis() {
+        if (byID('run-analysis').disabled) {
+          return;
+        }
+        busy = true;
+        updateButtons();
+        byID('analysis-request-state').replaceChildren(element('span', undefined, 'spinner'), document.createTextNode('Requesting BloodHound analysis…'));
+        byID('analysis-request-state').setAttribute('aria-busy', 'true');
+        try {
+          renderNativeStatus(await call('analysis', 'POST', {}));
+        } catch (error) {
+          // A lost response may follow an accepted request. Check status before allowing another click.
+          nativeAnalysis = null;
+          byID('analysis-request-state').textContent = 'Analysis request could not be confirmed: ' + error.message + ' It may have been queued. Refresh to check its status before requesting again.';
+        } finally {
+          busy = false;
+          byID('analysis-request-state').setAttribute('aria-busy', 'false');
+          updateButtons();
+        }
+      }
+
+      function download(name, text) {
+        const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+        const link = element('a');
+        link.href = url;
+        link.download = name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      function renderSchemas() {
+        byID('schema-downloads').replaceChildren();
+        for (const name of Object.keys(active.files).filter(name => name.endsWith('.json')).sort()) {
+          const button = element('button', 'Download ' + name);
+          button.onclick = () => download(name, active.files[name]);
+          byID('schema-downloads').append(button);
+        }
+        byID('active-revision').textContent = active.revision ? 'Active revision: ' + active.revision : 'No active rules. Upload a complete extension to begin.';
+      }
+
+      function renderFilter() {
+        const filter = byID('extension-filter'), previous = filter.value;
+        filter.replaceChildren(element('option', 'All extensions'));
+        filter.firstChild.value = '';
+        const extensions = new Map((displayedPlan().extensions || []).map(item => [item.name, item.display_name]));
+        for (const query of queries(displayedPlan())) {
+          if (query.extension) {
+            extensions.set(query.extension, query.extension_name || query.extension);
+          }
+        }
+        for (const [name, displayName] of [...extensions].sort((a, b) => a[1].localeCompare(b[1]))) {
+          const option = element('option', displayName || name);
+          option.value = name;
+          filter.append(option);
+        }
+        if (extensions.has(previous)) {
+          filter.value = previous;
+        }
+      }
+
+      function detailsFor(query) {
+        const container = element('div'), facts = element('dl'), processing = query.processing || {};
+        entry(facts, 'Graph inputs', describe((query.inputs || []).map(input => input.type + ': ' + input.name)));
+        entry(facts, 'Waits for rules', describe((query.prerequisites || []).map(input => input.name + ' → $' + input.parameter)));
+        entry(facts, 'Used by rules', describe(query.dependents));
+        entry(facts, 'Result rows', '$' + query.parameter);
+        entry(facts, 'Helper objects created', describe(
+          (query.outputs || [])
+            .filter(output => output.type === 'node')
+            .map(output => output.kind + ' (ID prefix: ' + output.id_prefix + ')')
+        ));
+        entry(facts, 'Connections created', describe(
+          (query.outputs || [])
+            .filter(output => output.type === 'relationship')
+            .map(output => output.kind + ' ['
+              + (output.endpoints || [])
+                .map(endpoint => endpoint.source_kind + ' → ' + endpoint.target_kind)
+                .join('; ')
+              + '] · existing connection policy: ' + output.existing_edge_policy)
+        ));
+        if (!(query.outputs || []).length) {
+          entry(facts, 'Graph output', 'Result rows only; this rule does not publish objects or connections.');
+        }
+        if (processing.reachability) {
+          const reach = processing.reachability;
+          entry(facts, 'Reachability', 'Direction: ' + reach.direction
+            + '; connections: ' + describe(reach.relationships)
+            + '; object kinds: ' + (reach.node_kinds && reach.node_kinds.length ? describe(reach.node_kinds) : 'unrestricted')
+            + '; include starting object: ' + (reach.include_start ? 'yes' : 'no')
+            + '; expand result rows: ' + (reach.expand_results ? 'yes' : 'no')
+            + '; reject cycles: ' + (reach.reject_cycles ? 'yes' : 'no'));
+        }
+        if (processing.group_overlap) {
+          entry(facts, 'Group overlap', 'Membership rows from ' + processing.group_overlap.memberships);
+        }
+        if (processing.batch_dependency) {
+          entry(facts, 'Batch prerequisite', processing.batch_dependency);
+        }
+        const button = element('button', 'Download query');
+        button.onclick = () => download(query.name, query.text);
+        container.append(facts, button, element('h3', 'Full Cypher query'), element('pre', query.text));
+        return container;
+      }
+
+      function renderTable() {
+        const rows = byID('rule-rows');
+        rows.replaceChildren();
+        const visible = visibleQueries();
+        byID('rule-count').textContent = visible.length + ' of ' + queries(displayedPlan()).length + ' rules';
+        for (const query of visible) {
+          const row = element('tr'), choiceCell = element('td'), choice = element('input');
+          choice.type = 'checkbox';
+          choice.dataset.selectRule = query.name;
+          choice.checked = selected.has(query.name);
+          choice.setAttribute('aria-label', 'Select ' + query.name);
+          choice.onchange = () => {
+            if (choice.checked) {
+              selected.add(query.name);
+            } else {
+              selected.delete(query.name);
+            }
+            updateButtons();
+          };
+          choiceCell.append(choice);
+          const nameCell = element('td'), expand = element('button', (expanded.has(query.name) ? '▾ ' : '▸ ') + query.name, 'rule-name');
+          expand.setAttribute('aria-expanded', String(expanded.has(query.name)));
+          expand.onclick = () => {
+            if (expanded.has(query.name)) {
+              expanded.delete(query.name);
+            } else {
+              expanded.add(query.name);
+            }
+            renderTable();
+          };
+          nameCell.append(expand);
+          const stateCell = element('td', query.disabled_reason || (query.enabled === false ? 'Disabled' : 'Enabled'), 'rule-state');
+          let date = query.added_at ? new Date(query.added_at).toLocaleString() : (pending && !Object.hasOwn(active.files, query.name) ? 'On activation' : 'Not recorded');
+          const actions = element('td'), explicitlyDisabled = (active.disabled || []).includes(query.name), toggle = element('button', explicitlyDisabled ? 'Enable' : 'Disable');
+          toggle.dataset.ruleAction = query.name;
+          toggle.onclick = () => ruleAction(explicitlyDisabled ? 'enable' : 'disable', [query.name]);
+          const trash = element('button', undefined, 'trash');
+          trash.dataset.ruleAction = query.name;
+          trash.setAttribute('aria-label', 'Delete ' + query.name);
+          trash.title = 'Delete ' + query.name;
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'), path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          svg.setAttribute('viewBox', '0 0 24 24');
+          svg.setAttribute('aria-hidden', 'true');
+          path.setAttribute('d', 'M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 10v8M14 10v8');
+          svg.append(path);
+          trash.append(svg);
+          trash.onclick = () => ruleAction('remove', [query.name]);
+          const actionButtons = element('div', undefined, 'rule-actions');
+          actionButtons.append(toggle, trash);
+          actions.append(actionButtons);
+          row.append(choiceCell, element('td', String(query.order)), nameCell, element('td', 'Stage ' + query.stage), element('td', date), element('td', query.extension_name || query.extension || 'Not recorded'), stateCell, actions);
+          rows.append(row);
+          if (expanded.has(query.name)) {
+            const detailRow = element('tr'), detailCell = element('td', undefined, 'detail-cell');
+            detailCell.colSpan = 8;
+            detailCell.append(detailsFor(query));
+            detailRow.append(detailCell);
+            rows.append(detailRow);
+          }
+        }
+        if (!visible.length) {
+          const row = element('tr'), cell = element('td', 'No rules match this view.');
+          cell.colSpan = 8;
+          row.append(cell);
+          rows.append(row);
+        }
+        for (const button of document.querySelectorAll('[data-sort]')) {
+          button.parentElement.setAttribute('aria-sort', button.dataset.sort === sortKey ? (sortDirection === 1 ? 'ascending' : 'descending') : 'none');
+        }
+        updateButtons();
+      }
+
+      function renderStatus(status) {
+        byID('status').textContent = JSON.stringify(status, null, 2);
+        const state = status.state || status.status || (status.running ? 'running' : 'No analysis is running');
+        byID('analysis-state').replaceChildren(element('span', undefined, state === 'running' ? 'spinner' : 'status-light'), document.createTextNode('Latest extension report: ' + state));
+      }
+
+      async function readSnapshot() {
+        const [bundle, plan, status] = await Promise.all([call('rules').catch(error => {
+            if (error.status === 404 && error.message === 'no active rule bundle') {
+              return { revision: '', files: {}, disabled: [] };
+            }
+            throw error;
+          }), call('plan'), loadStatus(), refreshNativeStatus()]);
+        if (bundle.revision !== plan.revision) {
+          throw Error('The active revision changed while loading. Refresh to load the complete plan.');
+        }
+        active = bundle;
+        activePlan = plan;
+        loaded = true;
+        selected.clear();
+        renderSchemas();
+        renderFilter();
+        renderTable();
+        renderStatus(status);
+      }
+
+      async function refresh() {
+        if (busy) {
+          return;
+        }
+        busy = true;
+        loaded = false;
+        discardPreview();
+        message('Refreshing rules and analysis status…', true);
+        updateButtons();
+        try {
+          await readSnapshot();
+          message('Rules and analysis status are up to date.');
+        } catch (error) {
+          message(error.message);
+        } finally {
+          busy = false;
+          updateButtons();
+        }
+      }
+
+      function chooseOverwrite(name) {
+        const dialog = byID('overwrite-dialog');
+        byID('overwrite-name').textContent = name;
+        byID('overwrite-effect').textContent = name.endsWith('.json')
+          ? 'This replaces this extension’s schema definitions. Review the resulting rule list before activation.'
+          : 'This replaces the full query and its declared inputs and the rules it needs.';
+        return new Promise(resolve => {
+          const finish = action => {
+            dialog.close();
+            dialog.removeEventListener('cancel', cancel);
+            resolve(action);
+          };
+          const cancel = event => {
+            event.preventDefault();
+            finish('cancel');
+          };
+          byID('overwrite-file').onclick = () => finish('overwrite');
+          byID('skip-file').onclick = () => finish('skip');
+          byID('cancel-upload').onclick = () => finish('cancel');
+          dialog.addEventListener('cancel', cancel);
+          dialog.showModal();
+        });
+      }
+      // Preview validates the change without saving it and replaces the table with proposed rules.
+      function showPreview(change, review) {
+        pending = { change, review };
+        selected.clear();
+        renderFilter();
+        renderTable();
+        byID('table-title').textContent = 'Proposed rules';
+        byID('review-revisions').textContent = 'Based on: ' + (review.base_revision || 'no active revision') + '\nProposed revision: ' + review.revision;
+        const changes = byID('review-changes');
+        changes.replaceChildren();
+        entry(changes, 'New files', describe(Object.keys(change.files || {}).filter(name => !Object.hasOwn(active.files, name)).sort()));
+        entry(changes, 'Overwritten files', describe(review.overwritten));
+        entry(changes, 'All deleted files', describe(review.removed));
+        entry(changes, 'Disabled rules', describe(review.disabled));
+        entry(changes, 'Enabled rules', describe(review.enabled));
+        entry(changes, 'Connections to delete', describe(review.retired_relationships) + '. Connections owned by deleted rules are deleted after the next successful analysis. Supporting objects stay in the graph.');
+        byID('review').hidden = false;
+      }
+
+      async function previewUpload() {
+        if (busy || !loaded || pending) {
+          return;
+        }
+        busy = true;
+        message('Reading uploaded files and validating the proposed rules…', true);
+        updateButtons();
+        try {
+          const uploads = Array.from(byID('files').files);
+          if (uploads.length > 32) {
+            throw Error('Select at most 32 files.');
+          }
+          const files = {}, overwrite = [], seen = new Set();
+          for (const file of uploads) {
+            if (file.name !== 'schema.json' && !/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\.schema\.json|\.cypher)$/.test(file.name)) {
+              throw Error('Use schema.json, extension_name.schema.json, or snake_case.cypher filenames.');
+            }
+            if (seen.has(file.name)) {
+              throw Error('Duplicate filename: ' + file.name);
+            }
+            seen.add(file.name);
+            if (file.size > 1048576) {
+              throw Error('File exceeds 1 MiB: ' + file.name);
+            }
+            const contents = await file.text();
+            if (Object.hasOwn(active.files, file.name)) {
+              if (active.files[file.name] === contents) {
+                continue;
+              }
+              const choice = await chooseOverwrite(file.name);
+              if (choice === 'cancel') {
+                message('Upload review cancelled.');
+                return;
+              }
+              if (choice === 'skip') {
+                continue;
+              }
+              overwrite.push(file.name);
+            }
+            files[file.name] = contents;
+          }
+          if (!Object.keys(files).length) {
+            throw Error('Select new or changed files to upload.');
+          }
+          const change = { base_revision: active.revision, files, overwrite };
+          if (new TextEncoder().encode(JSON.stringify(change)).length > 4194304) {
+            throw Error('Upload exceeds 4 MiB.');
+          }
+          showPreview(change, await call('preview', 'POST', change));
+          message('Review the proposed rules, then activate this revision.');
+        } catch (error) {
+          discardPreview();
+          message(error.message + (error.status === 409 ? ' Refresh and review your changes again.' : ''));
+        } finally {
+          busy = false;
+          updateButtons();
+        }
+      }
+      // Show every affected rule before a delete, disable, or enable change can be saved.
+      function confirmAction(action, names, review) {
+        const dialog = byID('confirm-dialog'), deleting = action === 'remove';
+        byID('confirm-title').textContent = deleting ? 'Delete these rules?' : action === 'disable' ? 'Disable these rules?' : 'Enable these rules?';
+        byID('confirm-description').textContent = deleting
+          ? 'This deletes the listed files, including dependent rules and supporting rules that are no longer needed. Connections owned by deleted rules will be deleted on the next successful analysis. Supporting objects will stay in the graph.'
+          : action === 'disable'
+            ? 'These rules will stop running. Their files and existing graph results will stay. Rules that need them will pause too.'
+            : 'These rules can run again on the next analysis. A rule still waits if one of the rules it needs remains disabled.';
+        byID('confirm-names').textContent = (deleting ? 'All files to delete: ' : 'Selected rules: ') + describe(deleting ? review.removed : names);
+        const paused = queries(review.plan).filter(query => query.disabled_reason);
+        const pausedRules = byID('confirm-paused-rules');
+        pausedRules.replaceChildren();
+        byID('confirm-paused').hidden = deleting || !paused.length;
+        // Use text nodes so names and reasons from uploaded rules stay literal text.
+        if (!deleting) {
+          for (const query of paused) {
+            const item = element('li');
+            item.append(element('strong', query.name), element('span', query.disabled_reason, 'muted'));
+            pausedRules.append(item);
+          }
+        }
+        byID('confirm-change').textContent = deleting ? 'Delete rules' : action === 'disable' ? 'Disable rules' : 'Enable rules';
+        return new Promise(resolve => {
+          const finish = answer => {
+            dialog.close();
+            dialog.removeEventListener('cancel', cancel);
+            resolve(answer);
+          };
+          const cancel = event => {
+            event.preventDefault();
+            finish(false);
+          };
+          byID('confirm-change').onclick = () => finish(true);
+          byID('cancel-change').onclick = () => finish(false);
+          dialog.addEventListener('cancel', cancel);
+          dialog.showModal();
+        });
+      }
+
+      async function ruleAction(action, names) {
+        if (busy || !loaded || pending || !names.length) {
+          return;
+        }
+        busy = true;
+        message('Checking how this change affects the rules…', true);
+        updateButtons();
+        try {
+          const change = { base_revision: active.revision, [action]: names };
+          const review = await call('preview', 'POST', change);
+          showPreview(change, review);
+          message('Review the affected rules before confirming.');
+          if (await confirmAction(action, names, review)) {
+            await activatePending();
+          } else {
+            discardPreview();
+            message('Change cancelled.');
+          }
+        } catch (error) {
+          discardPreview();
+          message(error.message + (error.status === 409 ? ' Refresh and review your changes again.' : ''));
+        } finally {
+          busy = false;
+          updateButtons();
+        }
+      }
+      // Save only the reviewed revision; the service rejects a preview based on stale rules.
+      async function activatePending() {
+        if (!pending) {
+          return;
+        }
+        message('Activating the reviewed revision…', true);
+        const bundle = await call('rules', 'PUT', { ...pending.change, confirm_revision: pending.review.revision });
+        pending = null;
+        byID('review').hidden = true;
+        byID('table-title').textContent = 'Rules';
+        byID('files').value = '';
+        await readSnapshot();
+        message('Revision ' + bundle.revision + ' activated. New settings apply to the next analysis. Deleted connections are cleared after its next successful run.');
+      }
+
+      async function activate() {
+        if (busy || !pending) {
+          return;
+        }
+        busy = true;
+        updateButtons();
+        try {
+          await activatePending();
+        } catch (error) {
+          discardPreview();
+          message(error.message + (error.status === 409 ? ' Refresh and review your changes again.' : ''));
+        } finally {
+          busy = false;
+          updateButtons();
+        }
+      }
+
+      byID('refresh').onclick = refresh;
+      byID('run-analysis').onclick = runAnalysis;
+      byID('preview').onclick = previewUpload;
+      byID('activate').onclick = activate;
+      byID('cancel-preview').onclick = () => {
+        discardPreview();
+        message('Preview discarded.');
+      };
+      byID('files').onchange = () => {
+        if (pending) {
+          discardPreview();
+        }
+      };
+      byID('token').oninput = () => {
+        loaded = false;
+        discardPreview();
+      };
+      byID('extension-filter').onchange = () => {
+        selected.clear();
+        renderTable();
+      };
+      // Select all includes only visible rows. Changing the filter clears the selection.
+      byID('select-all').onchange = event => {
+        selected.clear();
+        if (event.target.checked) {
+          for (const query of visibleQueries()) {
+            selected.add(query.name);
+          }
+        }
+        updateButtons();
+      };
+      for (const button of document.querySelectorAll('[data-sort]')) {
+        button.onclick = () => {
+          if (sortKey === button.dataset.sort) {
+            sortDirection *= -1;
+          } else {
+            sortKey = button.dataset.sort;
+            sortDirection = 1;
+          }
+          renderTable();
+        };
+      }
+      byID('delete-selected').onclick = () => ruleAction('remove', [...selected]);
+      byID('disable-selected').onclick = () => ruleAction('disable', [...selected]);
+      byID('enable-selected').onclick = () => ruleAction('enable', [...selected]);
+
+      setInterval(async () => {
+        if (busy || polling || !loaded) {
+          return;
+        }
+        polling = true;
+        updateButtons();
+        byID('analysis-state').replaceChildren(element('span', undefined, 'spinner'), document.createTextNode('Checking status…'));
+        byID('analysis-state').setAttribute('aria-busy', 'true');
+        try {
+          const [status] = await Promise.all([loadStatus(), refreshNativeStatus()]);
+          renderStatus(status);
+        } catch (error) {
+          byID('analysis-state').textContent = 'Status refresh failed: ' + error.message;
+        } finally {
+          polling = false;
+          byID('analysis-state').setAttribute('aria-busy', 'false');
+          updateButtons();
+        }
+      }, 10000);
+
+      (async function initialize() {
+        busy = true;
+        message('Connecting to the rule service…', true);
+        updateButtons();
+        try {
+          const response = await fetch('/v1/browser-mode', { headers: { 'Content-Type': 'application/json' } });
+          if (!response.ok) {
+            throw Error('Cannot read browser access mode: HTTP ' + response.status);
+          }
+          const mode = await response.json();
+          localUI = mode.local_ui === true;
+          byID('auth').hidden = localUI;
+          if (!localUI) {
+            message('Enter your bearer token, then refresh to load the rules.');
+          }
+        } catch (error) {
+          byID('auth').hidden = false;
+          message(error.message);
+        } finally {
+          busy = false;
+          updateButtons();
+        }
+        if (localUI) {
+          await refresh();
+        }
+      })();
+    </script>
+  </body>
+</html>

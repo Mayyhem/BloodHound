@@ -1,0 +1,127 @@
+{
+  "date": "2026-10-08",
+  "scope": "Optional single-process Community Edition integration with a persistent rule registry; small synthetic graphs, not a production-scale benchmark.",
+  "native_reference_commit": "2cb6dbd37738ffe31e34e1729b3638f3887a93e9",
+  "images": {
+    "extension_enabled_bloodhound": "sha256:12cd5c1db357c1ac525f4d6e67d204ac52c77507ac615c939206add8d66e0706",
+    "rule_registry": "sha256:f89b0d7d7c542ffe538c4339b2dc20c32d3986270320daf380c063e926cef988",
+    "native_binary_sha256": "ec1990186e02e061d60994199b34e129231dea8ac1d4e2c6e2b31447db555a1a",
+    "registry_binary_sha256": "9868d268d13f2ad0afb58ec21ddeba29a6f783b904152b51441335779d24b2af"
+  },
+  "neo4j": {
+    "workflow": {
+      "phases": [
+        "baseline",
+        "keep-existing",
+        "write-query-rejected",
+        "replace-existing",
+        "runtime-failure-retained-results",
+        "restored-valid-rules"
+      ],
+      "read_count": 633,
+      "read_errors": 0,
+      "reads_overlapping_rules": {
+        "graph": 26,
+        "ui": 24
+      },
+      "state": "success"
+    },
+    "evidence_directory": "work/persistent-neo/check-final",
+    "registry_restart_preserved_rules_and_status": true
+  },
+  "postgresql": {
+    "core_workflow": {
+      "state": "passed",
+      "phases": [
+        "baseline",
+        "keep-existing",
+        "write-query-rejected",
+        "replace-existing",
+        "runtime-failure-retained-results",
+        "restored-valid-rules"
+      ],
+      "expected_esc1_pairs": 11,
+      "evidence_directory": "work/persistent-pg/check-paths"
+    },
+    "core_and_first_opengraph_attempt_reads": {
+      "read_count": 375,
+      "read_errors": 0,
+      "reads_overlapping_rules": {
+        "graph": 41,
+        "ui": 41
+      }
+    },
+    "first_opengraph_attempt": {
+      "state": "failed test assertion",
+      "reason": "Native job did not complete all 2 files without failures",
+      "native_job_id": 7,
+      "reported_total_files": 1,
+      "uploaded_files": 2,
+      "extension_result": "success; 11 ESC1 connections and one vault connection",
+      "evidence_directory": "work/persistent-pg/check-paths/opengraph-baseline"
+    },
+    "opengraph_separate_uploads": {
+      "workflow": {
+        "phases": [
+          "opengraph-directory",
+          "opengraph-baseline",
+          "opengraph-no-support",
+          "opengraph-restored"
+        ],
+        "read_count": 208,
+        "read_errors": 0,
+        "reads_overlapping_rules": {
+          "graph": 22,
+          "ui": 18
+        },
+        "state": "success"
+      },
+      "vault_pair_counts": [
+        1,
+        0,
+        1
+      ],
+      "esc1_pairs_each_phase": 11,
+      "evidence_directory": "work/persistent-pg/opengraph-separate"
+    }
+  },
+  "checks": {
+    "full_poc_unit_and_race": "passed; work/persistent-complete-final-unit.log",
+    "poc_vet": "passed; work/persistent-final-vet.log",
+    "native_adapters_both_backends": "passed with race detection; 26 direct ESC1 fixtures each, all edge policies, exact numbers, actual gate/read availability, rollback; work/native-adapter-final-live.log",
+    "native_pipeline_and_tool_coordination": "passed; work/native-hook-coordination-race.log",
+    "native_raw_purge_gate": "passed; work/native-delete-gate-final.log",
+    "actual_commit_reporting": "passed; work/native-final-report-unit.log",
+    "dawgs_fresh_full_unit_and_race": "passed; work/native-dawgs-unit.log",
+    "dawgs_statement_coverage_percent": 62.95134818288394,
+    "dawgs_covered_statements": 21479,
+    "dawgs_total_statements": 34120,
+    "upload_browser": "six checks passed; work/rule-upload-browser/verification.json",
+    "maintained_file_inventory": "171 files, local README links and source syntax pass; work/persistent-final-file-checks-after-docs.log"
+  },
+  "preserved_failures": [
+    "Early inspection scripts used a reserved Cypher variable and could not parse Go nanosecond timestamps on Python 3.10; the script was corrected and the Neo4j workflow rerun.",
+    "The PostgreSQL API rejects the test scalar map projection with a missing SQL table alias. Normal path responses verify complete IDs and properties without broadening DAWGS.",
+    "A mixed classic/OpenGraph upload returned an incorrect total file count. The exact count assertion was retained; separate one-file jobs passed.",
+    "The broader native v2 race run exposed a shared mock slice race in unchanged ListKinds handler/tests. It was left outside this change; work/native-delete-gate-tests.log."
+  ],
+  "limits": [
+    "Only one CE application process is coordinated; other applications and direct database writers are not.",
+    "Reads bypass coordination, but database locks and processing load may delay them. Application graph writes wait during native analysis and extension calculation.",
+    "No 100-million-edge benchmark, Enterprise integration, hard database-memory bound, or real lost-commit-acknowledgement fault injection is claimed.",
+    "One active schema bundle supports multiple managed kinds. Existing producers cannot be removed or reassigned through uploads.",
+    "Schema records, indexes and kind catalog preparation are separate from the all-or-nothing helper, edge and run-record changes.",
+    "On an uncertain commit, further writes stop until the operator inspects the run record and restarts the application.",
+    "The registry restart was tested on Neo4j; PostgreSQL OpenGraph changes used separate native upload jobs after the mixed-file accounting failure.",
+    "The unchanged control images and private-ZIP comparisons remain earlier independent evidence. This run did not re-import the private ZIP."
+  ],
+  "final_running_state": {
+    "extension_app": "http://127.0.0.1:28080/",
+    "rule_upload_page": "http://127.0.0.1:18081/",
+    "backend": "neo4j",
+    "expected_native_and_extension_pairs": 11,
+    "original_app_18080_and_new_app_ui_http": 200,
+    "postgresql_demo": "stopped; separate database and combined rule bundle preserved",
+    "evidence": "work/persistent-neo/final-health.json"
+  }
+}

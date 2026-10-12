@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"strings"
 
 	"log"
 	"log/slog"
@@ -51,6 +52,20 @@ func NewDaemon[DBType database.Database](ctx context.Context, connections bootst
 		toolContainer = tools.NewToolContainer(connections.RDMS)
 		ingestControl = tools.NewIngestControlTool(connections.RDMS, retainedFileService)
 	)
+	// These maintenance operations use separate database connections and can
+	// continue after their HTTP request ends. They cannot share the extension
+	// writer gate, so require a restart with extension processing disabled.
+	if cfg.PostProcessing.URL != "" {
+		router.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+				if request.Method == http.MethodPut && (strings.HasPrefix(request.URL.Path, "/graph-db/switch/") || strings.HasPrefix(request.URL.Path, "/pg-migration/")) {
+					http.Error(response, "Disable extension processing and restart before switching or migrating graph databases.", http.StatusConflict)
+					return
+				}
+				next.ServeHTTP(response, request)
+			})
+		})
+	}
 
 	router.Mount("/metrics", promhttp.Handler())
 

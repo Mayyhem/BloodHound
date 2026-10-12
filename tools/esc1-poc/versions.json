@@ -1,0 +1,9 @@
+{
+  "bloodhound_commit": "2cb6dbd37738ffe31e34e1729b3638f3887a93e9",
+  "bloodhound_image": "esc1-poc-bloodhound:2cb6dbd37738ffe31e34e1729b3638f3887a93e9",
+  "neo4j_image": "docker.io/library/neo4j:4.4.42@sha256:73b5a47eb9952f47fcc42fcc80bdd6bd0d6b71eea9a1a345c216675498c790e4",
+  "neo4j_go_driver": "v5.28.4",
+  "go": "1.27.1",
+  "postgres_image": "docker.io/library/postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+  "bloodhound_image_id": "sha256:f717a1d92bd7a44e04cee88c15df013e0143e303f514eaf8aeacce5494c71f1a"
+}

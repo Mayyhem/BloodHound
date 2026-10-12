@@ -1,0 +1,92 @@
+{
+  "scope": "Single proposed OpenGraph definition, offline model viewer, and existing CE Neo4j lab. The endpoint and processing additions are not official BloodHound fields.",
+  "browser": {
+    "checked_at_utc": "2026-10-08T02:58:08.095514+00:00",
+    "checks": [
+      {
+        "model": "esc1",
+        "triples": 4,
+        "nodes": 7,
+        "arrows": 4
+      },
+      {
+        "model": "vault",
+        "triples": 2,
+        "nodes": 5,
+        "arrows": 2
+      },
+      {
+        "model": "synthetic",
+        "triples": 4,
+        "parallel_relationships": 2,
+        "self_loops": 1,
+        "safe_import_and_embedding": true,
+        "invalid_import_keeps_previous_model": true
+      }
+    ],
+    "network_requests": [],
+    "browser_errors": [],
+    "tested_controls": [
+      "search",
+      "traversability filters",
+      "relationship details",
+      "type details",
+      "zoom",
+      "fit",
+      "pan",
+      "drag types",
+      "import resets filters",
+      "invalid import retains model"
+    ],
+    "snapshot_sha256": {
+      "model.html": "b6e0bd9b3f77e9056e8aa371ea58d9329fe6de5430158454d697bc6bd535f51c",
+      "examples/vault/model.html": "36627ce1f4d4f8039c27219a5c116b9679f52317ced7a8b8aebd1ff2bb6fec60"
+    },
+    "passed": true
+  },
+  "go_checks": {
+    "unit_and_real_neo4j_tests": "passed",
+    "checks_log": "work/schema-checks.log",
+    "vet_with_integration_tag": "passed",
+    "exact_pair_rejection_preserves_full_graph": "passed",
+    "multiple_node_labels_require_one_complete_allowed_pair": "passed"
+  },
+  "container": {
+    "image": "sha256:6371d6f9aa191de20fdd1530f405f7cf75844efc109aac280eb437a25c58ef10",
+    "reports_directory": "work/schema-demo",
+    "commands_verified": [
+      "plan",
+      "model",
+      "schema",
+      "run",
+      "compare"
+    ],
+    "both_example_schemas_registered": true,
+    "host_and_container_html_identical": true,
+    "relationship_ids_and_properties_retained": true,
+    "helpers_and_collected_kinds_unchanged": true,
+    "native_esc1_comparison": {
+      "missing": [],
+      "extra": []
+    },
+    "runs": [
+      {
+        "example": "vault",
+        "committed": true,
+        "relationships_added": 0,
+        "relationships_removed": 0,
+        "relationships_unchanged": 1,
+        "helpers_changed": 0
+      },
+      {
+        "example": "esc1",
+        "committed": true,
+        "relationships_added": 0,
+        "relationships_removed": 0,
+        "relationships_unchanged": 1,
+        "helpers_changed": 0
+      }
+    ]
+  },
+  "limits": "The private lab archive and complete arrival-order demonstrations were verified earlier; they were not repeated for this schema-only change. Current registration strips proposed fields; native BloodHound does not enforce them. The viewer includes only the types and pairs declared by its supplied definition."
+}

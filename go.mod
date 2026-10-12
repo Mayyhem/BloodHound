@@ -20,6 +20,13 @@ go 1.27.1
 // This is required for goose as the ydb driver that is used by including it as a tool uses an extremely old build
 replace google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 => google.golang.org/genproto v0.0.0-20260622175928-b703f567277d
 
+// Local proof of concept. Both folders must accompany this review.
+replace github.com/specterops/bloodhound/tools/esc1-poc => ./tools/esc1-poc
+
+replace github.com/specterops/dawgs => ./tools/DAWGS
+
+require github.com/specterops/bloodhound/tools/esc1-poc v0.0.0
+
 require (
 	cuelang.org/go v0.17.0
 	github.com/Masterminds/semver/v3 v3.5.0

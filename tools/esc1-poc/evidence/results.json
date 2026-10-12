@@ -1,0 +1,228 @@
+{
+  "versions": {
+    "bloodhound_commit": "2cb6dbd37738ffe31e34e1729b3638f3887a93e9",
+    "bloodhound_image": "esc1-poc-bloodhound:2cb6dbd37738ffe31e34e1729b3638f3887a93e9",
+    "neo4j_image": "docker.io/library/neo4j:4.4.42@sha256:73b5a47eb9952f47fcc42fcc80bdd6bd0d6b71eea9a1a345c216675498c790e4",
+    "neo4j_go_driver": "v5.28.4",
+    "go": "1.27.1",
+    "postgres_image": "docker.io/library/postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+    "bloodhound_image_id": "sha256:f717a1d92bd7a44e04cee88c15df013e0143e303f514eaf8aeacce5494c71f1a"
+  },
+  "description": "Observed local runs. Times cover calculation and publication only. Memory covers the runner process, not database containers. Private graph identifiers are omitted. These small samples do not establish large graph performance.",
+  "native_scenarios": 16,
+  "private_collection_records": 397,
+  "private_collection_files": 13,
+  "both_arrival_orders_match": true,
+  "bloodhound_browser_inspection": {
+    "relationship_visible": true,
+    "helper_visible": true,
+    "screenshots": [
+      "bloodhound-relationship.png",
+      "bloodhound-helper.png"
+    ],
+    "data": "Synthetic demonstration only"
+  },
+  "final_checks": {
+    "all_packages_with_database_tests": "passed",
+    "go_vet_with_database_tests": "passed",
+    "log": "work/opengraph-checks.log"
+  },
+  "human_authoring_effort": "not measured",
+  "measurements": [
+    {
+      "case": "demo/one-support.json",
+      "committed": true,
+      "native_pairs_match": true,
+      "desired_pairs": 1,
+      "calculation_nanoseconds": 41453572,
+      "peak_process_memory_kib": 12480,
+      "query_files": 5,
+      "query_rows": {
+        "domain_helpers.cypher": 1,
+        "eligible_templates.cypher": 1,
+        "esc1.cypher": 1,
+        "membership.cypher": 23,
+        "trusted_cas.cypher": 1
+      },
+      "graph_objects_changed": 1,
+      "relationships_added": 0,
+      "relationships_removed": 0,
+      "relationships_unchanged": 1
+    },
+    {
+      "case": "demo/baseline.json",
+      "committed": true,
+      "native_pairs_match": true,
+      "desired_pairs": 1,
+      "calculation_nanoseconds": 49331149,
+      "peak_process_memory_kib": 12128,
+      "query_files": 5,
+      "query_rows": {
+        "domain_helpers.cypher": 1,
+        "eligible_templates.cypher": 1,
+        "esc1.cypher": 1,
+        "membership.cypher": 23,
+        "trusted_cas.cypher": 1
+      },
+      "graph_objects_changed": 1,
+      "relationships_added": 0,
+      "relationships_removed": 0,
+      "relationships_unchanged": 1
+    },
+    {
+      "case": "demo/two-templates.json",
+      "committed": true,
+      "native_pairs_match": true,
+      "desired_pairs": 1,
+      "calculation_nanoseconds": 70896152,
+      "peak_process_memory_kib": 12608,
+      "query_files": 5,
+      "query_rows": {
+        "domain_helpers.cypher": 1,
+        "eligible_templates.cypher": 2,
+        "esc1.cypher": 1,
+        "membership.cypher": 23,
+        "trusted_cas.cypher": 1
+      },
+      "graph_objects_changed": 1,
+      "relationships_added": 0,
+      "relationships_removed": 0,
+      "relationships_unchanged": 1
+    },
+    {
+      "case": "demo/no-support.json",
+      "committed": true,
+      "native_pairs_match": true,
+      "desired_pairs": 0,
+      "calculation_nanoseconds": 42124770,
+      "peak_process_memory_kib": 11264,
+      "query_files": 5,
+      "query_rows": {
+        "domain_helpers.cypher": 1,
+        "eligible_templates.cypher": 0,
+        "esc1.cypher": 0,
+        "membership.cypher": 23,
+        "trusted_cas.cypher": 1
+      },
+      "graph_objects_changed": 2,
+      "relationships_added": 0,
+      "relationships_removed": 1,
+      "relationships_unchanged": 0
+    },
+    {
+      "case": "demo/restored.json",
+      "committed": true,
+      "native_pairs_match": true,
+      "desired_pairs": 1,
+      "calculation_nanoseconds": 49011449,
+      "peak_process_memory_kib": 11616,
+      "query_files": 5,
+      "query_rows": {
+        "domain_helpers.cypher": 1,
+        "eligible_templates.cypher": 1,
+        "esc1.cypher": 1,
+        "membership.cypher": 23,
+        "trusted_cas.cypher": 1
+      },
+      "graph_objects_changed": 2,
+      "relationships_added": 1,
+      "relationships_removed": 0,
+      "relationships_unchanged": 0
+    },
+    {
+      "case": "demo/unchanged.json",
+      "committed": true,
+      "native_pairs_match": true,
+      "desired_pairs": 1,
+      "calculation_nanoseconds": 38780455,
+      "peak_process_memory_kib": 11008,
+      "query_files": 5,
+      "query_rows": {
+        "domain_helpers.cypher": 1,
+        "eligible_templates.cypher": 1,
+        "esc1.cypher": 1,
+        "membership.cypher": 23,
+        "trusted_cas.cypher": 1
+      },
+      "graph_objects_changed": 1,
+      "relationships_added": 0,
+      "relationships_removed": 0,
+      "relationships_unchanged": 1
+    },
+    {
+      "case": "native-20261007-204519/report.json",
+      "committed": true,
+      "native_pairs_match": true,
+      "desired_pairs": 7,
+      "calculation_nanoseconds": 1421689117,
+      "peak_process_memory_kib": 13344,
+      "query_files": 5,
+      "query_rows": {
+        "domain_helpers.cypher": 16,
+        "eligible_templates.cypher": 10,
+        "esc1.cypher": 7,
+        "membership.cypher": 336,
+        "trusted_cas.cypher": 12
+      },
+      "graph_objects_changed": 24,
+      "relationships_added": 7,
+      "relationships_removed": 0,
+      "relationships_unchanged": 0
+    },
+    {
+      "case": "lab-20261007-204253/report.json",
+      "committed": true,
+      "native_pairs_match": true,
+      "desired_pairs": 2,
+      "calculation_nanoseconds": 4521333093,
+      "peak_process_memory_kib": 14752,
+      "query_files": 5,
+      "query_rows": {
+        "domain_helpers.cypher": 1,
+        "eligible_templates.cypher": 3,
+        "esc1.cypher": 2,
+        "membership.cypher": 419,
+        "trusted_cas.cypher": 1
+      },
+      "graph_objects_changed": 4,
+      "relationships_added": 2,
+      "relationships_removed": 0,
+      "relationships_unchanged": 0
+    },
+    {
+      "case": "lab-20261007-204253/unchanged.json",
+      "committed": true,
+      "native_pairs_match": true,
+      "desired_pairs": 2,
+      "calculation_nanoseconds": 438296613,
+      "peak_process_memory_kib": 12576,
+      "query_files": 5,
+      "query_rows": {
+        "domain_helpers.cypher": 1,
+        "eligible_templates.cypher": 3,
+        "esc1.cypher": 2,
+        "membership.cypher": 420,
+        "trusted_cas.cypher": 1
+      },
+      "graph_objects_changed": 1,
+      "relationships_added": 0,
+      "relationships_removed": 0,
+      "relationships_unchanged": 2
+    }
+  ],
+  "private_lab_recheck_after_opengraph": {
+    "passed": true,
+    "reports_directory": "work/lab-20261007-220122",
+    "log": "work/lab-recheck-after-opengraph.log",
+    "desired_pairs": 2,
+    "native_missing_pairs": 0,
+    "native_extra_pairs": 0,
+    "repeat_relationships_added": 0,
+    "repeat_relationships_removed": 0,
+    "repeat_relationships_unchanged": 2,
+    "final_comparison_matches": true,
+    "first_calculation_nanoseconds": 3987751426,
+    "repeat_calculation_nanoseconds": 252671798,
+    "data": "The same authorized private SharpHound archive; no private graph identifiers included."
+  }
+}

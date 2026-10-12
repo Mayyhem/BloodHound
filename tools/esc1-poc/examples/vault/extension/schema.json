@@ -1,0 +1,69 @@
+{
+  "schema": {
+    "name": "vault_poc",
+    "display_name": "Vault account identity processing example",
+    "version": "v1.0.0",
+    "namespace": "PoC_Vault"
+  },
+  "node_kinds": [
+    {
+      "name": "PoC_Vault_Container",
+      "display_name": "Synthetic vault",
+      "description": "A collected vault container whose accounts may correspond to directory users.",
+      "is_display_kind": true,
+      "icon": "vault",
+      "color": "#5965D8"
+    },
+    {
+      "name": "PoC_Vault_Account",
+      "display_name": "Synthetic vault account",
+      "description": "A collected account containing a directory user SID.",
+      "is_display_kind": true,
+      "icon": "key",
+      "color": "#5965D8"
+    },
+    {
+      "name": "PoC_Vault_Base",
+      "display_name": "Synthetic vault source",
+      "description": "The custom source kind attached to collected vault objects. It is separate from native AD Base.",
+      "is_display_kind": false,
+      "icon": "database",
+      "color": "#5965D8"
+    },
+    {
+      "name": "PoC_Vault_Helper",
+      "display_name": "Vault processing helper",
+      "description": "An owned summary of the collected vault, published atomically with calculated account identity relationships.",
+      "is_display_kind": true,
+      "icon": "flask",
+      "color": "#5965D8"
+    }
+  ],
+  "relationship_kinds": [
+    {
+      "name": "PoC_Vault_ContainsAccount",
+      "description": "Collected evidence that a vault contains an account.",
+      "is_traversable": false,
+      "endpoints": [
+        {
+          "source_kind": "PoC_Vault_Container",
+          "target_kind": "PoC_Vault_Account"
+        }
+      ]
+    },
+    {
+      "name": "PoC_Vault_HasAccountFor",
+      "description": "Calculated association with a directory user whose SID matches an account contained in this vault.",
+      "is_traversable": false,
+      "endpoints": [
+        {
+          "source_kind": "PoC_Vault_Container",
+          "target_kind": "User"
+        }
+      ]
+    }
+  ],
+  "external_node_kinds": [
+    "User"
+  ]
+}

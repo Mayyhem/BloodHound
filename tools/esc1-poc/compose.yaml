@@ -1,0 +1,109 @@
+# Copyright 2026 Specter Ops, Inc.
+#
+# Licensed under the Apache License, Version 2.0
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# This stack is only for this experiment. Its data lives in ./work rather than
+# Docker's shared data volumes. Docker itself still needs its normal image and
+# container storage. Image downloads and stack startup are separate steps.
+name: esc1-poc
+services:
+  app-db:
+    image: docker.io/library/postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    pull_policy: never
+    environment:
+      POSTGRES_USER: bloodhound
+      POSTGRES_PASSWORD: experiment-only
+      POSTGRES_DB: bloodhound
+    volumes:
+      - ${POC_DATA_DIR:-./work}/postgres:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U bloodhound -d bloodhound"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  graph-db:
+    image: docker.io/library/neo4j:4.4.42@sha256:73b5a47eb9952f47fcc42fcc80bdd6bd0d6b71eea9a1a345c216675498c790e4
+    pull_policy: never
+    environment:
+      NEO4J_AUTH: neo4j/experiment-only
+    ports:
+      - 127.0.0.1:17687:7687
+      - 127.0.0.1:17474:7474
+    volumes:
+      - ${POC_DATA_DIR:-./work}/neo4j:/data
+      - ${POC_DATA_DIR:-./work}/neo4j-logs:/logs
+    healthcheck:
+      test: [CMD-SHELL, "wget -q -O /dev/null http://127.0.0.1:7474"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+  bloodhound:
+    # Build this image from the exact reference checkout. A moving tag such as
+    # latest would make a comparison change underneath the experiment.
+    image: esc1-poc-bloodhound:2cb6dbd37738ffe31e34e1729b3638f3887a93e9
+    build:
+      context: ../..
+      dockerfile: dockerfiles/bloodhound.Dockerfile
+      labels:
+        org.opencontainers.image.revision: 2cb6dbd37738ffe31e34e1729b3638f3887a93e9
+    pull_policy: never
+    environment:
+      bhe_database_connection: user=bloodhound password=experiment-only dbname=bloodhound host=app-db
+      bhe_neo4j_connection: neo4j://neo4j:experiment-only@graph-db:7687/
+      bhe_graph_driver: neo4j
+      bhe_default_admin_principal_name: admin
+      bhe_default_admin_password: experiment-only
+      bhe_default_admin_expire_now: "false"
+      # A fixed test key keeps the local session valid across the application's
+      # deliberate stop/start cycles. This key is only for this disposable lab.
+      bhe_crypto_jwt_signing_key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+      bhe_root_url: http://127.0.0.1:18080/
+      bhe_enable_startup_wait_period: "false"
+      bhe_datapipe_interval: "1"
+    ports:
+      - 127.0.0.1:18080:8080
+    volumes:
+      - ${POC_DATA_DIR:-./work}/bloodhound:/opt/bloodhound/work
+    depends_on:
+      app-db:
+        condition: service_healthy
+      graph-db:
+        condition: service_healthy
+  test-graph:
+    # An independent empty graph for tests. It is never a native-parity target.
+    profiles: [tests]
+    image: docker.io/library/neo4j:4.4.42@sha256:73b5a47eb9952f47fcc42fcc80bdd6bd0d6b71eea9a1a345c216675498c790e4
+    pull_policy: never
+    environment:
+      NEO4J_AUTH: neo4j/experiment-only
+    ports:
+      - 127.0.0.1:27687:7687
+      - 127.0.0.1:27474:7474
+    volumes:
+      - ./work/test-neo4j:/data
+      - ./work/test-neo4j-logs:/logs
+  test-pg-graph:
+    # A separate database and storage for destructive adapter tests.
+    profiles: [tests]
+    image: docker.io/library/postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    pull_policy: never
+    environment:
+      POSTGRES_USER: bloodhound
+      POSTGRES_PASSWORD: experiment-only
+      POSTGRES_DB: esc1_poc_test
+    ports:
+      - 127.0.0.1:25432:5432
+    volumes:
+      - ./work/test-postgres:/var/lib/postgresql

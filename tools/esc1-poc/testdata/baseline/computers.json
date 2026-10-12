@@ -1,0 +1,51 @@
+{
+  "meta": {
+    "methods": 328257,
+    "type": "computers",
+    "count": 1,
+    "version": 6
+  },
+  "data": [
+    {
+      "ObjectIdentifier": "S-1-5-21-111111111-222222222-333333333-1002",
+      "Properties": {
+        "domain": "ESC1-EXPERIMENT.TEST",
+        "name": "CA-HOST.ESC1-EXPERIMENT.TEST",
+        "domainsid": "S-1-5-21-111111111-222222222-333333333",
+        "distinguishedname": "CN=CA-HOST,DC=ESC1-EXPERIMENT,DC=TEST",
+        "enabled": true,
+        "samaccountname": "CA-HOST$",
+        "isdc": false,
+        "unconstraineddelegation": false,
+        "trustedtoauth": false,
+        "sidhistory": []
+      },
+      "Aces": [],
+      "IsDeleted": false,
+      "IsACLProtected": false,
+      "ContainedBy": null,
+      "PrimaryGroupSID": "",
+      "AllowedToDelegate": [],
+      "AllowedToAct": [],
+      "HasSIDHistory": [],
+      "DumpSMSAPassword": [],
+      "LocalGroups": [],
+      "UserRights": [],
+      "Sessions": {
+        "Collected": false,
+        "FailureReason": "Not needed by the ESC1 fixture",
+        "Results": []
+      },
+      "PrivilegedSessions": {
+        "Collected": false,
+        "FailureReason": "Not needed by the ESC1 fixture",
+        "Results": []
+      },
+      "RegistrySessions": {
+        "Collected": false,
+        "FailureReason": "Not needed by the ESC1 fixture",
+        "Results": []
+      }
+    }
+  ]
+}

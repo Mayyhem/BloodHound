@@ -277,6 +277,16 @@ type Configuration struct {
 	Teleport                        TeleportConfiguration     `json:"teleport"`
 	Storage                         StorageConfiguration      `json:"storage"`
 	SecretStore                     SecretStoreConfiguration  `json:"secret_store"`
+
+	// Empty URL keeps the optional extension runner disabled.
+	PostProcessing PostProcessingConfiguration `json:"post_processing"`
+}
+
+// Rules are kept in a separate container. The token is a shared secret used
+// only to fetch those rules and report whether their calculation succeeded.
+type PostProcessingConfiguration struct {
+	URL   string `json:"url"`
+	Token string `json:"token"`
 }
 
 func (s Configuration) ScratchDirectory() string {

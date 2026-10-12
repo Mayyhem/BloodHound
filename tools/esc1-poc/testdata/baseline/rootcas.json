@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "methods": 328257,
+    "type": "rootcas",
+    "count": 1,
+    "version": 6
+  },
+  "data": [
+    {
+      "ObjectIdentifier": "44444444-4444-4444-8444-444444444444",
+      "Properties": {
+        "domain": "ESC1-EXPERIMENT.TEST",
+        "name": "EXPERIMENT ROOT@ESC1-EXPERIMENT.TEST",
+        "domainsid": "S-1-5-21-111111111-222222222-333333333",
+        "distinguishedname": "CN=EXPERIMENT ROOT,CN=CERTIFICATION AUTHORITIES,CN=PUBLIC KEY SERVICES,CN=SERVICES,CN=CONFIGURATION,DC=ESC1-EXPERIMENT,DC=TEST",
+        "certthumbprint": "0123456789ABCDEF0123456789ABCDEF01234567",
+        "certname": "SYNTHETIC SELF-SIGNED CA",
+        "certchain": [
+          "0123456789ABCDEF0123456789ABCDEF01234567"
+        ],
+        "hasbasicconstraints": true,
+        "basicconstraintpathlength": 0
+      },
+      "Aces": [],
+      "IsDeleted": false,
+      "IsACLProtected": false,
+      "ContainedBy": null,
+      "DomainSID": "S-1-5-21-111111111-222222222-333333333"
+    }
+  ]
+}

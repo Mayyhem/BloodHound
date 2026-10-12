@@ -1,0 +1,77 @@
+{
+  "meta": {
+    "methods": 328257,
+    "type": "enterprisecas",
+    "count": 1,
+    "version": 6
+  },
+  "data": [
+    {
+      "ObjectIdentifier": "33333333-3333-4333-8333-333333333333",
+      "Properties": {
+        "domain": "ESC1-EXPERIMENT.TEST",
+        "name": "EXPERIMENT-CA@ESC1-EXPERIMENT.TEST",
+        "domainsid": "S-1-5-21-111111111-222222222-333333333",
+        "distinguishedname": "CN=EXPERIMENT-CA,CN=ENROLLMENT SERVICES,CN=PUBLIC KEY SERVICES,CN=SERVICES,CN=CONFIGURATION,DC=ESC1-EXPERIMENT,DC=TEST",
+        "certthumbprint": "0123456789ABCDEF0123456789ABCDEF01234567",
+        "certname": "SYNTHETIC SELF-SIGNED CA",
+        "certchain": [
+          "0123456789ABCDEF0123456789ABCDEF01234567"
+        ],
+        "hasbasicconstraints": true,
+        "basicconstraintpathlength": 0,
+        "caname": "EXPERIMENT-CA",
+        "dnshostname": "CA-HOST.ESC1-EXPERIMENT.TEST",
+        "casecuritycollected": true,
+        "enrollmentagentrestrictionscollected": true,
+        "isuserspecifiessanenabledcollected": true
+      },
+      "Aces": [],
+      "IsDeleted": false,
+      "IsACLProtected": false,
+      "ContainedBy": null,
+      "HostingComputer": "S-1-5-21-111111111-222222222-333333333-1002",
+      "DomainSID": "S-1-5-21-111111111-222222222-333333333",
+      "EnabledCertTemplates": [
+        {
+          "ObjectIdentifier": "11111111-1111-4111-8111-111111111111",
+          "ObjectType": "CertTemplate"
+        },
+        {
+          "ObjectIdentifier": "22222222-2222-4222-8222-222222222222",
+          "ObjectType": "CertTemplate"
+        }
+      ],
+      "HttpEnrollmentEndpoints": [],
+      "CARegistryData": {
+        "CASecurity": {
+          "Data": [
+            {
+              "PrincipalSID": "S-1-5-21-111111111-222222222-333333333-1001",
+              "PrincipalType": "User",
+              "RightName": "Enroll",
+              "IsInherited": false
+            }
+          ],
+          "Collected": true,
+          "FailureReason": null
+        },
+        "EnrollmentAgentRestrictions": {
+          "Restrictions": [],
+          "Collected": true,
+          "FailureReason": null
+        },
+        "IsUserSpecifiesSanEnabled": {
+          "Value": false,
+          "Collected": true,
+          "FailureReason": null
+        },
+        "RoleSeparationEnabled": {
+          "Value": false,
+          "Collected": true,
+          "FailureReason": null
+        }
+      }
+    }
+  ]
+}

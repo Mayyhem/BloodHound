@@ -40,6 +40,15 @@ type graphWiper interface {
 }
 
 func DeleteCollectedGraphData(ctx context.Context, graphDB graph.Database, deleteRequest model.AnalysisRequest, sourceKinds graph.Kinds) error {
+	// PostgreSQL's fast deletion methods use the driver directly. Admit the
+	// complete operation here so they also respect an extension's turn and
+	// a write stop caused by an uncertain commit.
+	writeContext, release, err := graph.EnterWriteAccess(ctx, graphDB)
+	if err != nil {
+		return err
+	}
+	defer release()
+	ctx = writeContext
 	defer measure.ContextLogAndMeasure(
 		ctx,
 		slog.LevelInfo,

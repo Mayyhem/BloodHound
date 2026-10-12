@@ -622,6 +622,15 @@ func CheckTagGlyph(glyph null.String, tagType model.AssetGroupTagType, tagPositi
 }
 
 func (s *Resources) UpdateAssetGroupTag(response http.ResponseWriter, request *http.Request) {
+	// Renaming a tag also changes a graph kind through the application database.
+	// Include that change in the same optional coordination as graph writes.
+	writeContext, release, err := graph.EnterWriteAccess(request.Context(), s.Graph)
+	if err != nil {
+		api.WriteErrorResponse(request.Context(), api.BuildErrorResponse(http.StatusServiceUnavailable, "graph changes are temporarily unavailable", request), response)
+		return
+	}
+	defer release()
+	request = request.WithContext(writeContext)
 	var (
 		tagUpdates    assetGroupTagUpdateRequest
 		assetTagIdStr = mux.Vars(request)[api.URIPathVariableAssetGroupTagID]

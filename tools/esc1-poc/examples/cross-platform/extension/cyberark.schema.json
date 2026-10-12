@@ -1,0 +1,50 @@
+{
+  "schema": {
+    "name": "cyberark",
+    "display_name": "CyberArk",
+    "version": "v1.0.0",
+    "namespace": "PoC_CyberArk"
+  },
+  "node_kinds": [
+    {
+      "name": "PoC_CyberArk_Account",
+      "display_name": "Synthetic CyberArk account",
+      "description": "Collected synthetic account with a user_sid joining value.",
+      "is_display_kind": true,
+      "icon": "key",
+      "color": "#805AD5"
+    },
+    {
+      "name": "PoC_CyberArk_Base",
+      "display_name": "Synthetic CyberArk source",
+      "description": "Custom source kind for synthetic OpenGraph account data.",
+      "is_display_kind": false,
+      "icon": "database",
+      "color": "#805AD5"
+    },
+    {
+      "name": "PoC_CyberArk_AccountSummary",
+      "display_name": "CyberArk account helper",
+      "description": "Owned account summary independent of directory data.",
+      "is_display_kind": true,
+      "icon": "flask",
+      "color": "#805AD5"
+    }
+  ],
+  "relationship_kinds": [
+    {
+      "name": "PoC_CyberArk_AccountFor",
+      "description": "Factual association of an account with a directory user whose SID matches. It makes no credential access or attack path claim.",
+      "is_traversable": false,
+      "endpoints": [
+        {
+          "source_kind": "PoC_CyberArk_Account",
+          "target_kind": "User"
+        }
+      ]
+    }
+  ],
+  "external_node_kinds": [
+    "User"
+  ]
+}

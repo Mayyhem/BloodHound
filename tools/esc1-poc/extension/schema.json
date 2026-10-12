@@ -1,0 +1,58 @@
+{
+  "schema": {
+    "name": "esc1_poc",
+    "display_name": "ESC1 processing experiment",
+    "version": "v1.0.0",
+    "namespace": "PoC"
+  },
+  "node_kinds": [
+    {
+      "name": "PoC_DomainHelper",
+      "display_name": "Experimental domain helper",
+      "description": "A separate helper used to demonstrate safe publication. The native domain is unchanged.",
+      "is_display_kind": true,
+      "icon": "flask",
+      "color": "#5965D8"
+    },
+    {
+      "name": "PoC_Run",
+      "display_name": "Last successful experiment run",
+      "description": "Records the last committed batch and the exact analysis files used.",
+      "is_display_kind": true,
+      "icon": "clock",
+      "color": "#5965D8"
+    }
+  ],
+  "relationship_kinds": [
+    {
+      "name": "PoC_ADCSESC1",
+      "description": "Independently calculated experimental ESC1 connection, checked against native BloodHound results.",
+      "is_traversable": true,
+      "endpoints": [
+        {
+          "source_kind": "User",
+          "target_kind": "Domain"
+        },
+        {
+          "source_kind": "Group",
+          "target_kind": "Domain"
+        },
+        {
+          "source_kind": "Computer",
+          "target_kind": "Domain"
+        },
+        {
+          "source_kind": "LocalGroup",
+          "target_kind": "Domain"
+        }
+      ]
+    }
+  ],
+  "external_node_kinds": [
+    "Computer",
+    "Domain",
+    "Group",
+    "LocalGroup",
+    "User"
+  ]
+}

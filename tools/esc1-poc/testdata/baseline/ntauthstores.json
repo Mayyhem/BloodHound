@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "methods": 328257,
+    "type": "ntauthstores",
+    "count": 1,
+    "version": 6
+  },
+  "data": [
+    {
+      "ObjectIdentifier": "55555555-5555-4555-8555-555555555555",
+      "Properties": {
+        "domain": "ESC1-EXPERIMENT.TEST",
+        "name": "NTAUTHCERTIFICATES@ESC1-EXPERIMENT.TEST",
+        "domainsid": "S-1-5-21-111111111-222222222-333333333",
+        "distinguishedname": "CN=NTAUTHCERTIFICATES,CN=PUBLIC KEY SERVICES,CN=SERVICES,CN=CONFIGURATION,DC=ESC1-EXPERIMENT,DC=TEST",
+        "certthumbprints": [
+          "0123456789ABCDEF0123456789ABCDEF01234567"
+        ]
+      },
+      "Aces": [],
+      "IsDeleted": false,
+      "IsACLProtected": false,
+      "ContainedBy": null,
+      "DomainSID": "S-1-5-21-111111111-222222222-333333333"
+    }
+  ]
+}

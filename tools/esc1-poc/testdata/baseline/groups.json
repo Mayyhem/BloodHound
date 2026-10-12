@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "methods": 328257,
+    "type": "groups",
+    "count": 1,
+    "version": 6
+  },
+  "data": [
+    {
+      "ObjectIdentifier": "S-1-5-21-111111111-222222222-333333333-1101",
+      "Properties": {
+        "domain": "ESC1-EXPERIMENT.TEST",
+        "name": "TEMPLATE ENROLLERS@ESC1-EXPERIMENT.TEST",
+        "domainsid": "S-1-5-21-111111111-222222222-333333333",
+        "distinguishedname": "CN=TEMPLATE ENROLLERS,DC=ESC1-EXPERIMENT,DC=TEST"
+      },
+      "Aces": [],
+      "IsDeleted": false,
+      "IsACLProtected": false,
+      "ContainedBy": null,
+      "Members": [
+        {
+          "ObjectIdentifier": "S-1-5-21-111111111-222222222-333333333-1001",
+          "ObjectType": "User"
+        }
+      ],
+      "HasSIDHistory": []
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "VAULT-DEMO",
+        "kinds": [
+          "PoC_Vault_Container",
+          "PoC_Vault_Base"
+        ],
+        "properties": {
+          "name": "VAULT-DEMO"
+        }
+      },
+      {
+        "id": "VAULT-ACCOUNT-1",
+        "kinds": [
+          "PoC_Vault_Account",
+          "PoC_Vault_Base"
+        ],
+        "properties": {
+          "name": "VAULT-ACCOUNT-1",
+          "user_sid": "S-1-5-21-111111111-222222222-333333333-1001"
+        }
+      },
+      {
+        "id": "VAULT-ACCOUNT-2",
+        "kinds": [
+          "PoC_Vault_Account",
+          "PoC_Vault_Base"
+        ],
+        "properties": {
+          "name": "VAULT-ACCOUNT-2",
+          "user_sid": "S-1-5-21-111111111-222222222-333333333-1001"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "start": {
+          "match_by": "id",
+          "value": "VAULT-DEMO",
+          "kind": "PoC_Vault_Container"
+        },
+        "end": {
+          "match_by": "id",
+          "value": "VAULT-ACCOUNT-1",
+          "kind": "PoC_Vault_Account"
+        },
+        "kind": "PoC_Vault_ContainsAccount"
+      },
+      {
+        "start": {
+          "match_by": "id",
+          "value": "VAULT-DEMO",
+          "kind": "PoC_Vault_Container"
+        },
+        "end": {
+          "match_by": "id",
+          "value": "VAULT-ACCOUNT-2",
+          "kind": "PoC_Vault_Account"
+        },
+        "kind": "PoC_Vault_ContainsAccount"
+      }
+    ]
+  },
+  "metadata": {
+    "source_kind": "PoC_Vault_Base"
+  }
+}
