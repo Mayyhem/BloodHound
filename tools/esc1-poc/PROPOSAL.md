@@ -206,6 +206,8 @@ Cypher can accomplish the same logic with far fewer lines of code, reducing main
 
 Hosting the processing engine server-side makes this logic far easier to trace and debug, as the system produces an analysis plan in processing order that can be reviewed and can identify any specific query that fails. This query can be copied into BloodHound and refined to fix the issue.
 
+Defining compatible source/target node kinds for each relationship kind in the OpenGraph schema would allow the entire model to be viewed in BloodHound without relying on external documentation/diagrams.
+
 ---
 
 ## Extensions need additional setup
