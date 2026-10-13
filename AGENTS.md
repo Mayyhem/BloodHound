@@ -2,13 +2,19 @@
 
 # AGENTS.md
 
+## tools/esc1-poc
+
+Familiarize yourself with the .md files in the tools/esc1-poc directory. That is what we're primarily working on for this project (OpenGraph Relationship Analysis). BloodHound and DAWGS are dependencies. 
+
 Do not use technical software engineering jargon. I barely understand Go, so the code needs to be well commented in plain english.
 
 Make the code, architecture, and documentation easy to understand. This is the most important thing. I need to be able to understand every bit of it (despite severely limited Go experience) and explain it to the software engineers responsible for reviewing and merging it with BloodHound proper. 
 
 If I don't ask you to start coding, don't start coding. Request permission if you are uncertain. 
 
-Prioritize ease of use and understanding for extension developers. Changes to DAWGS and BloodHound are allowed if necessary but should be minimized unless it makes things easier for extension developers or enhances performance significantly. These changes MUST not remove functionality, change API contracts, or otherwise negatively impact the current user experience.
+Prioritize ease of use and understanding for extension developers. 
+
+Changes to DAWGS and BloodHound are allowed if necessary but should be minimized unless it makes things easier for extension developers or enhances performance significantly. These changes MUST not remove functionality, change API contracts, or otherwise negatively impact the current user experience.
 
 Don't change the requirements for extension authors (e.g., schema.json or .cypher file definitions) based on assumptions without my approval. 
 
