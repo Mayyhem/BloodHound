@@ -24,6 +24,26 @@ Post-processing and other terms such as “pre-processing” are often conflated
 
 What matters is that analysis is used to create relationships that rely on data that already exists in the graph or that rely on complex chains of relationships created during prior analysis (e.g., nested group memberships).
 
+# Why establish this foundation now
+
+OpenGraph relationship analysis is still early enough that a small number of representative extensions can expose weaknesses in the shared design. That makes this the least expensive time to establish how extensions declare dependencies, how they share calculations, and how their results are safely updated.
+
+Once many extensions have been developed (for example, the 100 that Justin mentioned on our horizon), these choices become compatibility promises. Changing them would require updating independently maintained queries, preserving old and new behavior during customer upgrades, retesting relationships already stored in customer graphs, and coordinating extensions that consume one another's calculations.
+
+The cost grows faster than the number of extensions. One piece of work might be reused by several extensions. Several extensions might also independently create the same connection in BloodHound.
+That means changing one shared piece later could break many extensions—possibly extensions written by different people. Also, if Neo4j and PostgreSQL behave differently, extension authors may add special fixes to their rules. Once many extensions depend on those fixes, correcting the underlying database behavior could break them.
+
+**In short: a small design problem today can spread into many extensions and become much harder to fix later.**
+
+This does not mean every interface, optimization, or large-scale deployment question must be finished before another extension is written. It means the following contracts should be settled and tested before the extension catalog grows substantially:
+
+- how each query tells BloodHound what stored information and earlier calculations it needs
+- how queries share results with future queries, including across extensions
+- how several queries can jointly support the same relationship
+- how changing, disabling, or removing a query affects results already in the graph
+- how a failed query leaves the last confirmed complete results in place
+- how the same supported query produces the same answer on Neo4j and PostgreSQL
+
 # The Problems
 
 This design proposal addresses several practical problems we **must** address for OpenGraph relationship analysis to scale.
@@ -148,6 +168,24 @@ This would reduce processing duration and resource consumption.
 
 ---
 
+## Independently developed extensions can collide or silently affect one another
+
+A design that works for one extension may not work once extensions are installed, updated, disabled, and removed independently.
+
+One extension may use an answer calculated by another extension. If that answer changes—such as renaming a value or changing what it represents—the extension using it may break.
+
+Also, two queries may independently find that the same connection should exist. Removing one query should not remove that connection if the other query still says it is valid.
+
+These problems become harder to correct after extensions have been distributed. Changes to a shared answer can affect several downstream extensions, while relationships already stored in customer graphs may not contain enough information to reconstruct the assumptions used by an older rule set.
+
+#### **Solution: Protect shared calculations and relationships**
+
+Shared calculations should describe the columns, value types, meaning, and compatible versions of the answers they provide. Proposed updates should be checked against all affected consumers before activation.
+
+When several rules produce the same relationship type, BloodHound should combine their complete answers before updating the graph. A relationship should be removed only when no participating producer still returns it within the declared endpoint scope.
+
+---
+
 ## Different extensions rebuild the same capabilities
 
 Each extension either needs to build its own foreign account resolution logic or build its own capability to fetch that data from the API and conduct collector-side analysis. 
@@ -178,19 +216,30 @@ Each customer must define the frequency at which each extension collector must p
 
 This will reduce support costs associated with repeated collector setup and maintenance.
 
+# Recommended sequencing
+
+Use a small set of deliberately different extensions to establish the shared contracts before expanding the catalog:
+
+1. A complex analysis such as ESC1 should prove that the model can express multi-stage calculations and match independently written expected results.
+2. A small OpenGraph extension should prove that custom collected data can be joined safely to native BloodHound data.
+3. Two separate extensions should prove cross-extension dependencies, shared calculations, independent updates, and overlapping relationship producers.
+4. Both supported databases should run the same written cases and return the same exact answers.
+
 # Implementation
 
 The pilot implements the core approach: **authors describe the connections they want, and BloodHound calculates and maintains them.** Authors supply Cypher files and a description of their model. Shared code handles the order of work, checks the answers, and saves the resulting relationships.
 
-Some proposed capabilities remain future work. In particular, the pilot does **not** replace a complete collection, expire old evidence, or automatically limit each run to only the analyses affected by a change.
+The pilot implements affected-rule selection when it has a complete account of changed graph types. First runs, changed rule sets, application restarts, unsupported writes, and incomplete or exhausted change tracking still run all enabled rules.
+
+The pilot does not yet treat a new collection as a complete replacement for older data, automatically expire old evidence, or let an extension require a specific version and result format from another extension’s shared calculation.
 
 ## What runs where
 
 | Part | Responsibility |
 | --- | --- |
-| Extension files | `.cypher` files describe the analysis. `schema.json` describes object types, allowed connections, which query produces each result, and what happens to an existing matching relationship. |
+| Extension files | Each schema describes an extension's object and relationship types and exact directed endpoint pairs. `.cypher` files declare graph inputs, query prerequisites, calculations, literal output types, and optional existing-edge policies. |
 | Rule container | Provides a page for uploading files, checks and stores them, and displays the latest analysis report. It does not need access to the graph database. |
-| Modified BloodHound application | Runs the rules after its own analysis succeeds, using its existing database connection. It checks which results belong to the extension and saves the complete update. |
+| Modified BloodHound application | Runs the rules after its own analysis succeeds, using its existing database connection. It validates returned objects and relationships against the complete rule plan and saves the complete update. |
 
 The customer installs the modified application and rule container once. Later rule uploads do not require rebuilding or restarting BloodHound. They take effect after the next successful BloodHound analysis; uploading rules alone does not run them.
 
@@ -203,18 +252,21 @@ The pilot works with Neo4j and PostgreSQL. Focused changes to DAWGS, BloodHound'
 | **Useful research takes too long to become product coverage** | A researcher can add supported analysis by uploading query files and a schema. The shared engine handles ordering, checking, and saving results, so each rule does not need its own Go implementation. | The pilot demonstrates this workflow. It has not measured the reduction in development time or cost. |
 | **SpecterOps is the bottleneck for graph expansion** | Authors describe the conditions for a connection and return the two objects to connect. The engine handles database changes and cleanup. The same schema generates an HTML model picture that helps explain and review the extension. | Authors still need to understand their data and write correct queries. New capabilities outside the supported query and calculation features may still require engine changes. |
 | **Collected data arrives at different times** | After successful BloodHound analysis, the rules reconsider the information now stored in the graph. In the vault example, an account keeps its directory identifier, allowing a later run to connect it when the matching user arrives. | The vault collector does not need to run again solely because directory data arrived later. This depends on retaining the matching identifier; the engine cannot recover information that was never collected. |
-| **Remediations between uploads are not reflected in the graph** | Once an upload changes the stored evidence, the engine calculates which relationships remain justified and removes obsolete results it owns. A vault-to-user connection stays while any exposed account supports it, and disappears when the last support is corrected. | Omission from an upload does not prove removal. Complete-collection replacement, a new explicit-removal message, and automatic expiry are not implemented. Earlier evidence that remains stored can still support an outdated result. |
-| **Small changes trigger full analysis** | Declared dependencies establish the order of calculations. Authors can choose to preserve unchanged relationships instead of replacing them, avoiding unnecessary writes. | The automatic service still runs the full extension plan after successful native analysis. Selecting only affected analyses is future work. The default relationship policy still replaces matching results. |
-| **Risks span multiple sources** | Queries can combine evidence already in BloodHound. The vault rule checks exposed accounts, their directory identifiers, and the matching user's enabled state before creating a connection. No collector needs to fetch those directory objects back out for this analysis. | The engine can use only the evidence present in the graph. This example is a vault-to-directory match, not a general solution for matching every identity across every system. |
+| **Remediations between uploads are not reflected in the graph** | Once stored evidence changes, the engine recalculates which relationships remain justified. A relationship supported by several records remains while any support is present and is removed after explicit changes eliminate the final support. | Omission from an upload does not prove removal. Complete-collection replacement, a new explicit-removal message, and automatic expiry are not implemented. Earlier evidence that remains stored can still support an outdated result. |
+| **Small changes trigger full analysis** | The application records changed object and relationship types. It selects affected rules, every producer sharing their relationship outputs, their downstream consumers, and the prerequisites needed to calculate them. | Selection operates on complete queries, not individual changed objects. Bounded tracking falls back to all enabled rules when it cannot prove complete coverage, including during sufficiently large uploads. |
+| **Risks span multiple sources** | Queries can combine evidence already in BloodHound. The vault example joins a collected account's directory identifier to a native directory user without requiring the vault collector to fetch that user back from BloodHound. | The example demonstrates a factual cross-system association, not a general identity resolver or a claim that the association is an attack path. The engine can use only evidence actually stored in the graph. |
 | **Results are temporarily unavailable during processing** | Previous extension relationships remain visible while the complete answer is calculated. New relationships, removals, updates, supporting helper objects, and the success record are saved together. A failure before saving leaves the previous extension answer available. | This protection covers this engine's results. It does not change how built-in BloodHound analysis replaces its own results. Old extension results may be out of date after a failure. |
 | **Different analyzers repeat the same queries** | Several rules can name the same earlier query as a dependency. The engine calculates that shared answer once per run and passes it to each consumer. Independent queries can run together within a set limit. | Sharing is within the loaded rule set. Answers are not retained between runs, and this does not remove repeated work inside BloodHound's built-in ESC1 and ESC2 analyses. |
-| **Different extensions rebuild the same capabilities** | The shared engine provides query ordering, group and trust calculations, result checking, and safe relationship updates for both databases. Authors reuse those capabilities instead of writing them again in each collector. | The pilot accepts one active schema containing multiple analyses. A library shared across independently installed extensions, and a general foreign-account resolver, remain future work. |
+| **Independently developed extensions can collide or silently affect one another** | A query can use an answer calculated by another extension. When several queries support the same relationship, BloodHound combines their answers and keeps the relationship while any query still supports it. | Shared queries do not yet have formal versions or a declared result format. |
+| **Different extensions rebuild the same capabilities** | The shared engine provides query ordering, reusable answers, result checking, and safe relationship updates for both databases. Several schemas participate in one dependency plan, and a query can consume another extension's answer. | A general library of independently versioned shared calculations and a general foreign-account resolver remain future work. |
 | **Extensions are difficult to maintain after their authors leave** | Analysis stays in named text files. Dependencies produce an inspectable processing order, errors identify failed queries, and the model picture shows allowed connections. Another author can update the files without rebuilding BloodHound. | A query using answers from earlier queries needs those inputs when tested separately. Not every rule can be pasted unchanged into the query browser. |
-| **Extensions need additional setup** | Once installed, BloodHound schedules analysis after its own checks. Customers do not have to arrange separate analysis schedules or manually order the extension's query files. Saved rules survive a container restart. | Customers still configure collection schedules and install the modified application, rule service, and access settings. Existing analysis declarations cannot currently be removed or reassigned through uploads. |
+| **Extensions need additional setup** | Once installed, BloodHound schedules analysis after its own checks. Customers do not have to arrange separate analysis schedules or manually order query files. Saved rules and their enabled states survive a container restart. | Customers still configure collection schedules and install the modified application, rule service, and access settings. Production still needs native authenticated rule management rather than the local pilot page. |
 
 ## What happens to a matching relationship
 
-The schema's `existing_edge_policy` setting provides the three choices proposed above. It applies to **calculated relationships owned by the extension**, not to collection ingestion.
+A producing query may use an `existing-edge-policy` comment to choose what happens when its answer matches an existing relationship. Every producer of the same relationship type must use the same policy.
+
+Before updating that relationship type, the engine combines the complete answers from all participating producers. Existing relationships within the declared endpoint scope participate regardless of which extension or process originally created them. There is no extension ownership field stored on the relationship.
 
 | Choice | Effect |
 | --- | --- |
@@ -222,9 +274,9 @@ The schema's `existing_edge_policy` setting provides the three choices proposed 
 | `merge-properties` | Keep the relationship and update only the supplied details. Unmentioned details remain; a supplied null value removes that detail. |
 | `keep-existing` | Leave the matching relationship and its details unchanged. |
 
-Every choice creates newly justified relationships and removes owned relationships that no longer have support. “Keep existing” does not mean “keep forever.” If an existing result has missing or conflicting ownership, the run stops instead of taking it over or deleting it.
+Every choice creates newly justified relationships and removes in-scope relationships that no participating producer still returns. “Keep existing” means to preserve the details of a relationship that remains justified; it does not mean to keep an unjustified relationship forever.
 
-Extra helper objects created for calculations are not automatically deleted when a later answer omits them.
+The update occurs only after all selected producers have returned complete, validated answers. A failed or incomplete calculation cannot authorize removal of an earlier result. Extra helper objects created for calculations are not automatically deleted when a later answer omits them.
 
 ## How BloodHound stays available
 
