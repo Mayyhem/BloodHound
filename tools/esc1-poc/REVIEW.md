@@ -4,6 +4,14 @@ This is a proof of concept for one modified BloodHound Community Edition process
 
 Start with [README.md](README.md) for the proposal, [USAGE.md](USAGE.md) for operating instructions, and [DESIGN.md](DESIGN.md) for the rules the code follows and its failure behavior. [HANDOFF.md](HANDOFF.md) retains the dated work history, full historical commands, private log locations, and local running state.
 
+## Preparation and reachability follow-up — 13 October 2026
+
+[The focused report](PREPARATION_AND_REACHABILITY.md) and [evidence](evidence/preparation-followup/README.md) cover TODO #11 and the completed investigation/deferral outcome for #12. The code adds preparation-step timings and makes the identity query cheaper without changing its coverage. Native-adapter tests cover unrelated malformed IDs, the exact migration exception and preservation of the complete graph after rejection. The known-change selection path, skipped runs and failed checks retain accurate step timings.
+
+Review the small production changes in `internal/runner/runner.go` and `internal/graphdb/native.go`. The new `internal/graphdb/preparation_integration_test.go` exercises both application adapters; the existing snapshot helper now works with either database. Additional unit checks live beside the existing report and native tests.
+
+No new reachability shortcut is enabled. A recorded ordinary query reveals PostgreSQL pairing results with the wrong supplied starting row; TODO #13 tracks that correction. Existing DAWGS edits were present on entry and were left unchanged. Standard modern Cypher `ANY` support is a documented proposal, not implemented syntax.
+
 ## Ordinary Cypher and optional controls — completed 13 October 2026
 
 The [ordinary ESC1 example](examples/esc1-cypher/README.md) performs the complete calculation without `reachability`, `batch-on`, or `group-overlap`. The advanced example and its instructions remain supported. The [comparison report](CYPHER_COMPARISON.md) gives direct feature comparisons, complete-run costs, exact-answer checks, and proposed future controls. [Synthetic measurements and tables](evidence/cypher-comparison/README.md) are generated from retained individual observations. All eight final studies completed with 852 timed observations. Both databases also passed three repetitions of the separate batching-limit check: batching completed, while whole input failed the parameter limit and preserved saved results. The user set one million objects as the final size; larger capacity studies are deferred. The report explicitly identifies missed performance targets; completion does not mean those costs have been accepted.

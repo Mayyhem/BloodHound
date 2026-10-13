@@ -317,6 +317,14 @@ If the database saves changes but its acknowledgement is lost, the actual outcom
 
 For an uncertain native run, this application blocks further graph changes before releasing its exclusive turn. Reads remain admitted. Recovery requires inspecting the saved result and restarting the application. The registry's report alone cannot settle the database's committed state.
 
+## Preparation checks and their cost
+
+Each run still prepares the database and checks object identities across the whole graph before calculations proceed. The identity query first checks the `MigrationData` type before inspecting its complete type list. This avoids translating every ordinary object's type names on PostgreSQL while retaining the exact isolated-migration exception. Counting required-match rows preserves the duplicate-ID check. No checked result is reused across runs.
+
+The returned report's `preparation_steps` separates query-language checks, database preparation, transaction opening, rule selection and identity validation. Native Neo4j setup outside the runner is included. Zero means a step was not attempted or had no measurable elapsed time; a failed step includes its elapsed time. Temporary-file work remains in the overall preparation total. These detailed fields are in the runner report; the existing stored `Execution` summary and rule page are not extended by this change.
+
+See [the focused follow-up](PREPARATION_AND_REACHABILITY.md) for measurements and checks. Ordinary path queries still use ordinary execution. The follow-up found a PostgreSQL association error with several supplied starting objects; that is tracked separately from a proposed automatic reachability calculation.
+
 ## Resource controls and temporary files
 
 These controls stop excessive work without treating an incomplete result as complete. They do not establish a hard process-memory ceiling or large-graph capacity.

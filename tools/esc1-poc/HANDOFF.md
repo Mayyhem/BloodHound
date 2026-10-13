@@ -1,3 +1,28 @@
+## TODOs 11 and 12 — 13 October 2026
+
+The user explicitly requested execution of both TODOs. Follow `tools/esc1-poc/AGENTS.md`: plain English, preserve author requirements, work within postprocessing/local endpoints, and do not stage or commit.
+
+#11 adds preparation-step timings in `internal/runner/runner.go` and `internal/graphdb/native.go`, including setup outside the runner and rejected file validation. The identity check now checks the migration kind before asking for all its type names, and counts required-match rows. It retains the complete graph scope, exact isolated-migration exception and all-or-nothing saving. The 100,000-object comparison found PostgreSQL preparation medians 1.912 → 1.446 seconds (24.4%); complete-run medians were 9.423 → 8.332 seconds with other phase variation. Neo4j ranges overlap. Do not attribute the whole complete-run difference to this change or extrapolate it to the old million-object results.
+
+#12 reached its expressly permitted investigation/deferral outcome. The simple distinct-member query already used indexes well. The full membership plan multiplied 267 expanded rows by 101 input rows before DISTINCT. A separate two-input query proves wrong starting-object/result pairings on PostgreSQL; Neo4j gives the expected pairs. New TODO #13 records the required input-association correction. This follow-up did not modify the pre-existing dirty DAWGS checkout. No automatic replacement, new author format or depth-limit change was made.
+
+While work continued, the user asked for plain-English reachability explanations and whether modern Neo4j `ANY` could replace the custom instruction. The answer is yes for the central traversal, with surrounding Cypher for output shaping, expanded starting sets and explicit cycle rejection. Full parity includes paths, bounds, filters and input rows, and needs a newer Neo4j reference backend than the present 4.4.42 or a verified compatibility translation. This was discussion, not authorization to add the new syntax or change author requirements. The option is recorded in `PREPARATION_AND_REACHABILITY.md`.
+
+The focused report and public evidence are in `PREPARATION_AND_REACHABILITY.md` and `evidence/preparation-followup/`. Private binaries, initial diagnostics, full logs and new database storage are under ignored `work/preparation-followup/`. Original `esc1-poc-test-*` database directories and stopped states were never touched. New measurement containers use project `esc1-followup`; separate empty correctness fixtures use `esc1-followup-check`. Both projects must be stopped at handoff. `validation.json` records final checks/state.
+
+Unit checks use race detection. Targeted integration checks cover native identity rejection and exact migration exceptions on both databases, complete graph preservation, late save failure, and existing ordinary/advanced written-answer cases. The broad DAWGS suites and 852-observation matrix were not repeated because DAWGS was unchanged. Before any future commit, the required repository command still applies.
+
+After reviewing the report, this is a suitable manual checkpoint for the preparation change and documented investigation. No stage or commit was performed. Replace the Jira placeholder with the appropriate tag:
+
+```sh
+just prepare-for-codereview
+# Review the resulting changes before staging.
+git add tools/esc1-poc
+git commit -m "perf: Reduce extension identity-check preparation <JIRA-TAG>"
+```
+
+DAWGS is a separate repository with pre-existing uncommitted work; these commands do not commit it. Resolve #13 and the existing depth-limit review before making broader ordinary-query correctness or automatic-optimization claims.
+
 ## Report explanation completed — 13 October 2026
 
 The user asked where the automatic-performance recommendation was specified and then challenged its wording. The report now explains "shared preparation" as the setup/checks before an analysis, distinguishes measured phase time from an unproven cause, and describes how to investigate cheaper checks and narrowly recognized query improvements. New open TODOs #11 and #12 track those investigations with completion criteria and source links. They do not authorize implementation, additional benchmark studies, new author requirements, or bypassing existing checks. No runtime changes were made.

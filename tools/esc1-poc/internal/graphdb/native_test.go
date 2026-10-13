@@ -142,8 +142,12 @@ func TestNativeRejectsWritesAndBackendMismatchBeforeOpeningCallback(t *testing.T
 	var database = &nativeTestDatabase{}
 	plan := nativeTestPlan()
 	plan.Queries = []extension.Query{{Name: "bad.cypher", Text: "CREATE (item:User) RETURN item"}}
-	if _, err := RunNative(t.Context(), database, "neo4j", plan, nativeTestOptions(t)); err == nil {
+	report, err := RunNative(t.Context(), database, "neo4j", plan, nativeTestOptions(t))
+	if err == nil {
 		t.Fatal("accepted writing extension")
+	}
+	if report.Preparation.QueryValidation <= 0 || report.Preparation.Database != 0 || report.Execution.Elapsed != report.Elapsed {
+		t.Fatalf("missing or misleading rejected-file timing: %+v", report)
 	}
 	for _, backend := range []string{"unknown", "pg"} {
 		if _, err := RunNative(t.Context(), database, backend, nativeTestPlan(), nativeTestOptions(t)); err == nil {

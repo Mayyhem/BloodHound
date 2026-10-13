@@ -474,6 +474,9 @@ Only relationship producers can use `batch-on`, and reachability seed queries ca
 
 ## Performance and limits
 
+The [preparation follow-up](PREPARATION_AND_REACHABILITY.md) improves the internal identity check without changing author files. Automatic reachability replacement remains deferred. Modern Cypher `ANY` support is a proposed future language feature; it is not currently accepted by DAWGS.
+
+
 Reading output declarations happens when rules load. Returning `kind` adds one short string column per relationship row; it adds no graph traversal or additional database query. This change preserves the existing streaming, batching, and overlap algorithms. Its runtime overhead has not been benchmarked.
 
 Keep repeated work in shared prerequisite queries. Return only the columns consumers need. Keep joins tied to relevant kinds and object IDs, and avoid collecting every possible path when you only need to know which objects are connected.

@@ -1,0 +1,1 @@
+UNWIND ['Comparison_Group_000000000', 'Comparison_Group_000000001'] AS requested_root MATCH (member)-[:MemberOf|MemberOfLocalGroup*1..]->(root) WHERE root.objectid = requested_root RETURN requested_root, root.objectid AS actual_root, count(*) AS routes ORDER BY requested_root, actual_root

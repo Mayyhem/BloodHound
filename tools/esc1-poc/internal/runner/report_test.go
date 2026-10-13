@@ -22,6 +22,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
 )
@@ -152,5 +153,37 @@ func TestBroadInputsPreventUnsafeSkipping(t *testing.T) {
 	result, err = runner.Run(t.Context(), database, plan, options)
 	if err != nil || !result.Skipped {
 		t.Fatalf("known unchanged graph: %+v, %v", result, err)
+	}
+}
+
+// Failures and a true skip must report only the steps that were attempted.
+func TestPreparationTimesOnIdentityFailureAndSkip(t *testing.T) {
+	var (
+		database = fixtureDatabase()
+		plan     = fixturePlan()
+		settings = completeBatch()
+	)
+	if _, err := runner.Run(t.Context(), database, plan, settings); err != nil {
+		t.Fatal(err)
+	}
+	settings.Changes = runner.Changes{CoverageKnown: true}
+	skipped, err := runner.Run(t.Context(), database, plan, settings)
+	if err != nil || !skipped.Skipped || skipped.Preparation.Selection <= 0 || skipped.Preparation.Identities != 0 {
+		t.Fatalf("skip timings: %+v, %v", skipped, err)
+	}
+	settings.Changes = runner.Changes{}
+	database.readErrors[identityQuery] = errors.New("identity read failed")
+	failed, err := runner.Run(t.Context(), database, plan, settings)
+	if err == nil || failed.Committed || failed.Preparation.Identities <= 0 || failed.CalculationElapsed != 0 || failed.SavingElapsed != 0 {
+		t.Fatalf("failed identity timings: %+v, %v", failed, err)
+	}
+	for _, report := range []runner.Report{skipped, failed} {
+		var sum time.Duration
+		for _, elapsed := range []time.Duration{report.Preparation.Database, report.Preparation.Transaction, report.Preparation.Selection, report.Preparation.Identities} {
+			sum += elapsed
+		}
+		if sum > report.PreparationElapsed {
+			t.Fatalf("overlapping preparation times: %s > %s", sum, report.PreparationElapsed)
+		}
 	}
 }

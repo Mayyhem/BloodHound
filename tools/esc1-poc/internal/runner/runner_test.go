@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	identityQuery           = "MATCH (item) WHERE NOT (labels(item) = ['MigrationData'] AND NOT (item)--()) WITH item.objectid AS objectid, count(item) AS matches WHERE objectid IS NULL OR trim(objectid) = '' OR matches <> 1 RETURN objectid LIMIT 1"
+	identityQuery           = "MATCH (item) WHERE NOT (item:MigrationData AND size(labels(item)) = 1 AND NOT (item)--()) WITH item.objectid AS objectid, count(*) AS matches WHERE objectid IS NULL OR trim(objectid) = '' OR matches <> 1 RETURN objectid LIMIT 1"
 	helperQuery             = "RETURN 'helper fixture' AS fixture"
 	relationshipQuery       = "RETURN 'relationship fixture' AS fixture"
 	cycleQuery              = "MATCH path=(item)-[:MemberOf|MemberOfLocalGroup*1..]->(item) RETURN 1 AS cycle LIMIT 1"

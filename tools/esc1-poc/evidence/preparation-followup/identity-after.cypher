@@ -1,0 +1,1 @@
+MATCH (item) WHERE NOT (item:MigrationData AND size(labels(item)) = 1 AND NOT (item)--()) WITH item.objectid AS objectid, count(*) AS matches WHERE objectid IS NULL OR trim(objectid) = '' OR matches <> 1 RETURN objectid LIMIT 1

@@ -1,0 +1,108 @@
+{
+  "date": "2026-10-13",
+  "unit_tests": {
+    "packages": [
+      "internal/runner",
+      "internal/graphdb"
+    ],
+    "race": true,
+    "passed": true,
+    "seconds": [
+      9.805,
+      1.735
+    ]
+  },
+  "existing_identity_and_late_failure_tests": {
+    "passed": true,
+    "tests": [
+      "TestPostgresESC1IdentityGuard",
+      "TestPublicationGuardsPreserveGraph",
+      "TestIsolatedMigrationMetadataIdentity",
+      "TestNativeLatePublicationFailureRestoresPropertiesAndIDs"
+    ]
+  },
+  "new_native_identity_tests": {
+    "passed": true,
+    "cases": 13,
+    "backends": [
+      "neo4j",
+      "pg"
+    ],
+    "notes": "Twelve cases passed in the final whole-table run. The migration-duplicate fixture initially collided with a published endpoint and correctly hit a later PG safeguard; after selecting a non-endpoint ID, that case passed on both backends in its targeted rerun. No production behavior was relaxed."
+  },
+  "ordinary_and_advanced_cases": {
+    "passed": true,
+    "race": true,
+    "seconds": 44.175,
+    "cases": [
+      "baseline",
+      "no_template_permissions",
+      "parallel_membership_links",
+      "missing_identifier",
+      "blank_identifier",
+      "duplicate_identifier",
+      "membership_self_link"
+    ],
+    "variants": [
+      "advanced",
+      "ordinary-reach",
+      "no-batch",
+      "ordinary-groups",
+      "ordinary-all"
+    ],
+    "backends": [
+      "neo4j",
+      "postgresql"
+    ]
+  },
+  "vet": {
+    "tags": [
+      "integration"
+    ],
+    "packages": [
+      "internal/runner",
+      "internal/graphdb"
+    ],
+    "passed": true
+  },
+  "inspection_tool_build": true,
+  "measurement_script_syntax": true,
+  "known_changes_selection": {
+    "pg_nanoseconds": 4445559,
+    "neo4j_nanoseconds": 359674053,
+    "saved_answers_match": true,
+    "repetitions": 1,
+    "after_container_restart": true,
+    "part_of_repeated_comparison": false
+  },
+  "dawgs_full_suites_repeated": false,
+  "dawgs_changed_by_this_followup": false,
+  "prepare_for_codereview_run": false,
+  "reason": "No commit was requested or performed. Required before the user commits.",
+  "private_log_sha256": {
+    "unit-tests-final.log": "bcc2b0d1b5509b5defb99d5af7cc904071c7166c75b979ecbe7a97a4be44c6d5",
+    "identity-tests.log": "9b0f45cc3acf2709ca202e6ccb59955549db92d052e0660c1771159fa8ee1ca1",
+    "preparation-tests.log": "6bbde267c723f56869fc6f439aaa1a96757aa357c2c7fbf2e5d430044f405426",
+    "migration-duplicate-test.log": "57a9944d42d953e4da7ebe530b5bbb82b427765881f32e5f2a4dde3827540ac6",
+    "cypher-tests.log": "ddaf69f688c7aaef62b8e2fe17a44e5b42e31ba292d26a110476e68ff089465f",
+    "vet-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "earlier_test_setup_corrections": [
+    "Removed an unused test import after generalizing the snapshot helper.",
+    "Changed the Neo4j-only snapshot variable name node to item so PostgreSQL could parse it."
+  ],
+  "reachability_shortcut_enabled": false,
+  "reachability_investigation_outcome": "Deferred; input/result association discrepancy reproduced and tracked in TODO 13; path-bound and ANY support decisions documented.",
+  "original_database_storage_changed": false,
+  "application_or_rule_service_deployed": false,
+  "staged": false,
+  "committed": false,
+  "final_container_states": {
+    "esc1-followup-test-graph-1": "exited",
+    "esc1-followup-test-pg-graph-1": "exited",
+    "esc1-followup-check-test-graph-1": "exited",
+    "esc1-followup-check-test-pg-graph-1": "exited",
+    "esc1-poc-test-graph-1": "exited",
+    "esc1-poc-test-pg-graph-1": "exited"
+  }
+}

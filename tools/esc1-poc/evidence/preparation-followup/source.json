@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-13",
+  "bloodhound_commit": "253670cde0acd993e428089536dd5e22d3262831",
+  "dawgs_commit": "5f16c574e48045472d15a447c2fa9707d394a4bd",
+  "dawgs_preexisting_uncommitted_patch_sha256": "b794195cb7cf09c145979440f0807ccb0802295b1548dbac775a54e5c37bc23f",
+  "dawgs_changed_by_this_followup": false,
+  "dataset": {
+    "objects": 100000,
+    "relationships": 100316,
+    "membership_objects": 125,
+    "membership_pairs": 490,
+    "template_authority_pairs": 2,
+    "relevant_share": 0.00132,
+    "directory_users": 50033,
+    "vault_accounts": 49934,
+    "answer_shape": "users",
+    "creation_order_sha256": "edde2c42fd5e228d33d09d47b251c1dfabcda2e5f0d9b069415f2bef1e67acf4",
+    "load_nanoseconds": 15021518478
+  },
+  "go_version": "go version go1.27.1 linux/amd64",
+  "repetitions_per_version_backend": 3,
+  "warmups_per_version_backend": 1,
+  "measured_style": "advanced",
+  "changes_coverage_known": false,
+  "explicit_analyze_before_timing": false,
+  "notes": [
+    "Both builds include identical preparation timing instrumentation. Only the internal identity query differs.",
+    "The final source additionally reports failed file-validation time and synchronizes the two elapsed-time fields. Those reporting-only edits followed timing.",
+    "Initial load and first-run diagnostics, and plans captured during Neo4j loading, are not included in the comparison.",
+    "A measurement script result-recording error stopped after one extra warmup. The final sequence restarted and retained all its observations.",
+    "No concurrent benchmark or test process ran during the final measurement sequence."
+  ],
+  "expected_connections": 100,
+  "expected_same_saved_output_hash_on_both_backends": true,
+  "query_timeout_seconds": 900,
+  "run_timeout_seconds": 300,
+  "original_databases_untouched": true
+}

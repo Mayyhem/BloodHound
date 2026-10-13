@@ -1,0 +1,1 @@
+MATCH (member)-[:MemberOf|MemberOfLocalGroup*1..]->(root) WHERE root.objectid = 'Comparison_Group_000000000' RETURN DISTINCT member.objectid AS member

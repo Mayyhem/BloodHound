@@ -25,7 +25,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/specterops/bloodhound/tools/esc1-poc/internal/graphdb"
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
 )
 
@@ -283,10 +282,10 @@ func (s lostCommitAcknowledgementTransaction) Commit(ctx context.Context) error 
 	return errors.New("simulated lost commit acknowledgement")
 }
 
-func guardGraphSnapshot(t *testing.T, database *graphdb.Database) []runner.Rows {
+func guardGraphSnapshot(t *testing.T, database runner.Database) []runner.Rows {
 	t.Helper()
 	var (
-		nodes = read(t, database, "MATCH (node) RETURN id(node) AS id, labels(node) AS kinds, properties(node) AS properties ORDER BY id", nil)
+		nodes = read(t, database, "MATCH (item) RETURN id(item) AS id, labels(item) AS kinds, properties(item) AS properties ORDER BY id", nil)
 		edges = read(t, database, "MATCH (source)-[edge]->(target) RETURN id(edge) AS id, id(source) AS source, id(target) AS target, type(edge) AS kind, properties(edge) AS properties ORDER BY id", nil)
 	)
 	return []runner.Rows{nodes, edges}

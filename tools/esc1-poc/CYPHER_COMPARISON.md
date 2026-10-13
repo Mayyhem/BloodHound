@@ -270,7 +270,7 @@ A separate usability improvement is a readable way to reject invalid evidence wi
 
 ## Follow-up: reduce setup work and improve queries automatically
 
-These are proposed investigations, tracked as [TODO #11](TODO.md#11-make-the-checks-before-an-analysis-cheaper) and [TODO #12](TODO.md#12-improve-ordinary-queries-without-extra-instructions). They have not been implemented or measured. Their order applies to performance follow-up; it does not replace the separate authoring and interface priorities.
+**Follow-up completed 13 October 2026:** [the separate report](PREPARATION_AND_REACHABILITY.md) records the measured preparation change for TODO #11 and the decision to defer an automatic reachability replacement for #12. It also records a newly demonstrated PostgreSQL input/result association error, now #13, and the proposed Cypher `ANY` direction. The earlier comparison measurements above are unchanged. The original investigation rationale is retained below; it is not a claim that the proposed automatic replacement was implemented.
 
 ### Make the checks before an analysis cheaper
 

@@ -113,32 +113,47 @@ The comparison cleanup exposed a separate DAWGS problem: `MATCH (n) WITH n LIMIT
 
 ## 11. Make the checks before an analysis cheaper
 
-The million-object PostgreSQL comparison spent about 4.8 seconds preparing an advanced run and 0.3 seconds calculating it. Both authoring styles perform this preparation. It includes database setup, selecting the rules to run, and checking object identities. The current measurements do not identify which part accounts for most of the time. This item investigates that cost without removing checks or adding author instructions.
+**Completed: 13 October 2026.** Separate timers identified avoidable work in the whole-graph identity query. An equivalent query reduced PostgreSQL preparation by 24.4% in the targeted 100,000-object comparison, with identical saved answers and identity/failure checks on both databases. Neo4j timing ranges overlap. See [the follow-up report](PREPARATION_AND_REACHABILITY.md) and [retained evidence](evidence/preparation-followup/README.md).
 
-- [ ] Measure the separate preparation steps before choosing a change: database type/index preparation, opening the transaction, selecting affected rules, and checking missing, empty or duplicate object IDs.
-- [ ] Use those measurements to identify unnecessary repetition or an expensive database query. Prefer an equivalent, cheaper check or removing proven duplicate work within one run while the checked information remains unchanged.
-- [ ] Preserve the full scope of identity checks, including unrelated objects and the narrow exception for isolated migration records. Do not make checks optional for authors.
-- [ ] Keep reuse across separate runs out of the first change. Any later proposal must explain how imports, writes, rule changes and restarts invalidate old checks; coordinate that proposal with #9.
-- [ ] Check exact results and failure preservation on both databases, then measure preparation and complete-run time separately with a small, targeted comparison. Reuse the existing evidence; do not repeat the full comparison matrix by default.
+The million-object PostgreSQL comparison spent about 4.8 seconds preparing an advanced run and 0.3 seconds calculating it. Both authoring styles perform this preparation. It includes database setup, selecting the rules to run, and checking object identities. Those earlier phase totals did not identify which part accounted for most of the time. This follow-up investigated that cost without removing checks or adding author instructions.
+
+- [x] Measure the separate preparation steps before choosing a change: database type/index preparation, opening the transaction, selecting affected rules, and checking missing, empty or duplicate object IDs.
+- [x] Use those measurements to identify unnecessary repetition or an expensive database query. Prefer an equivalent, cheaper check or removing proven duplicate work within one run while the checked information remains unchanged.
+- [x] Preserve the full scope of identity checks, including unrelated objects and the narrow exception for isolated migration records. Do not make checks optional for authors.
+- [x] Keep reuse across separate runs out of the first change. Any later proposal must explain how imports, writes, rule changes and restarts invalidate old checks; coordinate that proposal with #9.
+- [x] Check exact results and failure preservation on both databases, then measure preparation and complete-run time separately with a small, targeted comparison. Reuse the existing evidence; do not repeat the full comparison matrix by default.
 
 **Done when:** the cost of each preparation step is documented and a targeted change demonstrates lower cost with the same protections, or the investigation records why a proposed change should be deferred. Do not claim a speedup from the existing phase totals alone.
 
-See [how this would work](CYPHER_COMPARISON.md#follow-up-reduce-setup-work-and-improve-queries-automatically). Start in [runner setup and identity checks](internal/runner/runner.go) and [database-specific preparation](internal/graphdb/native.go). This is proposed follow-up work, not part of the completed comparison.
+See [how this would work](CYPHER_COMPARISON.md#follow-up-reduce-setup-work-and-improve-queries-automatically). Start in [runner setup and identity checks](internal/runner/runner.go) and [database-specific preparation](internal/graphdb/native.go). This is a separate completed follow-up, not a revision of the earlier comparison measurements.
 
 ## 12. Improve ordinary queries without extra instructions
 
+**Investigation completed: 13 October 2026; automatic replacement deferred.** The PostgreSQL execution plan exposed a repeated-input association error, now tracked in #13. Reusing the advanced calculation also requires decisions about path bounds, loops and exact query meaning. No new query shortcut or author-file requirement was introduced. [The report](PREPARATION_AND_REACHABILITY.md#what-the-ordinary-reachability-plans-showed) includes measured plans, mismatched answers, a narrow candidate, and the proposed modern Cypher `ANY` alternative.
+
 Investigate whether the engine can perform a clearly recognized ordinary query more efficiently while returning exactly the answer it requests. Begin with distinct reachable objects, where the comparison identified a PostgreSQL cost. This does not assume that arbitrary Cypher can be replaced with the advanced calculations.
 
-- [ ] Inspect the database's execution plan for one expensive query form. First check for unnecessary reads or repeated work that can be corrected directly, as happened with the already selected endpoint during this study.
-- [ ] If a dedicated reachability calculation is justified, describe one narrowly supported query form and its exact meaning. Recognize it by reading the query's structure and operations, not by matching a few words or guessing from the current data.
-- [ ] Establish matching behavior for permitted links, direction, starting objects, path bounds, loops, filters, empty answers and repeated rows. Queries requesting routes, lengths, ordering or other unsupported behavior must retain ordinary execution.
-- [ ] Preserve existing time, memory, input and saving protections. Resolve any dependence on unrestricted path searches with the separately documented depth-limit review; this task does not authorize removing another limit.
-- [ ] Compare the same query with the change enabled and disabled, using written expected answers on both databases. Confirm that unsupported forms take the ordinary path. Measure a small relevant before/after set and enable a shortcut only where its measured cost justifies it.
-- [ ] Document the accepted query forms, where the change runs, measured benefit and remaining limits. Leave automatic group selection and automatic input splitting for separate proposals unless their equivalence can also be established explicitly.
+- [x] Inspect the database's execution plan for one expensive query form. First check for unnecessary reads or repeated work that can be corrected directly, as happened with the already selected endpoint during this study.
+- [ ] **Deferred:** If a dedicated reachability calculation is justified, describe one narrowly supported query form and its exact meaning. Recognize it by reading the query's structure and operations, not by matching a few words or guessing from the current data.
+- [ ] **Deferred with the implementation:** Establish matching behavior for permitted links, direction, starting objects, path bounds, loops, filters, empty answers and repeated rows. Queries requesting routes, lengths, ordering or other unsupported behavior must retain ordinary execution.
+- [x] Preserve existing time, memory, input and saving protections. Resolve any dependence on unrestricted path searches with the separately documented depth-limit review; this task does not authorize removing another limit.
+- [ ] **Not applicable until a shortcut exists:** Compare the same query with the change enabled and disabled, using written expected answers on both databases. Confirm that unsupported forms take the ordinary path. Measure a small relevant before/after set and enable a shortcut only where its measured cost justifies it.
+- [x] Document the investigation outcome: no new accepted query forms or enabled shortcut, the observed costs and answer discrepancy, and the work needed before implementation. Leave automatic group selection and automatic input splitting for separate proposals unless their equivalence can also be established explicitly.
 
 **Done when:** one supported form receives a verified automatic improvement without author-file changes, or the investigation records why it should remain ordinary Cypher. Other forms must continue to work with their existing meaning and limits. No general automatic optimizer or new speedup is promised by this TODO.
 
 See [how this would work](CYPHER_COMPARISON.md#follow-up-reduce-setup-work-and-improve-queries-automatically). Start in [DAWGS query translation](../DAWGS/cypher/models/pgsql/translate), [query execution](internal/runner/calculate.go), and [the existing reachability calculation](internal/runner/reach.go). Within this performance follow-up, investigate #11 first. The previously listed authoring and interface work remains separate.
+
+## 13. Preserve the starting input for ordinary path results
+
+The #12 investigation found that PostgreSQL can combine each `UNWIND` input with paths belonging to other input rows. An ordinary query retaining both the requested starting ID and actual starting object returns mismatched pairs, despite its `WHERE` requiring them to agree. ESC1's membership query hides those extra rows with `DISTINCT`, but still pays for the extra work.
+
+- [ ] Add matching, written-answer cases on both databases for several starting objects, repeated and empty inputs, zero-length paths, direction, and returned input columns.
+- [ ] Correct how DAWGS reconnects supplied input rows with path results. Preserve legitimate repeated answers; deleting the input join alone is not sufficient.
+- [ ] Check required and optional matches, filters, bounds, route/count results and saving queries before making broader performance claims.
+- [ ] Repeat the single membership-query plan and a small exact-answer comparison. Keep automatic reachability selection separate until its meaning and limits are agreed.
+
+**Done when:** each result remains associated with the input that selected it, on both databases, and the unnecessary combinations are absent without losing requested repeated rows. See [the recorded query and answers](PREPARATION_AND_REACHABILITY.md#what-the-ordinary-reachability-plans-showed). Start in DAWGS `buildExpansionPatternRoot` in `cypher/models/pgsql/translate/expansion.go`. This discovered correctness follow-up was documented, not implemented, during #11/#12.
 
 ## Done
 

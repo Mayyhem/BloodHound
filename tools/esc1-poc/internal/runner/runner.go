@@ -103,8 +103,20 @@ type Report struct {
 	NativeComparison    *Comparison       `json:"native_comparison,omitempty"`
 	Elapsed             time.Duration     `json:"elapsed_nanoseconds"`
 	PreparationElapsed  time.Duration     `json:"preparation_nanoseconds"`
+	Preparation         PreparationTimes  `json:"preparation_steps"`
 	CalculationElapsed  time.Duration     `json:"calculation_nanoseconds"`
 	SavingElapsed       time.Duration     `json:"saving_nanoseconds"`
+}
+
+// PreparationTimes separates the checks before calculation. These are elapsed
+// times, including failed checks. They exclude temporary-file setup and cleanup,
+// so their sum can be smaller than PreparationElapsed.
+type PreparationTimes struct {
+	QueryValidation time.Duration `json:"query_validation_nanoseconds"`
+	Database        time.Duration `json:"database_nanoseconds"`
+	Transaction     time.Duration `json:"transaction_nanoseconds"`
+	Selection       time.Duration `json:"selection_nanoseconds"`
+	Identities      time.Duration `json:"identities_nanoseconds"`
 }
 
 // Run finishes and checks every calculation before publishing changes. Reads
@@ -121,6 +133,7 @@ func Run(ctx context.Context, database Database, plan extension.Plan, options Op
 
 func run(ctx context.Context, database Database, plan extension.Plan, options Options, report *Report) error {
 	var (
+		stepStarted  time.Time
 		phaseStarted = time.Now()
 		phaseElapsed = &report.PreparationElapsed
 	)
@@ -146,10 +159,15 @@ func run(ctx context.Context, database Database, plan extension.Plan, options Op
 	}
 	defer space.close()
 	space.observeAnswer = options.ObserveAnswer
-	if err := prepareDatabase(ctx, database, plan); err != nil {
+	stepStarted = time.Now()
+	err = prepareDatabase(ctx, database, plan)
+	report.Preparation.Database = time.Since(stepStarted)
+	if err != nil {
 		return err
 	}
+	stepStarted = time.Now()
 	transaction, err := database.Begin(ctx)
+	report.Preparation.Transaction = time.Since(stepStarted)
 	if err != nil {
 		return err
 	}
@@ -159,12 +177,14 @@ func run(ctx context.Context, database Database, plan extension.Plan, options Op
 
 	// The saved hash always describes the WHOLE plan, even when this run only
 	// checks part of it. A first run or any edit must establish a new baseline.
+	stepStarted = time.Now()
 	planHash := fingerprint(plan)
 	plan = runnablePlan(plan)
 	report.Execution.selectQueries(plan, "The rules are new or changed, or the complete set of input changes is unknown.")
 	if options.Changes.CoverageKnown {
 		previous, err := transaction.Read(ctx, "MATCH (run:PoC_Run {objectid: $id}) RETURN run.plan_hash AS plan_hash", map[string]any{"id": stateID(plan)})
 		if err != nil {
+			report.Preparation.Selection = time.Since(stepStarted)
 			return err
 		}
 		if len(previous) == 1 && previous[0]["plan_hash"] == planHash {
@@ -172,18 +192,25 @@ func run(ctx context.Context, database Database, plan extension.Plan, options Op
 			report.Execution.selectQueries(plan, "A confirmed input change affects this query or a connected calculation.")
 			if len(plan.Queries) == 0 && len(plan.RetiredRelationships) == 0 {
 				report.Skipped = true
+				report.Preparation.Selection = time.Since(stepStarted)
 
 				return nil
 			}
 		}
 	}
+	report.Preparation.Selection = time.Since(stepStarted)
 	// Missing IDs in an intermediate query can disappear from a collected list.
 	// Check them before that happens, so malformed evidence cannot look like a
 	// valid reason to remove an old connection. Duplicate IDs are ambiguous too.
 	// Native BloodHound also keeps an isolated MigrationData node with version
 	// numbers and no objectid. It is bookkeeping, not collected evidence. Exempt
 	// only that exact standalone kind; any connection makes its identity required.
-	invalidIdentities, err := transaction.Read(ctx, "MATCH (item) WHERE NOT (labels(item) = ['MigrationData'] AND NOT (item)--()) WITH item.objectid AS objectid, count(item) AS matches WHERE objectid IS NULL OR trim(objectid) = '' OR matches <> 1 RETURN objectid LIMIT 1", nil)
+	// Testing the kind first avoids looking up every object's type names on
+	// PostgreSQL. The size check still excludes records with any extra kind.
+	// Every matched item exists, so counting rows preserves the duplicate check.
+	stepStarted = time.Now()
+	invalidIdentities, err := transaction.Read(ctx, "MATCH (item) WHERE NOT (item:MigrationData AND size(labels(item)) = 1 AND NOT (item)--()) WITH item.objectid AS objectid, count(*) AS matches WHERE objectid IS NULL OR trim(objectid) = '' OR matches <> 1 RETURN objectid LIMIT 1", nil)
+	report.Preparation.Identities = time.Since(stepStarted)
 	if err != nil {
 		return fmt.Errorf("check graph identities: %w", err)
 	}

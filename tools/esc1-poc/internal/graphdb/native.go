@@ -36,6 +36,12 @@ import (
 // write gate for the whole call and continues to own the driver's lifecycle.
 // backend is the application's resolved graph driver, not an uploaded setting.
 func RunNative(ctx context.Context, database graph.Database, backend string, plan extension.Plan, options runner.Options) (runner.Report, error) {
+	var (
+		started           = time.Now()
+		validationElapsed time.Duration
+		report            runner.Report
+		err               error
+	)
 	if database == nil {
 		return runner.Report{}, errors.New("native graph database is required")
 	}
@@ -50,23 +56,38 @@ func RunNative(ctx context.Context, database graph.Database, backend string, pla
 			continue
 		}
 		if err := validatePostgresRead(statement.Text); err != nil {
-			return runner.RejectedQueryReport(plan, options, statement.Name, err), fmt.Errorf("%s (%s): %w", statement.Name, backend, err)
+			report = runner.RejectedQueryReport(plan, options, statement.Name, err)
+			recordNativeValidation(&report, time.Since(started))
+			return report, fmt.Errorf("%s (%s): %w", statement.Name, backend, err)
 		}
 	}
+	validationElapsed = time.Since(started)
 	var driver, postgres = graph.AsDriver[*pg.Driver](database)
 	switch backend {
 	case "pg", "postgres", "postgresql":
 		if !postgres || driver == nil {
 			return runner.Report{}, errors.New("native PostgreSQL driver does not match the selected backend")
 		}
-		return runner.Run(ctx, &nativePostgresDatabase{PostgresDatabase: &PostgresDatabase{driver: driver}, native: database}, plan, options)
+		report, err = runner.Run(ctx, &nativePostgresDatabase{PostgresDatabase: &PostgresDatabase{driver: driver}, native: database}, plan, options)
 	case "neo4j":
 		if postgres {
 			return runner.Report{}, errors.New("native Neo4j driver does not match the selected backend")
 		}
-		return runNativeNeo4j(ctx, database, plan, options)
+		report, err = runNativeNeo4j(ctx, database, plan, options)
 	default:
 		return runner.Report{}, fmt.Errorf("unsupported native graph backend %q", backend)
+	}
+	// File-language checks happen before runner.Run; keep their cost visible too.
+	recordNativeValidation(&report, validationElapsed)
+	return report, err
+}
+
+func recordNativeValidation(report *runner.Report, elapsed time.Duration) {
+	report.Preparation.QueryValidation = elapsed
+	report.PreparationElapsed += elapsed
+	report.Elapsed += elapsed
+	if report.Execution != nil {
+		report.Execution.Elapsed = report.Elapsed
 	}
 }
 
@@ -208,6 +229,7 @@ func runNativeNeo4j(ctx context.Context, database graph.Database, plan extension
 		callbackError                     error
 		callbackStarted, callbackFinished time.Time
 		entered                           bool
+		databaseElapsed                   time.Duration
 		borrowed                          = &nativeNeo4jDatabase{database: database}
 	)
 	if limits == (runner.Limits{}) {
@@ -217,9 +239,11 @@ func runNativeNeo4j(ctx context.Context, database graph.Database, plan extension
 	defer cancel()
 	if err := runner.PrepareDatabase(ctx, borrowed, plan); err != nil {
 		report.PreparationElapsed = time.Since(started)
+		report.Preparation.Database = report.PreparationElapsed
 		report.Elapsed = report.PreparationElapsed
 		return report, err
 	}
+	databaseElapsed = time.Since(started)
 	borrowed.prepared = true
 	err := database.WriteTransaction(ctx, func(transaction graph.Transaction) error {
 		callbackStarted = time.Now()
@@ -234,9 +258,13 @@ func runNativeNeo4j(ctx context.Context, database graph.Database, plan extension
 	// Include that preparation and final save/rollback in the phase measurements.
 	if entered {
 		report.PreparationElapsed += callbackStarted.Sub(started)
+		report.Preparation.Database += databaseElapsed
+		report.Preparation.Transaction += callbackStarted.Sub(started) - databaseElapsed
 		report.SavingElapsed += time.Since(callbackFinished)
 	} else {
 		report.PreparationElapsed = time.Since(started)
+		report.Preparation.Database = databaseElapsed
+		report.Preparation.Transaction = report.PreparationElapsed - databaseElapsed
 	}
 	report.Elapsed = time.Since(started)
 	if err != nil {

@@ -48,6 +48,7 @@ Existing settings give BloodHound the rule container's address and access secret
 | Use supplied extensions and understand what happens after uploads or rule changes | [End-user questions and answers](END_USERS.md) |
 | Write my first extension or look up the authoring rules | [Developer guide and quick start](DEVELOPERS.md) |
 | Extend the starter with shared answers, helpers, and properties | [Step-by-step examples](DEVELOPERS.md#continue-with-the-same-example) |
+| Review cheaper preparation checks and the reachability investigation | [Focused follow-up and findings](PREPARATION_AND_REACHABILITY.md) |
 | Review planned improvements to extension development | [Developer experience backlog](TODO.md) |
 | Read the proposal and how the pilot addresses each problem | [OpenGraph analysis proposal](PROPOSAL.md) |
 | Start it, upload rules, and find the results | [Usage guide](USAGE.md) |
