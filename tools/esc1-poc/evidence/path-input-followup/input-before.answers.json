@@ -1,0 +1,22 @@
+[
+  {
+    "actual_root": "Comparison_Group_000000000",
+    "requested_root": "Comparison_Group_000000000",
+    "routes": 166
+  },
+  {
+    "actual_root": "Comparison_Group_000000001",
+    "requested_root": "Comparison_Group_000000000",
+    "routes": 46
+  },
+  {
+    "actual_root": "Comparison_Group_000000000",
+    "requested_root": "Comparison_Group_000000001",
+    "routes": 166
+  },
+  {
+    "actual_root": "Comparison_Group_000000001",
+    "requested_root": "Comparison_Group_000000001",
+    "routes": 46
+  }
+]

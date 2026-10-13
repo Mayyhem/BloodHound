@@ -1,0 +1,42 @@
+{
+  "date": "2026-10-13",
+  "bloodhound_commit": "7110b5c36a9fb0b828596af6a032520ba51cf43f",
+  "dawgs_commit": "5f16c574e48045472d15a447c2fa9707d394a4bd",
+  "dawgs_before_patch_sha256": "b794195cb7cf09c145979440f0807ccb0802295b1548dbac775a54e5c37bc23f",
+  "dataset": {
+    "objects": 100000,
+    "relationships": 100316,
+    "membership_objects": 125,
+    "membership_pairs": 490,
+    "template_authority_pairs": 2,
+    "relevant_share": 0.00132,
+    "directory_users": 50033,
+    "vault_accounts": 49934,
+    "answer_shape": "users",
+    "creation_order_sha256": "edde2c42fd5e228d33d09d47b251c1dfabcda2e5f0d9b069415f2bef1e67acf4",
+    "load_nanoseconds": 15021518478
+  },
+  "go_version": "go version go1.27.1 linux/amd64",
+  "styles": [
+    "advanced",
+    "ordinary"
+  ],
+  "repetitions_per_style_version_backend": 3,
+  "warmups_per_style_version_backend": 1,
+  "query_timeout_seconds": 900,
+  "run_timeout_seconds": 300,
+  "inspection_timeout_seconds": 120,
+  "explicit_analyze_before_timing": false,
+  "original_databases_untouched": true,
+  "expected_connections": 100,
+  "expected_membership_objects": 125,
+  "expected_saved_outputs_sha256": "820300fae60fa274af78a6d210938073ec36be9ca6d594a165e96ae431537228",
+  "notes": [
+    "Before includes all earlier uncommitted DAWGS work and the already committed preparation fix.",
+    "After additionally includes the path input, optional duplicate input, empty input, zero upper bound and CREATE source corrections.",
+    "Both complete authoring styles ran sequentially, followed by separate read-only plan measurements.",
+    "No tests, builds or other benchmark process launched by this task ran during timing. Host load was not held constant; retain all observations and do not infer a reliable whole-run percentage from the noisy totals.",
+    "There is no separate reachability shortcut or new author syntax. Both optimizer settings retain the correctness fix.",
+    "After timing, empty-input bookkeeping was moved from a newly added binding flag to a private scope map so public type definitions remain unchanged. The complete SQL translation cases still match, and focused tests repeat both databases and optimizer modes after this internal change."
+  ]
+}

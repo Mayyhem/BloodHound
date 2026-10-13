@@ -4,7 +4,7 @@ Make the code, architecture, and documentation easy to understand. This is the m
 
 If I don't ask you to start coding, don't start coding. Request permission if you are uncertain. 
 
-Prioritize ease of use and understanding for extension developers. Changes to DAWGS and BloodHound are allowed if necessary but should be minimized unless it makes things easier for extension developers or enhances performance significantly.
+Prioritize ease of use and understanding for extension developers. Changes to DAWGS and BloodHound are allowed if necessary but should be minimized unless it makes things easier for extension developers or enhances performance significantly. These changes MUST not remove functionality, change API contracts, or otherwise negatively impact the current user experience.
 
 Don't change the requirements for extension authors (e.g., schema.json or .cypher file definitions) based on assumptions without my approval. 
 

@@ -2,6 +2,8 @@
 
 See [the report](../../PREPARATION_AND_REACHABILITY.md) for conclusions and limitations. This is a separate, small follow-up to the earlier comparison. All graph data here is synthetic.
 
+These files retain the initial #11/#12 investigation, including the failing path-input query. The later #13 correction and completed #12 direct improvement are recorded separately in [path-input-followup](../path-input-followup/README.md); the older observations below are not measurements of the corrected code.
+
 - `measurements.json`: complete reports, including separately marked warmups. Three timed repetitions per version/backend: 12 timed observations and four warmups. Versions alternate, backends run sequentially. Complete saved-answer hashes agree within and across databases.
 - `pg-known-changes.json`, `neo4j-known-changes.json`: one affected-rule selection diagnostic per database after restart, with saved-answer checks; not part of the repeated timing table.
 - `pg-settings.json`, `container-settings.txt`: actual PostgreSQL settings and container image/resource configuration, recorded after the study.
@@ -11,6 +13,7 @@ See [the report](../../PREPARATION_AND_REACHABILITY.md) for conclusions and limi
 - `reach.cypher`, `reach-plan.{sql,json}`: a simple distinct-member query and its measured execution plan.
 - `membership-plan.{sql,json}`: the complete ordinary membership query with the fixture's 101 starting objects.
 - `reach-input-check*`: the query, translated SQL and PostgreSQL/Neo4j answers demonstrating incorrect input/result association. Written expectation: `requested_root` must equal `actual_root` in every row. PostgreSQL violates that condition twice; Neo4j satisfies it.
+- `reach-input-release-*`: separate checks of that same query using clean DAWGS v0.9.0 and v0.9.1. Both fail with a missing `s0` relation; they do not reproduce the modified checkout's wrong answers. The JSON record identifies source commits, method and limits; each SQL file is the unmodified translation emitted before execution failed.
 
 Plans use `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` and execute the read query. Their rows and loops are observed, unlike the older comparison's estimated plans. They include measurement overhead and are not complete-run timing samples. Kind numbers and object IDs belong to this generated database. `inspect.go` reads its kind mapping before translating a query.
 

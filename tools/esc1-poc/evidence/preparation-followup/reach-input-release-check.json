@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-13",
+  "query": "reach-input-check.cypher",
+  "inspector": "inspect.go",
+  "method": "Export each clean DAWGS tag with git archive, build the existing inspector within its module using go build -mod=readonly, and execute against the existing synthetic PostgreSQL graph in a read-only transaction.",
+  "fixture": "cypher_comparison in esc1-followup-test-pg-graph-1",
+  "failure_stage": "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)",
+  "checks": [
+    {
+      "version": "v0.9.0",
+      "commit": "72ea7171b5712e838ff5a174692697c041952d13",
+      "sql": "reach-input-release-v0.9.0.sql",
+      "exit_code": 2,
+      "error": "ERROR: relation \"s0\" does not exist (SQLSTATE 42P01)",
+      "answers_returned": false
+    },
+    {
+      "version": "v0.9.1",
+      "commit": "1d7915c65f5fb40933016f3be2a09933caf4c158",
+      "sql": "reach-input-release-v0.9.1.sql",
+      "exit_code": 2,
+      "error": "ERROR: relation \"s0\" does not exist (SQLSTATE 42P01)",
+      "answers_returned": false
+    }
+  ],
+  "bloodhound_dependency_source": "https://raw.githubusercontent.com/SpecterOps/BloodHound/v9.8.0/go.mod",
+  "bloodhound_v9_8_0_dawgs_version": "v0.9.0",
+  "released_application_endpoint_tested": false,
+  "customer_workloads_tested": false,
+  "graph_mutations": false,
+  "fixture_container_restored_to_stopped": true
+}

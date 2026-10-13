@@ -1,8 +1,8 @@
 # Preparation costs and ordinary reachability
 
-13 October 2026. This is the focused follow-up for TODOs #11 and #12, separate from the completed [large Cypher comparison](CYPHER_COMPARISON.md).
+13 October 2026. This is the focused follow-up for TODOs #11, #12 and #13, separate from the completed [large Cypher comparison](CYPHER_COMPARISON.md).
 
-**#11 is implemented:** reports separate the preparation steps, and an equivalent identity check avoids unnecessary type-name lookups. **#12's investigation is complete, with automatic replacement deferred:** inspecting an ordinary query exposed a PostgreSQL input/result association error that should be corrected first. No new reachability shortcut, author instruction, or path-limit change was introduced.
+**#11 is implemented:** reports separate the preparation steps, and an equivalent identity check avoids unnecessary type-name lookups. **#13 now corrects path/input association. #12 is completed through its direct-correction approach:** the unchanged ordinary membership query does less unnecessary work, with identical complete answers. Its instrumented PostgreSQL execution median fell from 1.278 seconds to 0.127 seconds in the focused follow-up. No separate reachability algorithm, author instruction, or additional path-limit change was introduced.
 
 ## What changed before an analysis
 
@@ -62,7 +62,7 @@ Every measured run saved the same exact 100 connections and helper properties. T
 
 ## What the ordinary reachability plans showed
 
-A simple query asking for distinct members beneath one group used indexed lookups and completed its instrumented PostgreSQL execution in 2.298 ms. It expanded 166 paths and returned 124 distinct objects. That plan does not justify introducing a separate calculation for every distinct-reach query.
+The initial investigation, before the input correction below, found that a simple query asking for distinct members beneath one group used indexed lookups and completed its instrumented PostgreSQL execution in 2.298 ms. It expanded 166 paths and returned 124 distinct objects. That plan does not justify introducing a separate calculation for every distinct-reach query.
 
 The complete ordinary `membership_reach.cypher` query was more revealing. Its supplied input contained 101 starting objects. The first expansion produced 267 rows, then PostgreSQL combined every one with all 101 input rows: **26,967 rows before `DISTINCT` reduced them to 125 objects**. The full instrumented plan took 839.302 ms; approximately 747 ms was database code-generation work. Those single plan observations include measurement overhead and are diagnostics, not repeated speed comparisons.
 
@@ -79,11 +79,56 @@ ORDER BY requested_root, actual_root
 
 The `WHERE` requires both returned root names to agree. Neo4j returns those two matching pairs. PostgreSQL returns those pairs **and two mismatched pairs**. The [recorded answers](evidence/preparation-followup/reach-input-check.answers.json) and [Neo4j output](evidence/preparation-followup/reach-input-check-neo4j.txt) preserve the discrepancy. The supplied membership query discards the starting-object column and applies `DISTINCT`, which explains why the earlier exact ESC1 checks did not expose this error.
 
-This points to how DAWGS reconnects an `UNWIND` input with an ordinary path result in `buildExpansionPatternRoot` in `translate/expansion.go`. A correction must preserve the association and legitimate repeated input rows, including empty input and zero-length paths. Simply deleting the input join could remove requested columns or lose repeated answers. This is recorded separately as TODO #13. No DAWGS files were changed in this follow-up; the existing uncommitted DAWGS work was preserved.
+This points to how DAWGS reconnects an `UNWIND` input with an ordinary path result in `buildExpansionPatternRoot` in `translate/expansion.go`. A correction must preserve the association and legitimate repeated input rows, including empty input and zero-length paths. Simply deleting the input join could remove requested columns or lose repeated answers. This was recorded separately as TODO #13. That initial investigation did not edit DAWGS. The user subsequently requested “Fix 13, then do 12”; the implementation and measurements below supersede the earlier deferral.
 
-## Why an automatic replacement remains deferred
+## Correcting the input association, then measuring ordinary queries
 
-There is currently **no accepted or enabled new query form**. Ordinary queries continue through their existing execution path, with its existing behavior and limits. No enabled/disabled shortcut comparison is claimed because no shortcut was implemented.
+DAWGS now performs each ordinary path search with access to the current incoming row. Previously, it could search using all supplied rows and then combine every path with every supplied row again. The new PostgreSQL query uses `LATERAL`, which lets an inner search read the current outer row. The path search itself still follows the authored links, direction, filters and bounds and retains all requested routes. This applies to the first variable-length step and later steps, including inputs carried through `WITH`.
+
+An optional match needs an additional distinction: two identical input values can still represent two separate rows. DAWGS assigns each incoming row a temporary number and uses it when restoring unmatched rows. The number remains internal. Empty and null `UNWIND` inputs receive a valid SQL array type but produce no rows; comparisons against those absent elements no longer generate invalid SQL casts. An explicit zero upper bound now prevents taking even the first edge. The saving check also corrected `CREATE` after a completed `WITH` so it reads that completed input rather than referring to a missing result.
+
+The original two-group reproduction now returns exactly the two expected pairs: group 0 with itself and 166 routes, and group 1 with itself and 46 routes. It no longer returns either mismatched pair. Repeated inputs retain their repeated routes. Required and optional matches, empty/null inputs, input-dependent endpoint filters, zero and positive bounds, both directed spellings, cycles and self-links, counts, path values, multiple path steps, and `SET`/`CREATE` values have written-answer cases shared by PostgreSQL and Neo4j. Saving cases use supported `WITH DISTINCT` inputs; this is not a claim to fix every possible write query.
+
+For TODO #12, the preferred first step was to remove proven repeated work directly. That is sufficient here: the complete membership query still returns the same 125 objects and their complete collected values, but its first stage processes **267 rows before DISTINCT instead of 26,967**, a 99.0% reduction at that stage. The correction is part of ordinary translation of parsed path operations, without text matching, data-dependent guesses or new extension files. Correctness applies with PostgreSQL optimizations enabled or disabled. Routes, lengths, counts and ordering continue through ordinary execution; they are not replaced by a set of reachable objects.
+
+The follow-up reused the same isolated 100,000-object / 100,316-relationship graph. Before and after builds share the #11 preparation change and all earlier local DAWGS work; only the input correction differs. Each sequence had one warmup and three alternating measured repetitions per version/backend. Tests, builds and measurements ran separately. All observations, including slow ones, were retained. Server caches were not cleared, and no statistics refresh or database setting change was made.
+
+PostgreSQL membership query, instrumented execution in milliseconds, median [fastest–slowest]:
+
+| Measurement | Before | After |
+| --- | ---: | ---: |
+| EXPLAIN ANALYZE execution | 1,277.593 [1,134.260–2,770.709] | 126.572 [124.381–140.799] |
+| Query planning | 3.946 [3.884–4.866] | 4.299 [4.252–4.791] |
+| Database code generation within execution | 1,170.082 [1,028.343–2,502.051] | 59.544 [57.062–67.961] |
+
+The execution median is 90.1% lower in these observations. Much of that difference is PostgreSQL spending less time generating executable code for the changed plan; it is not all time saved by removing duplicate rows. Cached page accesses increased from 12,381 to 13,657, while physical reads and temporary blocks written were zero in both plans. This demonstrates less unnecessary row processing and lower measured execution cost, not uniformly lower resource use. It does not measure total server memory or network traffic.
+
+Complete-run measurements in seconds, median [fastest–slowest]:
+
+| Database and example | Before | After |
+| --- | ---: | ---: |
+| PostgreSQL ordinary Cypher | 17.055 [5.065–27.624] | 4.137 [3.946–20.915] |
+| PostgreSQL advanced instructions | 7.757 [7.449–9.391] | 6.755 [6.536–8.744] |
+| Neo4j ordinary Cypher | 3.313 [3.173–4.193] | 3.255 [3.054–3.459] |
+| Neo4j advanced instructions | 2.597 [2.185–4.048] | 1.993 [1.752–6.519] |
+
+Complete-run ranges overlap, and preparation and other queries also varied. These totals support exact-answer validation but do not establish those median differences as reliable whole-analysis speedups. No Neo4j speedup is claimed. Every run saved the same 100 connections and complete helper properties, with the same `820300fae60fa274af78a6d210938073ec36be9ca6d594a165e96ae431537228` saved-output hash on both databases. Reported temporary answer storage remained about 119 KB. The existing query/run timeouts, row, input, memory and disk allowances, scope checks and all-or-nothing saving were unchanged.
+
+[Follow-up evidence](evidence/path-input-followup/README.md) retains the plans, exact answers, individual observations, source information and validation commands. These are small follow-up measurements, not replacements for the earlier million-object study or evidence of production capacity.
+
+## Does the query problem affect released BloodHound?
+
+A separate read-only check on 13 October 2026 built the existing inspector from clean DAWGS tags `v0.9.0` and `v0.9.1`, without our local DAWGS changes. Both translated the two-input query above into SQL that fails with `ERROR: relation "s0" does not exist (SQLSTATE 42P01)`. The generated query references a missing intermediate result. It returned no answers. This is a different observed symptom from the incorrectly paired answers in our modified checkout; do not describe those wrong answers as reproduced in a released version.
+
+[BloodHound CE v9.8.0's dependency file](https://raw.githubusercontent.com/SpecterOps/BloodHound/v9.8.0/go.mod) selects DAWGS `v0.9.0`. That establishes a released-library failure for this particular custom Cypher pattern on PostgreSQL. It does not establish how many users submit such queries, an affected customer workload, or the behavior of the complete released application's request handling. The local BloodHound source allows custom Cypher through `GraphQuery.RawCypherQuery`; the inspected built-in queries did not contain this leading `UNWIND` pattern. Native ESC1 calculates from cached principal sets and does not run our extension's membership query. No evidence here establishes incorrect native ESC1 findings or corrupted saved graphs. The existing Neo4j check returned the expected answers.
+
+The [release-check record](evidence/preparation-followup/reach-input-release-check.json) and adjacent generated SQL preserve the versions and failure. Both checks used the existing synthetic `cypher_comparison` database through a read-only transaction. Its isolated container was started briefly and returned to its original stopped state. No application data or DAWGS source was changed.
+
+## Why no separate reachability replacement was added
+
+TODO #12 is complete through the direct improvement above. There is **no new query form or separately enabled reachability shortcut**. The ordinary path translator preserves the requested answer while avoiding the proven input multiplication. The before/after comparison uses saved builds; the correctness fix cannot be switched off with the optimizer setting. Both optimizer modes are tested against the written expectations.
+
+A dedicated calculation remains a possible later proposal. The simple one-root query already completed in a few milliseconds, and the more expensive membership query now benefits from the direct correction. These measurements do not justify another implementation with different loop or path behavior.
 
 A reasonable first candidate for a later design would be a single starting object, specified link types and direction, zero-or-more links up to an explicit maximum, and `RETURN DISTINCT` of the endpoint ID. No route, route length, ordering, input-dependent path filter, optional match, or aggregation other than distinct endpoints would be accepted initially. Recognizing that would require the parsed query operations, not a text search.
 
@@ -111,6 +156,8 @@ Full Neo4j parity would also require returning actual paths and matching filter,
 
 ## Checks and retained evidence
 
-The new native-adapter tests cover unrelated missing, null, empty, whitespace and duplicate IDs; objects with no type; valid unrelated objects; isolated migration records; mixed types; and incoming, outgoing and self connections. A rejected run must preserve all stored objects, relationships, properties and the prior success record. Separate runner tests cover a true skip and a failed identity read, and native tests check timing when file validation rejects a query.
+For #11, the native-adapter tests cover unrelated missing, null, empty, whitespace and duplicate IDs; objects with no type; valid unrelated objects; isolated migration records; mixed types; and incoming, outgoing and self connections. A rejected run must preserve all stored objects, relationships, properties and the prior success record. Separate runner tests cover a true skip and a failed identity read, and native tests check timing when file validation rejects a query.
 
-The exact test commands, outcomes, source identities, individual observations, query plans and repeat instructions are retained in [the evidence directory](evidence/preparation-followup/README.md). No application deployment, staging, or commit was performed. The original database directories and their stopped states were not changed.
+For #13/#12, both complete DAWGS `make test_all` suites passed. After the final adjustment to keep empty-input bookkeeping private, the complete unit suite, SQL translation cases and all 33 new cases on both databases passed again; PostgreSQL also passed with optimizations disabled. Comparable unit coverage increased from 21,161/34,182 statements (61.9069%) to 21,266/34,257 (62.0778%). Both profiles omit database connection settings. The higher database-enabled profile is not used for this comparison.
+
+The exact test commands, outcomes, source identities, individual observations, query plans and repeat instructions are retained in the [preparation evidence](evidence/preparation-followup/README.md) and [path-input evidence](evidence/path-input-followup/README.md). No application deployment, staging, or commit was performed. The original database directories and their stopped states were not changed.

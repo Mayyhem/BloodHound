@@ -1,0 +1,66 @@
+[
+  {
+    "variant": "before",
+    "repetition": 0,
+    "warmup": true,
+    "rows": 125,
+    "planning_ms": 2.515,
+    "execution_ms": 952.315
+  },
+  {
+    "variant": "after13",
+    "repetition": 0,
+    "warmup": true,
+    "rows": 125,
+    "planning_ms": 3.533,
+    "execution_ms": 118.883
+  },
+  {
+    "variant": "after13",
+    "repetition": 1,
+    "warmup": false,
+    "rows": 125,
+    "planning_ms": 4.299,
+    "execution_ms": 126.572
+  },
+  {
+    "variant": "before",
+    "repetition": 1,
+    "warmup": false,
+    "rows": 125,
+    "planning_ms": 3.884,
+    "execution_ms": 1277.593
+  },
+  {
+    "variant": "before",
+    "repetition": 2,
+    "warmup": false,
+    "rows": 125,
+    "planning_ms": 4.866,
+    "execution_ms": 2770.709
+  },
+  {
+    "variant": "after13",
+    "repetition": 2,
+    "warmup": false,
+    "rows": 125,
+    "planning_ms": 4.791,
+    "execution_ms": 140.799
+  },
+  {
+    "variant": "after13",
+    "repetition": 3,
+    "warmup": false,
+    "rows": 125,
+    "planning_ms": 4.252,
+    "execution_ms": 124.381
+  },
+  {
+    "variant": "before",
+    "repetition": 3,
+    "warmup": false,
+    "rows": 125,
+    "planning_ms": 3.946,
+    "execution_ms": 1134.26
+  }
+]

@@ -129,16 +129,16 @@ See [how this would work](CYPHER_COMPARISON.md#follow-up-reduce-setup-work-and-i
 
 ## 12. Improve ordinary queries without extra instructions
 
-**Investigation completed: 13 October 2026; automatic replacement deferred.** The PostgreSQL execution plan exposed a repeated-input association error, now tracked in #13. Reusing the advanced calculation also requires decisions about path bounds, loops and exact query meaning. No new query shortcut or author-file requirement was introduced. [The report](PREPARATION_AND_REACHABILITY.md#what-the-ordinary-reachability-plans-showed) includes measured plans, mismatched answers, a narrow candidate, and the proposed modern Cypher `ANY` alternative.
+**Completed: 13 October 2026, after correcting #13.** The direct correction removes proven repeated work from the unchanged ordinary membership query: 267 rows before DISTINCT instead of 26,967, with identical complete answers. Instrumented PostgreSQL execution medians were 1.278 seconds before and 0.127 seconds after. Whole-analysis measurements were variable; no reliable whole-analysis percentage is claimed. The evidence does not justify a separate reachability implementation. No author files, calculation limits or syntax requirements changed. See [the report](PREPARATION_AND_REACHABILITY.md#correcting-the-input-association-then-measuring-ordinary-queries) and [evidence](evidence/path-input-followup/README.md).
 
 Investigate whether the engine can perform a clearly recognized ordinary query more efficiently while returning exactly the answer it requests. Begin with distinct reachable objects, where the comparison identified a PostgreSQL cost. This does not assume that arbitrary Cypher can be replaced with the advanced calculations.
 
 - [x] Inspect the database's execution plan for one expensive query form. First check for unnecessary reads or repeated work that can be corrected directly, as happened with the already selected endpoint during this study.
-- [ ] **Deferred:** If a dedicated reachability calculation is justified, describe one narrowly supported query form and its exact meaning. Recognize it by reading the query's structure and operations, not by matching a few words or guessing from the current data.
-- [ ] **Deferred with the implementation:** Establish matching behavior for permitted links, direction, starting objects, path bounds, loops, filters, empty answers and repeated rows. Queries requesting routes, lengths, ordering or other unsupported behavior must retain ordinary execution.
+- [x] Evaluate whether a dedicated reachability calculation is justified. The direct correction is sufficient for the measured query; no additional calculation was added. It acts on parsed ordinary path operations, not text matching or guesses from graph data. The narrower replacement and modern `ANY` remain possible separate proposals.
+- [x] Establish matching behavior for permitted links, direction, starting objects, path bounds, loops, filters, empty answers and repeated rows. Shared written-answer cases cover these conditions. Routes, lengths, counts and ordering retain ordinary path execution; there is no endpoint-only replacement.
 - [x] Preserve existing time, memory, input and saving protections. Resolve any dependence on unrestricted path searches with the separately documented depth-limit review; this task does not authorize removing another limit.
-- [ ] **Not applicable until a shortcut exists:** Compare the same query with the change enabled and disabled, using written expected answers on both databases. Confirm that unsupported forms take the ordinary path. Measure a small relevant before/after set and enable a shortcut only where its measured cost justifies it.
-- [x] Document the investigation outcome: no new accepted query forms or enabled shortcut, the observed costs and answer discrepancy, and the work needed before implementation. Leave automatic group selection and automatic input splitting for separate proposals unless their equivalence can also be established explicitly.
+- [x] Compare saved builds before and after the correction using the same unchanged query and complete answers on both databases. Test the correction with PostgreSQL optimizations enabled and disabled. Measure the single-query plans and both complete example styles; preserve all observed timing variation. The correctness correction is always applied, so there is no separate shortcut switch.
+- [x] Document the direct improvement, its measured cost and limits, and why no separate reachability calculation was added. Leave automatic group selection and automatic input splitting for separate proposals unless their equivalence can also be established explicitly.
 
 **Done when:** one supported form receives a verified automatic improvement without author-file changes, or the investigation records why it should remain ordinary Cypher. Other forms must continue to work with their existing meaning and limits. No general automatic optimizer or new speedup is promised by this TODO.
 
@@ -146,14 +146,16 @@ See [how this would work](CYPHER_COMPARISON.md#follow-up-reduce-setup-work-and-i
 
 ## 13. Preserve the starting input for ordinary path results
 
-The #12 investigation found that PostgreSQL can combine each `UNWIND` input with paths belonging to other input rows. An ordinary query retaining both the requested starting ID and actual starting object returns mismatched pairs, despite its `WHERE` requiring them to agree. ESC1's membership query hides those extra rows with `DISTINCT`, but still pays for the extra work.
+**Completed: 13 October 2026.** Each input row remains attached to its own ordinary path search, including repeated inputs and optional matches. The original two-group reproduction returns only the two correct pairs. The shared template contains 33 written-answer cases; the corrected membership query retains its complete answer while avoiding the extra combinations. See [the implementation and measurements](PREPARATION_AND_REACHABILITY.md#correcting-the-input-association-then-measuring-ordinary-queries).
 
-- [ ] Add matching, written-answer cases on both databases for several starting objects, repeated and empty inputs, zero-length paths, direction, and returned input columns.
-- [ ] Correct how DAWGS reconnects supplied input rows with path results. Preserve legitimate repeated answers; deleting the input join alone is not sufficient.
-- [ ] Check required and optional matches, filters, bounds, route/count results and saving queries before making broader performance claims.
-- [ ] Repeat the single membership-query plan and a small exact-answer comparison. Keep automatic reachability selection separate until its meaning and limits are agreed.
+The #12 investigation found that PostgreSQL could combine each `UNWIND` input with paths belonging to other input rows. An ordinary query retaining both the requested starting ID and actual starting object returned mismatched pairs, despite its `WHERE` requiring them to agree. ESC1's membership query hid those extra rows with `DISTINCT`, but still paid for the extra work.
 
-**Done when:** each result remains associated with the input that selected it, on both databases, and the unnecessary combinations are absent without losing requested repeated rows. See [the recorded query and answers](PREPARATION_AND_REACHABILITY.md#what-the-ordinary-reachability-plans-showed). Start in DAWGS `buildExpansionPatternRoot` in `cypher/models/pgsql/translate/expansion.go`. This discovered correctness follow-up was documented, not implemented, during #11/#12.
+- [x] Add matching, written-answer cases on both databases for several starting objects, repeated and empty inputs, zero-length paths, direction, and returned input columns.
+- [x] Correct how DAWGS reconnects supplied input rows with path results. Preserve legitimate repeated answers; deleting the input join alone is not sufficient.
+- [x] Check required and optional matches, filters, bounds, route/count results and saving queries before making broader performance claims.
+- [x] Repeat the single membership-query plan and a small exact-answer comparison. Keep automatic reachability selection separate until its meaning and limits are agreed.
+
+**Done when:** each result remains associated with the input that selected it, on both databases, and the unnecessary combinations are absent without losing requested repeated rows. See [the recorded query and answers](PREPARATION_AND_REACHABILITY.md#what-the-ordinary-reachability-plans-showed). The correction is in DAWGS `buildExpansionPatternRoot` and `buildExpansionPatternStep`, with the input handling in `cypher/models/pgsql/translate/expansion_input.go`. It was implemented following the user's subsequent request to fix #13 and then complete #12.
 
 ## Done
 

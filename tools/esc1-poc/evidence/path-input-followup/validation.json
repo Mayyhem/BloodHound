@@ -1,0 +1,144 @@
+{
+  "date": "2026-10-13",
+  "outcome": "passed",
+  "source": {
+    "bloodhound_commit": "7110b5c36a9fb0b828596af6a032520ba51cf43f",
+    "dawgs_commit": "5f16c574e48045472d15a447c2fa9707d394a4bd"
+  },
+  "full_dawgs_suites": [
+    {
+      "backend": "postgresql",
+      "command": "make -C tools/DAWGS test_all",
+      "race": true,
+      "passed": true,
+      "seconds": 464.91458463668823
+    },
+    {
+      "backend": "neo4j",
+      "command": "make -C tools/DAWGS test_all",
+      "race": true,
+      "passed": true,
+      "seconds": 335.06612634658813
+    }
+  ],
+  "final_path_input_checks": {
+    "written_answer_cases": 33,
+    "postgresql": {
+      "passed": true,
+      "race": true,
+      "seconds": 99.82405138015747
+    },
+    "postgresql_optimizations_disabled": {
+      "passed": true,
+      "race": true,
+      "seconds": 52.56923508644104
+    },
+    "neo4j": {
+      "passed": true,
+      "race": true,
+      "seconds": 4.583514928817749
+    },
+    "sql_translation_cases_passed": true,
+    "private_scope_bookkeeping_checked": true
+  },
+  "final_unit_suite": {
+    "passed": true,
+    "race": true,
+    "coverage": {
+      "baseline": {
+        "covered_statements": 21161,
+        "total_statements": 34182,
+        "percent": 61.906851559300215
+      },
+      "final": {
+        "covered_statements": 21266,
+        "total_statements": 34257,
+        "percent": 62.077823510523395
+      },
+      "method": "Same DAWGS make test command, race detector, compiler and no database connection environment; repeated blocks are merged by maximum hit count before unique statements are counted."
+    }
+  },
+  "pilot": {
+    "unit": {
+      "packages": [
+        "internal/runner",
+        "internal/graphdb"
+      ],
+      "race": true,
+      "passed": true,
+      "seconds": 14.500261306762695
+    },
+    "integration": {
+      "tests": [
+        "TestCypherAlternatives",
+        "TestCypherAlternativesKeepSavedResults",
+        "TestNativeLatePublicationFailureRestoresPropertiesAndIDs"
+      ],
+      "backends": [
+        "neo4j",
+        "postgresql"
+      ],
+      "race": true,
+      "passed": true,
+      "go_test_seconds": 716.865,
+      "wall_seconds": 803.8399894237518,
+      "timeout_minutes": 30
+    }
+  },
+  "static_checks": {
+    "dawgs_vet": {
+      "packages": [
+        "cypher/models/pgsql/...",
+        "integration"
+      ],
+      "passed": true
+    },
+    "pilot_vet": {
+      "packages": [
+        "internal/runner",
+        "internal/graphdb"
+      ],
+      "passed": true
+    }
+  },
+  "setup_rejections": [
+    {
+      "stage": "before calculation",
+      "reason": "The first pilot invocation supplied DAWGS connection-string syntax to the pilot's direct adapters.",
+      "product_failure": false
+    },
+    {
+      "stage": "before calculation",
+      "reason": "The full DAWGS PostgreSQL suite left nine named test graphs in the disposable catalog; all nine had zero nodes and zero edges, and the pilot retained its single-graph guard.",
+      "product_failure": false,
+      "resolution": "Deleted only empty nondefault graph catalog entries, then reran the unchanged pilot checks."
+    }
+  ],
+  "private_log_sha256": {
+    "full-dawgs-pg.log": "d765108819a85f0744fe458d452a8d9718f9b34ca1d9e26773b043083d56c3da",
+    "full-dawgs-neo4j.log": "ebbe97d17463a9bb1d185f1ff65704f79211e6009b5b1e4db7d82013c77507b5",
+    "pilot-unit.log": "c5f9e5d2739b11bb9923730421cef273a689e22d18d5e7ca83cdf2fab09ff6e7",
+    "private-input-pg.log": "cab42118e97c05cb172197acaf408d1c527a62a6516197137141ce19b03c5de2",
+    "private-input-disabled-pg.log": "64963dc2ce8b32b72947efd236a815766bdd1cfaed5805d56f32691b4eefc16c",
+    "private-input-neo4j.log": "20a1be21add7db9d5aea0defe659aef80697d3d5857283e3cbd3a670f6357d1d",
+    "final-unit.log": "c0d12ac44437cae5d3d1160fc4979b73d69e4f12f397c4d3182c0e1db9f5e4c2",
+    "pilot-integration-final.log": "a2fee59bb45dc9011c2ca0818f00d1eef9f358b12f31a12d80ac4c5e23a84c0d",
+    "empty-test-graph-catalog-cleanup.log": "0b55e2b016c15e04ece6c83fcd99c84a39b1cb5d16c40794c20d50982b524d81"
+  },
+  "reachability_shortcut_added": false,
+  "new_author_syntax_added": false,
+  "public_api_contract_changed": false,
+  "prepare_for_codereview_run": false,
+  "prepare_for_codereview_reason": "No commit was requested or performed. This repository-required command remains due before the user's manual commit.",
+  "application_or_rule_service_deployed": false,
+  "staged": false,
+  "committed": false,
+  "final_container_states": {
+    "esc1-followup-test-graph-1": "exited_0",
+    "esc1-followup-test-pg-graph-1": "exited_0",
+    "esc1-followup-check-test-graph-1": "exited_0",
+    "esc1-followup-check-test-pg-graph-1": "exited_0",
+    "esc1-poc-test-graph-1": "exited_0",
+    "esc1-poc-test-pg-graph-1": "exited_0"
+  }
+}
