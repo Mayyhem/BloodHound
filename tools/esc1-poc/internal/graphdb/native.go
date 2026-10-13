@@ -202,12 +202,13 @@ func nativeTimeout(ctx context.Context) graph.TransactionOption {
 
 func runNativeNeo4j(ctx context.Context, database graph.Database, plan extension.Plan, options runner.Options) (runner.Report, error) {
 	var (
-		started       = time.Now()
-		limits        = options.Limits
-		report        runner.Report
-		callbackError error
-		entered       bool
-		borrowed      = &nativeNeo4jDatabase{database: database}
+		started                           = time.Now()
+		limits                            = options.Limits
+		report                            runner.Report
+		callbackError                     error
+		callbackStarted, callbackFinished time.Time
+		entered                           bool
+		borrowed                          = &nativeNeo4jDatabase{database: database}
 	)
 	if limits == (runner.Limits{}) {
 		limits = runner.DefaultLimits()
@@ -215,16 +216,29 @@ func runNativeNeo4j(ctx context.Context, database graph.Database, plan extension
 	ctx, cancel := context.WithTimeout(ctx, limits.RunTimeout)
 	defer cancel()
 	if err := runner.PrepareDatabase(ctx, borrowed, plan); err != nil {
+		report.PreparationElapsed = time.Since(started)
+		report.Elapsed = report.PreparationElapsed
 		return report, err
 	}
 	borrowed.prepared = true
 	err := database.WriteTransaction(ctx, func(transaction graph.Transaction) error {
+		callbackStarted = time.Now()
 		entered = true
 		borrowed.main = &nativeNeo4jTransaction{database: borrowed, transaction: transaction}
 		report, callbackError = runner.Run(ctx, borrowed, plan, options)
+		callbackFinished = time.Now()
 		report.Committed = false
 		return callbackError
 	}, nativeTimeout(ctx))
+	// Neo4j opens and finishes the surrounding transaction outside runner.Run.
+	// Include that preparation and final save/rollback in the phase measurements.
+	if entered {
+		report.PreparationElapsed += callbackStarted.Sub(started)
+		report.SavingElapsed += time.Since(callbackFinished)
+	} else {
+		report.PreparationElapsed = time.Since(started)
+	}
+	report.Elapsed = time.Since(started)
 	if err != nil {
 		report.GraphObjectsChanged = 0
 		if entered && callbackError == nil && borrowed.main.commitRequested {
@@ -235,7 +249,6 @@ func runNativeNeo4j(ctx context.Context, database graph.Database, plan extension
 		return report, err
 	}
 	report.Committed = borrowed.main != nil && borrowed.main.commitRequested
-	report.Elapsed = time.Since(started)
 	runner.ConfirmNativeSave(&report, nil)
 	return report, nil
 }

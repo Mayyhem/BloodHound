@@ -1,0 +1,19 @@
+{
+  "complete": true,
+  "completed_utc": "2026-10-13T03:37:26.026826+00:00",
+  "esc1_timed_observations": 852,
+  "matched_studies": 8,
+  "batch_capacity_successful_runs": 6,
+  "batch_capacity_expected_limit_failures": 6,
+  "largest_completed_objects": 1000000,
+  "relationships_at_largest_size": 1003106,
+  "relevant_input_share_at_largest_size": 0.001032,
+  "stop_reason": "User requested completion after the queued million-object comparisons and batching-limit check. Larger capacity studies are deferred, not established as failures.",
+  "original_database_contents_verified": true,
+  "original_stopped_states_restored": true,
+  "neo4j_logs": "Not part of the original archive; the existing logs, including experiment logs, are retained.",
+  "deployment_performed": false,
+  "commits_created": false,
+  "performance_tradeoffs_accepted_by_user": false,
+  "precommit_prepare_for_codereview_run": false
+}

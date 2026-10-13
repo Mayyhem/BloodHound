@@ -1,0 +1,25 @@
+{
+  "completed": false,
+  "phase": "unmeasured setup before seeding previous results",
+  "reason": "Host continued swapping during generation of wide input. The initial prefix selected all directory users before ORDER BY/LIMIT; the revised setup restricts the same intended first 1000 identifiers before returning the wide text.",
+  "database_sampled_max_bytes": 23328751616,
+  "elapsed_seconds": 79.2697062139996,
+  "limits_changed": false,
+  "esc1_code_changed": false,
+  "comparison_input_rows": 1000,
+  "evidence_bytes_per_row": 65536,
+  "remaining_active_postgres_queries_after_stop": 0,
+  "recovery_attempt": {
+    "completed": false,
+    "reason": "The corrected setup was stopped after 1.522 seconds by continuing host swap activity. Database sampled memory stayed below 660 MB and host available memory exceeded 24.4 GB; swap use was falling, consistent with pages returning after the previous setup pressure. No active PostgreSQL test queries remained.",
+    "limits_changed": false,
+    "next_step": "Restart dedicated test databases to clear their swapped process pages; run only the same batching check, one active backend at a time."
+  },
+  "monitor_correction": {
+    "reason": "The restarted PostgreSQL check completed its seed and first batched observation. The next attempt stopped while sampled swap use fell by 8192 bytes, available memory remained above 29453479936 bytes, and sampled database memory stayed below 303865856 bytes. This is consistent with recovery rather than renewed pressure; the old monitor did not distinguish swap directions.",
+    "change": "Count continuing writes to swap; recovery reads alone do not indicate fresh memory pressure.",
+    "unchanged_limits": "20% available-memory reserve, 25% disk reserve, same experiment/query/run deadlines and same 32 MiB parameter limit.",
+    "completed_esc1_studies_repeated": false,
+    "completed_capacity_observations_retained": 1
+  }
+}

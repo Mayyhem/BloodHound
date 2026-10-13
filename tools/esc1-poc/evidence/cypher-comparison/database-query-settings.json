@@ -1,0 +1,51 @@
+{
+  "postgresql": {
+    "effective_cache_size": {
+      "setting": "524288",
+      "unit": "8kB",
+      "bytes": 4294967296
+    },
+    "jit": {
+      "setting": "on",
+      "unit": null
+    },
+    "maintenance_work_mem": {
+      "setting": "65536",
+      "unit": "kB",
+      "bytes": 67108864
+    },
+    "max_parallel_workers_per_gather": {
+      "setting": "2",
+      "unit": null
+    },
+    "server_version": {
+      "setting": "18.6 (Debian 18.6-1.pgdg13+2)",
+      "unit": null
+    },
+    "shared_buffers": {
+      "setting": "16384",
+      "unit": "8kB",
+      "bytes": 134217728
+    },
+    "synchronous_commit": {
+      "setting": "on",
+      "unit": null
+    },
+    "work_mem": {
+      "setting": "4096",
+      "unit": "kB",
+      "bytes": 4194304
+    }
+  },
+  "neo4j": {
+    "dbms.memory.heap.initial_size": "No Value",
+    "dbms.memory.heap.max_size": "No Value",
+    "dbms.memory.pagecache.size": "512M",
+    "dbms.memory.transaction.database_max_size": "0B",
+    "dbms.memory.transaction.global_max_size": "0B",
+    "dbms.memory.transaction.max_size": "0B",
+    "dbms.transaction.timeout": "0s"
+  },
+  "dawgs_graph_query_memory_bytes": 33554432,
+  "note": "The DAWGS value limits certain Go path calculations; it is not a cap on database query memory. Database process usage is measured separately. Configurations were read without changing them."
+}

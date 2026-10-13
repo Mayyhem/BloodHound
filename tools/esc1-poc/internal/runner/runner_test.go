@@ -19,6 +19,7 @@ package runner_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -586,4 +587,24 @@ func TestCompareUsesDistinctSortedPairs(t *testing.T) {
 	if !reflect.DeepEqual(comparison, want) {
 		t.Fatalf("comparison %+v; expected %+v", comparison, want)
 	}
+}
+
+func TestAnswerObserverSeesCompleteRowsAndCannotPublishOnFailure(t *testing.T) {
+	var (
+		database = fixtureDatabase()
+		options  = completeBatch()
+		observed = map[string]int{}
+	)
+	options.ObserveAnswer = func(name string, row map[string]any) error {
+		observed[name]++
+		return nil
+	}
+	report, err := runner.Run(context.Background(), database, fixturePlan(), options)
+	if err != nil || !report.Committed || !reflect.DeepEqual(observed, report.QueryRows) {
+		t.Fatalf("observed rows %v differ from complete answers %v: %v", observed, report.QueryRows, err)
+	}
+	database = fixtureDatabase()
+	before := *database.graph
+	options.ObserveAnswer = func(string, map[string]any) error { return errors.New("cannot retain evidence") }
+	assertRollback(t, database, before, fixturePlan(), options, "cannot retain evidence")
 }

@@ -1,0 +1,554 @@
+[
+  {
+    "Plan": {
+      "Node Type": "Aggregate",
+      "Strategy": "Hashed",
+      "Partial Mode": "Simple",
+      "Parallel Aware": false,
+      "Async Capable": false,
+      "Startup Cost": 8595398.02,
+      "Total Cost": 8595399.68,
+      "Plan Rows": 111,
+      "Plan Width": 64,
+      "Disabled": false,
+      "Group Key": [
+        "(s6.i0 -> 'principal'::text)",
+        "((s6.n0).properties -> 'objectid'::text)"
+      ],
+      "Planned Partitions": 0,
+      "Plans": [
+        {
+          "Node Type": "Nested Loop",
+          "Parent Relationship": "InitPlan",
+          "Subplan Name": "CTE s0",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Join Type": "Inner",
+          "Startup Cost": 0.73,
+          "Total Cost": 146.16,
+          "Plan Rows": 489,
+          "Plan Width": 96,
+          "Disabled": false,
+          "Inner Unique": false,
+          "Plans": [
+            {
+              "Node Type": "Hash Join",
+              "Parent Relationship": "Outer",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Join Type": "Inner",
+              "Startup Cost": 0.05,
+              "Total Cost": 0.1,
+              "Plan Rows": 2,
+              "Plan Width": 64,
+              "Disabled": false,
+              "Inner Unique": false,
+              "Hash Cond": "((i0.i0 -> 'principal'::text) = (i1.i1 -> 'principal'::text))",
+              "Plans": [
+                {
+                  "Node Type": "Function Scan",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Function Name": "unnest",
+                  "Alias": "i0",
+                  "Startup Cost": 0.0,
+                  "Total Cost": 0.02,
+                  "Plan Rows": 2,
+                  "Plan Width": 32,
+                  "Disabled": false
+                },
+                {
+                  "Node Type": "Hash",
+                  "Parent Relationship": "Inner",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Startup Cost": 0.02,
+                  "Total Cost": 0.02,
+                  "Plan Rows": 2,
+                  "Plan Width": 32,
+                  "Disabled": false,
+                  "Plans": [
+                    {
+                      "Node Type": "Function Scan",
+                      "Parent Relationship": "Outer",
+                      "Parallel Aware": false,
+                      "Async Capable": false,
+                      "Function Name": "unnest",
+                      "Alias": "i1",
+                      "Startup Cost": 0.0,
+                      "Total Cost": 0.02,
+                      "Plan Rows": 2,
+                      "Plan Width": 32,
+                      "Disabled": false
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Node Type": "Index Scan",
+              "Parent Relationship": "Inner",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Scan Direction": "Forward",
+              "Index Name": "node_1_objectid_constraint",
+              "Relation Name": "node_1",
+              "Alias": "n0",
+              "Startup Cost": 0.68,
+              "Total Cost": 73.02,
+              "Plan Rows": 1,
+              "Plan Width": 182,
+              "Disabled": false,
+              "Index Cond": "((properties ->> 'objectid'::text) = ANY (jsonb_to_text_array((i0.i0 -> 'reach'::text))))",
+              "Filter": "(kind_ids OPERATOR(pg_catalog.@>) '{30}'::smallint[])"
+            }
+          ]
+        },
+        {
+          "Node Type": "Aggregate",
+          "Strategy": "Sorted",
+          "Partial Mode": "Simple",
+          "Parent Relationship": "InitPlan",
+          "Subplan Name": "CTE s2",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Startup Cost": 8595212.04,
+          "Total Cost": 8595218.93,
+          "Plan Rows": 200,
+          "Plan Width": 72,
+          "Disabled": false,
+          "Group Key": [
+            "s0.i0",
+            "s0.n0"
+          ],
+          "Plans": [
+            {
+              "Node Type": "Sort",
+              "Parent Relationship": "Outer",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Startup Cost": 8595212.04,
+              "Total Cost": 8595213.26,
+              "Plan Rows": 489,
+              "Plan Width": 96,
+              "Disabled": false,
+              "Sort Key": [
+                "s0.i0",
+                "s0.n0"
+              ],
+              "Plans": [
+                {
+                  "Node Type": "Nested Loop",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Join Type": "Left",
+                  "Startup Cost": 17.82,
+                  "Total Cost": 8595190.2,
+                  "Plan Rows": 489,
+                  "Plan Width": 96,
+                  "Disabled": false,
+                  "Inner Unique": false,
+                  "Join Filter": "((NOT (s0.n0 IS DISTINCT FROM s0_1.n0)) AND (NOT (s0.i1 IS DISTINCT FROM s0_1.i1)) AND (NOT (s0.i0 IS DISTINCT FROM s0_1.i0)))",
+                  "Plans": [
+                    {
+                      "Node Type": "CTE Scan",
+                      "Parent Relationship": "Outer",
+                      "Parallel Aware": false,
+                      "Async Capable": false,
+                      "CTE Name": "s0",
+                      "Alias": "s0",
+                      "Startup Cost": 0.0,
+                      "Total Cost": 9.78,
+                      "Plan Rows": 489,
+                      "Plan Width": 96,
+                      "Disabled": false
+                    },
+                    {
+                      "Node Type": "Merge Join",
+                      "Parent Relationship": "Inner",
+                      "Parallel Aware": false,
+                      "Async Capable": false,
+                      "Join Type": "Inner",
+                      "Startup Cost": 17.82,
+                      "Total Cost": 77.21,
+                      "Plan Rows": 999991,
+                      "Plan Width": 128,
+                      "Disabled": false,
+                      "Inner Unique": false,
+                      "Merge Cond": "(n2.id = e1.start_id)",
+                      "Join Filter": "((e1.id <> e0.id) AND ((n1.properties ->> 'objectid'::text) = ANY (jsonb_to_text_array((s0_1.i1 -> 'reach'::text)))))",
+                      "Plans": [
+                        {
+                          "Node Type": "Nested Loop",
+                          "Parent Relationship": "Outer",
+                          "Parallel Aware": false,
+                          "Async Capable": false,
+                          "Join Type": "Inner",
+                          "Startup Cost": 1.7,
+                          "Total Cost": 61403.49,
+                          "Plan Rows": 999991,
+                          "Plan Width": 205,
+                          "Disabled": false,
+                          "Inner Unique": false,
+                          "Plans": [
+                            {
+                              "Node Type": "Nested Loop",
+                              "Parent Relationship": "Outer",
+                              "Parallel Aware": false,
+                              "Async Capable": false,
+                              "Join Type": "Inner",
+                              "Startup Cost": 1.27,
+                              "Total Cost": 32639.29,
+                              "Plan Rows": 1,
+                              "Plan Width": 205,
+                              "Disabled": false,
+                              "Inner Unique": false,
+                              "Plans": [
+                                {
+                                  "Node Type": "Nested Loop",
+                                  "Parent Relationship": "Outer",
+                                  "Parallel Aware": false,
+                                  "Async Capable": false,
+                                  "Join Type": "Inner",
+                                  "Startup Cost": 0.85,
+                                  "Total Cost": 32630.83,
+                                  "Plan Rows": 1,
+                                  "Plan Width": 165,
+                                  "Disabled": false,
+                                  "Inner Unique": false,
+                                  "Plans": [
+                                    {
+                                      "Node Type": "Index Only Scan",
+                                      "Parent Relationship": "Outer",
+                                      "Parallel Aware": false,
+                                      "Async Capable": false,
+                                      "Scan Direction": "Forward",
+                                      "Index Name": "edge_1_end_id_kind_id_id_start_id_idx",
+                                      "Relation Name": "edge_1",
+                                      "Alias": "e0",
+                                      "Startup Cost": 0.42,
+                                      "Total Cost": 32622.38,
+                                      "Plan Rows": 1,
+                                      "Plan Width": 24,
+                                      "Disabled": false,
+                                      "Index Cond": "(kind_id = ANY ('{150}'::smallint[]))"
+                                    },
+                                    {
+                                      "Node Type": "Index Scan",
+                                      "Parent Relationship": "Inner",
+                                      "Parallel Aware": false,
+                                      "Async Capable": false,
+                                      "Scan Direction": "Forward",
+                                      "Index Name": "node_1_pkey",
+                                      "Relation Name": "node_1",
+                                      "Alias": "n1",
+                                      "Startup Cost": 0.42,
+                                      "Total Cost": 8.44,
+                                      "Plan Rows": 1,
+                                      "Plan Width": 157,
+                                      "Disabled": false,
+                                      "Index Cond": "(id = e0.start_id)"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "Node Type": "Index Scan",
+                                  "Parent Relationship": "Inner",
+                                  "Parallel Aware": false,
+                                  "Async Capable": false,
+                                  "Scan Direction": "Forward",
+                                  "Index Name": "node_1_pkey",
+                                  "Relation Name": "node_1",
+                                  "Alias": "n2",
+                                  "Startup Cost": 0.42,
+                                  "Total Cost": 8.44,
+                                  "Plan Rows": 1,
+                                  "Plan Width": 40,
+                                  "Disabled": false,
+                                  "Index Cond": "(id = e0.end_id)"
+                                }
+                              ]
+                            },
+                            {
+                              "Node Type": "Index Only Scan",
+                              "Parent Relationship": "Inner",
+                              "Parallel Aware": false,
+                              "Async Capable": false,
+                              "Scan Direction": "Forward",
+                              "Index Name": "node_1_environmentid_index",
+                              "Relation Name": "node_1",
+                              "Alias": "n0_1",
+                              "Startup Cost": 0.42,
+                              "Total Cost": 18764.29,
+                              "Plan Rows": 999991,
+                              "Plan Width": 0,
+                              "Disabled": false
+                            }
+                          ]
+                        },
+                        {
+                          "Node Type": "Sort",
+                          "Parent Relationship": "Inner",
+                          "Parallel Aware": false,
+                          "Async Capable": false,
+                          "Startup Cost": 16.12,
+                          "Total Cost": 16.12,
+                          "Plan Rows": 1,
+                          "Plan Width": 112,
+                          "Disabled": false,
+                          "Sort Key": [
+                            "e1.start_id"
+                          ],
+                          "Plans": [
+                            {
+                              "Node Type": "Hash Join",
+                              "Parent Relationship": "Outer",
+                              "Parallel Aware": false,
+                              "Async Capable": false,
+                              "Join Type": "Inner",
+                              "Startup Cost": 4.48,
+                              "Total Cost": 16.11,
+                              "Plan Rows": 1,
+                              "Plan Width": 112,
+                              "Disabled": false,
+                              "Inner Unique": false,
+                              "Hash Cond": "((s0_1.n0).id = e1.end_id)",
+                              "Plans": [
+                                {
+                                  "Node Type": "CTE Scan",
+                                  "Parent Relationship": "Outer",
+                                  "Parallel Aware": false,
+                                  "Async Capable": false,
+                                  "CTE Name": "s0",
+                                  "Alias": "s0_1",
+                                  "Startup Cost": 0.0,
+                                  "Total Cost": 9.78,
+                                  "Plan Rows": 489,
+                                  "Plan Width": 96,
+                                  "Disabled": false
+                                },
+                                {
+                                  "Node Type": "Hash",
+                                  "Parent Relationship": "Inner",
+                                  "Parallel Aware": false,
+                                  "Async Capable": false,
+                                  "Startup Cost": 4.47,
+                                  "Total Cost": 4.47,
+                                  "Plan Rows": 1,
+                                  "Plan Width": 24,
+                                  "Disabled": false,
+                                  "Plans": [
+                                    {
+                                      "Node Type": "Index Scan",
+                                      "Parent Relationship": "Outer",
+                                      "Parallel Aware": false,
+                                      "Async Capable": false,
+                                      "Scan Direction": "Forward",
+                                      "Index Name": "edge_1_kind_id_idx",
+                                      "Relation Name": "edge_1",
+                                      "Alias": "e1",
+                                      "Startup Cost": 0.42,
+                                      "Total Cost": 4.47,
+                                      "Plan Rows": 1,
+                                      "Plan Width": 24,
+                                      "Disabled": false,
+                                      "Index Cond": "(kind_id = ANY ('{149}'::smallint[]))"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Node Type": "Subquery Scan",
+          "Parent Relationship": "Outer",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Alias": "s6",
+          "Startup Cost": 27.71,
+          "Total Cost": 32.37,
+          "Plan Rows": 111,
+          "Plan Width": 64,
+          "Disabled": false,
+          "Plans": [
+            {
+              "Node Type": "Aggregate",
+              "Strategy": "Hashed",
+              "Partial Mode": "Simple",
+              "Parent Relationship": "Subquery",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Startup Cost": 27.71,
+              "Total Cost": 30.71,
+              "Plan Rows": 111,
+              "Plan Width": 80,
+              "Disabled": false,
+              "Group Key": [
+                "s2.i0",
+                "s2.n0",
+                "s2.i2"
+              ],
+              "Filter": "((s2.i2 > 0) OR (count((ROW(e2.id, e2.start_id, e2.end_id, e2.kind_id, e2.properties)::edgecomposite)) > 0))",
+              "Planned Partitions": 0,
+              "Plans": [
+                {
+                  "Node Type": "Nested Loop",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Join Type": "Left",
+                  "Startup Cost": 4.91,
+                  "Total Cost": 25.71,
+                  "Plan Rows": 200,
+                  "Plan Width": 104,
+                  "Disabled": false,
+                  "Inner Unique": false,
+                  "Join Filter": "((NOT (s2.n0 IS DISTINCT FROM s2_1.n0)) AND (NOT (s2.i2 IS DISTINCT FROM s2_1.i2)) AND (NOT (s2.i0 IS DISTINCT FROM s2_1.i0)))",
+                  "Plans": [
+                    {
+                      "Node Type": "CTE Scan",
+                      "Parent Relationship": "Outer",
+                      "Parallel Aware": false,
+                      "Async Capable": false,
+                      "CTE Name": "s2",
+                      "Alias": "s2",
+                      "Startup Cost": 0.0,
+                      "Total Cost": 4.0,
+                      "Plan Rows": 200,
+                      "Plan Width": 72,
+                      "Disabled": false
+                    },
+                    {
+                      "Node Type": "Materialize",
+                      "Parent Relationship": "Inner",
+                      "Parallel Aware": false,
+                      "Async Capable": false,
+                      "Startup Cost": 4.91,
+                      "Total Cost": 17.71,
+                      "Plan Rows": 1,
+                      "Plan Width": 104,
+                      "Disabled": false,
+                      "Plans": [
+                        {
+                          "Node Type": "Nested Loop",
+                          "Parent Relationship": "Outer",
+                          "Parallel Aware": false,
+                          "Async Capable": false,
+                          "Join Type": "Inner",
+                          "Startup Cost": 4.91,
+                          "Total Cost": 17.71,
+                          "Plan Rows": 1,
+                          "Plan Width": 104,
+                          "Disabled": false,
+                          "Inner Unique": false,
+                          "Join Filter": "((s2_1.i0 -> 'principal'::text) = (n3.properties -> 'objectid'::text))",
+                          "Plans": [
+                            {
+                              "Node Type": "Hash Join",
+                              "Parent Relationship": "Outer",
+                              "Parallel Aware": false,
+                              "Async Capable": false,
+                              "Join Type": "Inner",
+                              "Startup Cost": 4.48,
+                              "Total Cost": 9.24,
+                              "Plan Rows": 1,
+                              "Plan Width": 112,
+                              "Disabled": false,
+                              "Inner Unique": false,
+                              "Hash Cond": "((s2_1.n0).id = e2.end_id)",
+                              "Plans": [
+                                {
+                                  "Node Type": "CTE Scan",
+                                  "Parent Relationship": "Outer",
+                                  "Parallel Aware": false,
+                                  "Async Capable": false,
+                                  "CTE Name": "s2",
+                                  "Alias": "s2_1",
+                                  "Startup Cost": 0.0,
+                                  "Total Cost": 4.0,
+                                  "Plan Rows": 200,
+                                  "Plan Width": 72,
+                                  "Disabled": false
+                                },
+                                {
+                                  "Node Type": "Hash",
+                                  "Parent Relationship": "Inner",
+                                  "Parallel Aware": false,
+                                  "Async Capable": false,
+                                  "Startup Cost": 4.47,
+                                  "Total Cost": 4.47,
+                                  "Plan Rows": 1,
+                                  "Plan Width": 48,
+                                  "Disabled": false,
+                                  "Plans": [
+                                    {
+                                      "Node Type": "Index Scan",
+                                      "Parent Relationship": "Outer",
+                                      "Parallel Aware": false,
+                                      "Async Capable": false,
+                                      "Scan Direction": "Forward",
+                                      "Index Name": "edge_1_kind_id_idx",
+                                      "Relation Name": "edge_1",
+                                      "Alias": "e2",
+                                      "Startup Cost": 0.42,
+                                      "Total Cost": 4.47,
+                                      "Plan Rows": 1,
+                                      "Plan Width": 48,
+                                      "Disabled": false,
+                                      "Index Cond": "(kind_id = ANY ('{149}'::smallint[]))"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "Node Type": "Index Scan",
+                              "Parent Relationship": "Inner",
+                              "Parallel Aware": false,
+                              "Async Capable": false,
+                              "Scan Direction": "Forward",
+                              "Index Name": "node_1_pkey",
+                              "Relation Name": "node_1",
+                              "Alias": "n3",
+                              "Startup Cost": 0.42,
+                              "Total Cost": 8.45,
+                              "Plan Rows": 1,
+                              "Plan Width": 157,
+                              "Disabled": false,
+                              "Index Cond": "(id = e2.start_id)",
+                              "Filter": "(kind_ids OPERATOR(pg_catalog.@>) '{35}'::smallint[])"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "JIT": {
+      "Functions": 95,
+      "Options": {
+        "Inlining": true,
+        "Optimization": true,
+        "Expressions": true,
+        "Deforming": true
+      }
+    }
+  }
+]

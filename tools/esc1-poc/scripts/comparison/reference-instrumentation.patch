@@ -1,0 +1,167 @@
+diff --git a/tools/esc1-poc/internal/graphdb/native.go b/tools/esc1-poc/internal/graphdb/native.go
+index 3e3b94086..96af28a0f 100644
+--- a/tools/esc1-poc/internal/graphdb/native.go
++++ b/tools/esc1-poc/internal/graphdb/native.go
+@@ -202,12 +202,13 @@ func nativeTimeout(ctx context.Context) graph.TransactionOption {
+ 
+ func runNativeNeo4j(ctx context.Context, database graph.Database, plan extension.Plan, options runner.Options) (runner.Report, error) {
+ 	var (
+-		started       = time.Now()
+-		limits        = options.Limits
+-		report        runner.Report
+-		callbackError error
+-		entered       bool
+-		borrowed      = &nativeNeo4jDatabase{database: database}
++		started                           = time.Now()
++		limits                            = options.Limits
++		report                            runner.Report
++		callbackError                     error
++		callbackStarted, callbackFinished time.Time
++		entered                           bool
++		borrowed                          = &nativeNeo4jDatabase{database: database}
+ 	)
+ 	if limits == (runner.Limits{}) {
+ 		limits = runner.DefaultLimits()
+@@ -215,16 +216,29 @@ func runNativeNeo4j(ctx context.Context, database graph.Database, plan extension
+ 	ctx, cancel := context.WithTimeout(ctx, limits.RunTimeout)
+ 	defer cancel()
+ 	if err := runner.PrepareDatabase(ctx, borrowed, plan); err != nil {
++		report.PreparationElapsed = time.Since(started)
++		report.Elapsed = report.PreparationElapsed
+ 		return report, err
+ 	}
+ 	borrowed.prepared = true
+ 	err := database.WriteTransaction(ctx, func(transaction graph.Transaction) error {
++		callbackStarted = time.Now()
+ 		entered = true
+ 		borrowed.main = &nativeNeo4jTransaction{database: borrowed, transaction: transaction}
+ 		report, callbackError = runner.Run(ctx, borrowed, plan, options)
++		callbackFinished = time.Now()
+ 		report.Committed = false
+ 		return callbackError
+ 	}, nativeTimeout(ctx))
++	// Neo4j opens and finishes the surrounding transaction outside runner.Run.
++	// Include that preparation and final save/rollback in the phase measurements.
++	if entered {
++		report.PreparationElapsed += callbackStarted.Sub(started)
++		report.SavingElapsed += time.Since(callbackFinished)
++	} else {
++		report.PreparationElapsed = time.Since(started)
++	}
++	report.Elapsed = time.Since(started)
+ 	if err != nil {
+ 		report.GraphObjectsChanged = 0
+ 		if entered && callbackError == nil && borrowed.main.commitRequested {
+@@ -235,7 +249,6 @@ func runNativeNeo4j(ctx context.Context, database graph.Database, plan extension
+ 		return report, err
+ 	}
+ 	report.Committed = borrowed.main != nil && borrowed.main.commitRequested
+-	report.Elapsed = time.Since(started)
+ 	runner.ConfirmNativeSave(&report, nil)
+ 	return report, nil
+ }
+diff --git a/tools/esc1-poc/internal/runner/calculate.go b/tools/esc1-poc/internal/runner/calculate.go
+index cf77557b6..85fdd5f1c 100644
+--- a/tools/esc1-poc/internal/runner/calculate.go
++++ b/tools/esc1-poc/internal/runner/calculate.go
+@@ -213,6 +213,13 @@ func calculateQueries(ctx context.Context, database Database, transaction Transa
+ 		answers[query.Parameter] = file
+ 		report.Queries = append(report.Queries, query.Name)
+ 		report.QueryRows[query.Name] = int(file.rows)
++		if space.observeAnswer != nil {
++			if err := file.each(ctx, func(row map[string]any) error {
++				return space.observeAnswer(query.Name, row)
++			}); err != nil {
++				return nil, fmt.Errorf("record answers from %s: %w", query.Name, err)
++			}
++		}
+ 		for _, binding := range plan.Schema.Nodes {
+ 			if binding.Query != query.Name {
+ 				continue
+diff --git a/tools/esc1-poc/internal/runner/runner.go b/tools/esc1-poc/internal/runner/runner.go
+index 9ecf57b81..290214166 100644
+--- a/tools/esc1-poc/internal/runner/runner.go
++++ b/tools/esc1-poc/internal/runner/runner.go
+@@ -74,6 +74,10 @@ type Options struct {
+ 	Changes            Changes
+ 	Limits             Limits
+ 	TemporaryDirectory string
++	// ObserveAnswer is for separate correctness checks. It receives complete
++	// query answers, including Go calculations, before later queries use them.
++	// Leave it nil during timing runs; copying evidence is extra work.
++	ObserveAnswer func(query string, row map[string]any) error
+ }
+ 
+ // Report describes committed work. On an error, Committed remains false and
+@@ -98,6 +102,9 @@ type Report struct {
+ 	GraphObjectsChanged int               `json:"graph_objects_changed"`
+ 	NativeComparison    *Comparison       `json:"native_comparison,omitempty"`
+ 	Elapsed             time.Duration     `json:"elapsed_nanoseconds"`
++	PreparationElapsed  time.Duration     `json:"preparation_nanoseconds"`
++	CalculationElapsed  time.Duration     `json:"calculation_nanoseconds"`
++	SavingElapsed       time.Duration     `json:"saving_nanoseconds"`
+ }
+ 
+ // Run finishes and checks every calculation before publishing changes. Reads
+@@ -113,6 +120,14 @@ func Run(ctx context.Context, database Database, plan extension.Plan, options Op
+ }
+ 
+ func run(ctx context.Context, database Database, plan extension.Plan, options Options, report *Report) error {
++	var (
++		phaseStarted = time.Now()
++		phaseElapsed = &report.PreparationElapsed
++	)
++	// Measure elapsed time, including a failed phase. Query times can overlap,
++	// so their sum is not the calculation's elapsed time. Helpers and any early
++	// writes needed by later queries belong to the calculation phase.
++	defer func() { *phaseElapsed += time.Since(phaseStarted) }()
+ 	if options.BatchID == "" || !options.IngestionComplete {
+ 		return fmt.Errorf("a successfully completed ingestion batch is required; existing results were kept")
+ 	}
+@@ -130,6 +145,7 @@ func run(ctx context.Context, database Database, plan extension.Plan, options Op
+ 		return err
+ 	}
+ 	defer space.close()
++	space.observeAnswer = options.ObserveAnswer
+ 	if err := prepareDatabase(ctx, database, plan); err != nil {
+ 		return err
+ 	}
+@@ -214,12 +230,16 @@ func run(ctx context.Context, database Database, plan extension.Plan, options Op
+ 		return nil
+ 	}
+ 	report.Execution.Phase, report.Execution.Calculation = "calculation", "running"
++	*phaseElapsed += time.Since(phaseStarted)
++	phaseStarted, phaseElapsed = time.Now(), &report.CalculationElapsed
+ 	desiredByKind, err := calculate(ctx, database, transaction, plan, space, report, stage)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	report.Execution.Calculation = "succeeded"
+ 	report.Execution.Phase, report.Execution.Save = "saving", "saving"
++	*phaseElapsed += time.Since(phaseStarted)
++	phaseStarted, phaseElapsed = time.Now(), &report.SavingElapsed
+ 	// Only types read by later rules needed early writes. Save all remaining
+ 	// combined answers now, still within the same transaction.
+ 	for _, binding := range plan.Schema.Relationships {
+diff --git a/tools/esc1-poc/internal/runner/store.go b/tools/esc1-poc/internal/runner/store.go
+index db306ddd7..d23385e84 100644
+--- a/tools/esc1-poc/internal/runner/store.go
++++ b/tools/esc1-poc/internal/runner/store.go
+@@ -36,11 +36,12 @@ import (
+ // parallel queries and merge passes from each spending the entire disk budget.
+ // Files contain graph evidence, so directories and files are private to the user.
+ type answerSpace struct {
+-	directory string
+-	limits    Limits
+-	mutex     sync.Mutex
+-	bytes     int64
+-	peak      int64
++	directory     string
++	limits        Limits
++	mutex         sync.Mutex
++	bytes         int64
++	peak          int64
++	observeAnswer func(string, map[string]any) error
+ }
+ 
+ type answerFile struct {

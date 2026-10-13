@@ -55,7 +55,9 @@ No. Authors' instructions tell the engine which calculations must finish before 
 
 The engine runs rules affected by changed types of data and their supporting rules. Unaffected results stay saved, avoiding unnecessary work.
 
-First runs, rule changes, application restarts, or uncertainty about what changed run all enabled rules. Large uploads can also require this. Disabled rules stay paused.
+First runs, rule changes, application restarts, or uncertainty about what changed run all enabled rules.
+
+The engine limits the extra work spent tracking changes during imports. Large uploads can exceed those limits, leaving an incomplete picture of what changed. It then runs all enabled rules because skipping one could leave outdated results. File size alone does not decide this. Disabled rules stay paused.
 
 ## Can I run the rules without uploading more data?
 

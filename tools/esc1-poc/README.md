@@ -4,6 +4,8 @@ Making BloodHound extensions easier to build could reduce development effort, ex
 
 This project lets an extension author describe those connections in readable `.cypher` rule files. For example: **“If an account in this vault has the same directory identifier as an Active Directory user, connect the vault to that user.”** This factual association appears in BloodHound for inspection. It does not establish an attack path, so pathfinding cannot follow it.
 
+Complex analyses can also use ordinary Cypher: the [complete ESC1 example](examples/esc1-cypher/README.md) works without special processing instructions. Experienced authors can choose [optional advanced controls](ADVANCED_CONTROLS.md). The [comparison report](CYPHER_COMPARISON.md) checks exact answers and directly compares each choice on both databases through one million objects. The instructions remain optional, with measured differences in speed and input capacity.
+
 You install two parts once: an extra container that stores the rules, and a modified BloodHound application that runs them. Later, you can upload new rules without rebuilding or restarting BloodHound. This is an experimental Community Edition feature; it still needs review and testing before production use.
 
 ## What using it looks like
@@ -37,7 +39,7 @@ Existing settings give BloodHound the rule container's address and access secret
 - Both Neo4j and PostgreSQL have laboratory test evidence. This coordinates one modified Community Edition application; other applications or direct database writers are outside its protection.
 - Up to five ready queries can run together. A ready query can start without waiting for an unrelated slow query. Queries run one at a time after supporting objects are created, so they can see those new objects before saving.
 - First runs, changed rules, restarts, and incomplete change tracking run all enabled rules. Tracking is bounded, so large uploads can also require a full run of enabled rules.
-- Large-graph safeguards are implemented, but performance at 100 million edges and Enterprise compatibility have not been demonstrated. The [review guide](REVIEW.md) includes passing checks and unresolved failures.
+- Large-graph safeguards are implemented. The [Cypher comparison](CYPHER_COMPARISON.md) reports measured object and connection counts separately, along with remaining limits. Capacity at 100 million objects and Enterprise compatibility have not been demonstrated. The [review guide](REVIEW.md) includes the checks and unresolved work.
 
 ## Where to go next
 

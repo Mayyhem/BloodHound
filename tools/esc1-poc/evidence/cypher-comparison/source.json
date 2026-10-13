@@ -1,0 +1,14 @@
+{
+  "commits": {
+    "BloodHound": "7d57d4d11f34038991c491983a9490a20cb7ac58",
+    "DAWGS": "5f16c574e48045472d15a447c2fa9707d394a4bd"
+  },
+  "source_archives": {
+    "BloodHound": "10baa48fd239cad4997ced5a1ae13d1a8ca8ecc59f091e64677acba91490753b",
+    "DAWGS": "11adee087b7abc97ccc1aaae66f202eb6a643938b793bc974d558d6999a95728"
+  },
+  "go_version": "go version go1.27.1 linux/amd64",
+  "cpu_count": 20,
+  "experiment_budget_hours": 24,
+  "reference_instrumentation_sha256": "4606d086092513ac7c6eb4535f70cbbcb8982f94d66039ecc42466c231500a0f"
+}

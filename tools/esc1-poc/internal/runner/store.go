@@ -36,11 +36,12 @@ import (
 // parallel queries and merge passes from each spending the entire disk budget.
 // Files contain graph evidence, so directories and files are private to the user.
 type answerSpace struct {
-	directory string
-	limits    Limits
-	mutex     sync.Mutex
-	bytes     int64
-	peak      int64
+	directory     string
+	limits        Limits
+	mutex         sync.Mutex
+	bytes         int64
+	peak          int64
+	observeAnswer func(string, map[string]any) error
 }
 
 type answerFile struct {

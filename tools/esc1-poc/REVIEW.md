@@ -4,6 +4,18 @@ This is a proof of concept for one modified BloodHound Community Edition process
 
 Start with [README.md](README.md) for the proposal, [USAGE.md](USAGE.md) for operating instructions, and [DESIGN.md](DESIGN.md) for the rules the code follows and its failure behavior. [HANDOFF.md](HANDOFF.md) retains the dated work history, full historical commands, private log locations, and local running state.
 
+## Ordinary Cypher and optional controls — completed 13 October 2026
+
+The [ordinary ESC1 example](examples/esc1-cypher/README.md) performs the complete calculation without `reachability`, `batch-on`, or `group-overlap`. The advanced example and its instructions remain supported. The [comparison report](CYPHER_COMPARISON.md) gives direct feature comparisons, complete-run costs, exact-answer checks, and proposed future controls. [Synthetic measurements and tables](evidence/cypher-comparison/README.md) are generated from retained individual observations. All eight final studies completed with 852 timed observations. Both databases also passed three repetitions of the separate batching-limit check: batching completed, while whole input failed the parameter limit and preserved saved results. The user set one million objects as the final size; larger capacity studies are deferred. The report explicitly identifies missed performance targets; completion does not mean those costs have been accepted.
+
+Both-database tests compare all five required versions, including intermediate answers, exact group choices, repeated support from multiple authorities, saved properties and helpers, and failures preserving identities and the successful-run record. The complete pilot suite passed with race detection, including the final selected-endpoint correction. Its enlarged graph package passed in 871.846 seconds with an explicit 30-minute test allowance; the first invocation had reached Go's default 10-minute test timer. Full DAWGS suites passed on PostgreSQL and Neo4j after the final correction. Static checks passed too. The final comparable unit profile covers 61.9273% of unique statements, above the starting profile's 61.8852%. A previous 63.0127% figure also included extra PostgreSQL paths exercised by the test environment; it is not the final comparison. Private logs and commands are recorded in the handoff.
+
+The separate DAWGS checkout contains the query-language corrections. Review its diff as well as this repository: it is not included in a BloodHound commit. Shared examples cover ordinary paths beyond fifteen links, carried values through `WITH`, true/false input values, names shared by parameters and columns, `SET` values, returned-column sorting, and paths ending at an already selected object without multiplying the count. A test-only correction sorts expected retriever IDs because Neo4j can reuse previously deleted IDs; creation order is not numerical order. Shortest-path limits remain unchanged. The alias-sorting discrepancy recorded below is now fixed.
+
+The runner adds phase timings and an optional complete-answer observer for separate correctness runs. Timed runs leave that observer unset. Native Neo4j timings include preparation and the surrounding commit. The new [measurement command](cmd/cypher-comparison) is restricted to isolated local test databases. It calls the actual built-in ESC1 routine for a separate reference, measures probes through the real write gate, and preserves full answer evidence outside Git. The [reproduction guide](scripts/comparison/README.md) explains the starting-source measurement patch, limits, and retained setup interruptions. Final Python syntax checks, targeted measurement-command `go vet`, and both repository whitespace checks passed. Measurement-only corrections did not require repeating the completed correctness suites.
+
+No application or rule-service deployment has been performed. Original database contents were restored and verified against their saved archives, and both test containers are stopped as they were initially. Existing Neo4j logs are retained, including experiment logs; logs were not in the original archive. The user will review and commit; `just prepare-for-codereview` remains required before that manual commit.
+
 
 ## Earlier validation and execution reports — 12 October 2026
 
@@ -26,7 +38,7 @@ Validation passed:
 
 No application data was modified, and nothing was staged or committed. The existing isolated test database containers were started for verification and returned to their original stopped state afterward. `just prepare-for-codereview` remains required before the user’s manual commit.
 
-Separate follow-up: PostgreSQL returned a different order from Neo4j for a test query shaped like `MATCH (source)-[...]... RETURN source.objectid AS source ... ORDER BY source`. The returned alias reuses the node variable’s name. The new tests compare connection sets, whose ordering is irrelevant. Investigate that alias ordering behavior separately before relying on it with `LIMIT`; no DAWGS change was made here.
+At this earlier stage, PostgreSQL returned a different order from Neo4j for a query shaped like `MATCH (source)-[...]... RETURN source.objectid AS source ... ORDER BY source`. The returned column reuses the object's name. The Cypher work described above now fixes and tests that ordering, including `LIMIT`; it was not part of the earlier validation/report change.
 
 ## Schema kind declarations and inactive drafts
 
@@ -391,8 +403,10 @@ The tests supply these lab credentials in code; no private application settings 
 ```sh
 NEO4J_TEST_URI=bolt://127.0.0.1:27687 \
 ESC1_POC_POSTGRES_TEST_URI=postgresql://127.0.0.1:25432/esc1_poc_test \
-  ./scripts/go.sh test -race -tags integration -count=1 ./internal/graphdb
+  ./scripts/go.sh test -race -tags integration -count=1 -timeout 30m ./internal/graphdb
 ```
+
+The complete ordinary-Cypher comparison cases can exceed Go's default ten-minute test allowance. The command above allows thirty minutes for the test package; this does not change any analysis or benchmark limit.
 
 To exercise real uploads and native analysis, use [check-persistent-service.py](scripts/check-persistent-service.py) with a fresh persistent lab and the authenticated setup in [USAGE.md](USAGE.md). Its required arguments are `--collections` and `--output`; `--opengraph` adds vault changes and leaves a combined ESC1/vault bundle active. Existing producers cannot later be removed with a core-only upload. Keep the failed combined PostgreSQL count assertion in the review record when comparing a new run. Full historical commands and reports stay in [HANDOFF.md](HANDOFF.md).
 
@@ -418,7 +432,7 @@ Maintained files under this experiment are listed individually. The counts recor
 | [USAGE.md](USAGE.md) | Setup, rule upload, demonstrations, operation, and recovery instructions. |
 | [DESIGN.md](DESIGN.md) | Rule contracts, calculation and publication behavior, coordination, and design limits. |
 | [AGENTS.md](AGENTS.md) | Local instructions for plain-English explanations, readable code, delegated work, and leaving commits to the user. |
-| [CYPHER_IMPLEMENTATION_PLAN.md](CYPHER_IMPLEMENTATION_PLAN.md) | Plain-English plan for replacing author-facing reachability, batching, and group-selection instructions, with exact-result checks and a 1-million → 10-million → 100-million-object test ladder that stops early when justified. |
+| [CYPHER_IMPLEMENTATION_PLAN.md](CYPHER_IMPLEMENTATION_PLAN.md) | Plain-English plan for ordinary Cypher and optional reachability, batching, and group-selection instructions, with exact-result checks and comparisons through one million objects. Larger capacity studies are deferred at the user’s request. |
 | [REVIEW.md](REVIEW.md) | Source reading guide, change references, scoped evidence, checks, and complete maintained file inventory. |
 | [compose.pg.yaml](compose.pg.yaml) | Dedicated PostgreSQL graph lab, separate from the Neo4j environment. |
 | [compose.postprocessor.yaml](compose.postprocessor.yaml) | Runs a separate command on the existing external network with runtime mounts and a shared state directory. |

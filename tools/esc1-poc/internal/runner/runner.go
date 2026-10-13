@@ -74,6 +74,10 @@ type Options struct {
 	Changes            Changes
 	Limits             Limits
 	TemporaryDirectory string
+	// ObserveAnswer is for separate correctness checks. It receives complete
+	// query answers, including Go calculations, before later queries use them.
+	// Leave it nil during timing runs; copying evidence is extra work.
+	ObserveAnswer func(query string, row map[string]any) error
 }
 
 // Report describes committed work. On an error, Committed remains false and
@@ -98,6 +102,9 @@ type Report struct {
 	GraphObjectsChanged int               `json:"graph_objects_changed"`
 	NativeComparison    *Comparison       `json:"native_comparison,omitempty"`
 	Elapsed             time.Duration     `json:"elapsed_nanoseconds"`
+	PreparationElapsed  time.Duration     `json:"preparation_nanoseconds"`
+	CalculationElapsed  time.Duration     `json:"calculation_nanoseconds"`
+	SavingElapsed       time.Duration     `json:"saving_nanoseconds"`
 }
 
 // Run finishes and checks every calculation before publishing changes. Reads
@@ -113,6 +120,14 @@ func Run(ctx context.Context, database Database, plan extension.Plan, options Op
 }
 
 func run(ctx context.Context, database Database, plan extension.Plan, options Options, report *Report) error {
+	var (
+		phaseStarted = time.Now()
+		phaseElapsed = &report.PreparationElapsed
+	)
+	// Measure elapsed time, including a failed phase. Query times can overlap,
+	// so their sum is not the calculation's elapsed time. Helpers and any early
+	// writes needed by later queries belong to the calculation phase.
+	defer func() { *phaseElapsed += time.Since(phaseStarted) }()
 	if options.BatchID == "" || !options.IngestionComplete {
 		return fmt.Errorf("a successfully completed ingestion batch is required; existing results were kept")
 	}
@@ -130,6 +145,7 @@ func run(ctx context.Context, database Database, plan extension.Plan, options Op
 		return err
 	}
 	defer space.close()
+	space.observeAnswer = options.ObserveAnswer
 	if err := prepareDatabase(ctx, database, plan); err != nil {
 		return err
 	}
@@ -214,12 +230,16 @@ func run(ctx context.Context, database Database, plan extension.Plan, options Op
 		return nil
 	}
 	report.Execution.Phase, report.Execution.Calculation = "calculation", "running"
+	*phaseElapsed += time.Since(phaseStarted)
+	phaseStarted, phaseElapsed = time.Now(), &report.CalculationElapsed
 	desiredByKind, err := calculate(ctx, database, transaction, plan, space, report, stage)
 	if err != nil {
 		return err
 	}
 	report.Execution.Calculation = "succeeded"
 	report.Execution.Phase, report.Execution.Save = "saving", "saving"
+	*phaseElapsed += time.Since(phaseStarted)
+	phaseStarted, phaseElapsed = time.Now(), &report.SavingElapsed
 	// Only types read by later rules needed early writes. Save all remaining
 	// combined answers now, still within the same transaction.
 	for _, binding := range plan.Schema.Relationships {

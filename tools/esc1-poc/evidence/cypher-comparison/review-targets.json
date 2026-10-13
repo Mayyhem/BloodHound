@@ -1,0 +1,5190 @@
+{
+  "accepted_by_user": false,
+  "note": "Proposed thresholds, not an acceptance decision. Percentages near zero have no agreed absolute allowance. Sampled memory/space may miss peaks. Overlapping timing ranges require caution.",
+  "results": [
+    {
+      "study": "final-compact-probes/neo4j",
+      "version": "advanced",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1348287548,
+          "comparison": 1375821720,
+          "difference": 27534172,
+          "percent": 2.0421587398654815,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 658163833,
+          "comparison": 673850525,
+          "difference": 15686692,
+          "percent": 2.3834023101053625,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 39664,
+          "comparison": 40000,
+          "difference": 336,
+          "percent": 0.8471157724889069,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5165346816,
+          "comparison": 5166018560,
+          "difference": 671744,
+          "percent": 0.013004818919791194,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5205889024,
+          "comparison": 5206978560,
+          "difference": 1089536,
+          "percent": 0.020928913293715268,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 172969,
+          "comparison": 172970,
+          "difference": 1,
+          "percent": 0.0005781382791135984,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 106062,
+          "comparison": 106062,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "reference": 9037320,
+          "comparison": 11344816,
+          "difference": 2307496,
+          "percent": 25.532967738223277,
+          "statistic": "pooled p95",
+          "count": 649,
+          "reference_count": 639,
+          "allowance_percent": 10,
+          "status": "review required"
+        },
+        "writer_wait": {
+          "reference": 1282628974,
+          "comparison": 1309231471,
+          "difference": 26602497,
+          "percent": 2.0740601950568442,
+          "statistic": "pooled p95",
+          "count": 650,
+          "reference_count": 627,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-compact-probes/neo4j",
+      "version": "advanced",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1230355368,
+          "comparison": 1224783003,
+          "difference": -5572365,
+          "percent": -0.45290695232696376,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 622010710,
+          "comparison": 581493429,
+          "difference": -40517281,
+          "percent": -6.513920154204418,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 40728,
+          "comparison": 40868,
+          "difference": 140,
+          "percent": 0.3437438617167551,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5165555712,
+          "comparison": 5165686784,
+          "difference": 131072,
+          "percent": 0.0025374230248937056,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5207199744,
+          "comparison": 5206716416,
+          "difference": -483328,
+          "percent": -0.009281917801538439,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 172970,
+          "comparison": 172970,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 106063,
+          "comparison": 106063,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "reference": 11675308,
+          "comparison": 11421880,
+          "difference": -253428,
+          "percent": -2.1706322437061187,
+          "statistic": "pooled p95",
+          "count": 591,
+          "reference_count": 584,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        },
+        "writer_wait": {
+          "reference": 1190113241,
+          "comparison": 1170312905,
+          "difference": -19800336,
+          "percent": -1.6637354596074108,
+          "statistic": "pooled p95",
+          "count": 585,
+          "reference_count": 595,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-compact-probes/neo4j",
+      "version": "ordinary-all",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1348287548,
+          "comparison": 2846170492,
+          "difference": 1497882944,
+          "percent": 111.09521453505258,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 658163833,
+          "comparison": 2162134824,
+          "difference": 1503970991,
+          "percent": 228.51012401345366,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 39664,
+          "comparison": 43348,
+          "difference": 3684,
+          "percent": 9.288019362646228,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5165346816,
+          "comparison": 5166526464,
+          "difference": 1179648,
+          "percent": 0.02283773078597478,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5205889024,
+          "comparison": 5210640384,
+          "difference": 4751360,
+          "percent": 0.09126894519063801,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 172969,
+          "comparison": 192976,
+          "difference": 20007,
+          "percent": 11.566812550225764,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 106062,
+          "comparison": 106063,
+          "difference": 1,
+          "percent": 0.0009428447511832702,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "reference": 9037320,
+          "comparison": 7284058,
+          "difference": -1753262,
+          "percent": -19.400242549782458,
+          "statistic": "pooled p95",
+          "count": 1392,
+          "reference_count": 639,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        },
+        "writer_wait": {
+          "reference": 1282628974,
+          "comparison": 2867689433,
+          "difference": 1585060459,
+          "percent": 123.57903112517712,
+          "statistic": "pooled p95",
+          "count": 1000,
+          "reference_count": 627,
+          "allowance_percent": 10,
+          "status": "review required"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-compact-probes/neo4j",
+      "version": "ordinary-all",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1230355368,
+          "comparison": 2732089335,
+          "difference": 1501733967,
+          "percent": 122.05692810859506,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 622010710,
+          "comparison": 2115003238,
+          "difference": 1492992528,
+          "percent": 240.02682011697198,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 40728,
+          "comparison": 43684,
+          "difference": 2956,
+          "percent": 7.257906108819485,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5165555712,
+          "comparison": 5166518272,
+          "difference": 962560,
+          "percent": 0.018634200339063153,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5207199744,
+          "comparison": 5211250688,
+          "difference": 4050944,
+          "percent": 0.07779505682814844,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 172970,
+          "comparison": 192976,
+          "difference": 20006,
+          "percent": 11.566167543504655,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 106063,
+          "comparison": 106063,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "reference": 11675308,
+          "comparison": 10813705,
+          "difference": -861603,
+          "percent": -7.379702531188043,
+          "statistic": "pooled p95",
+          "count": 1343,
+          "reference_count": 584,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        },
+        "writer_wait": {
+          "reference": 1190113241,
+          "comparison": 3406462328,
+          "difference": 2216349087,
+          "percent": 186.23010068669592,
+          "statistic": "pooled p95",
+          "count": 1000,
+          "reference_count": 595,
+          "allowance_percent": 10,
+          "status": "review required"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-compact-probes/pg",
+      "version": "advanced",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 3043146259,
+          "comparison": 1740862985,
+          "difference": -1302283274,
+          "percent": -42.79397581199202,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1632526600,
+          "comparison": 265872184,
+          "difference": -1366654416,
+          "percent": -83.71406726236498,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 43140,
+          "comparison": 43664,
+          "difference": 524,
+          "percent": 1.2146499768196568,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1945346048,
+          "comparison": 1934901248,
+          "difference": -10444800,
+          "percent": -0.5369121864327554,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1989521408,
+          "comparison": 1979609088,
+          "difference": -9912320,
+          "percent": -0.4982263553506834,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 173620,
+          "comparison": 173620,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 75322,
+          "comparison": 2786,
+          "difference": -72536,
+          "percent": -96.30121345689174,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "reference": 17202902,
+          "comparison": 18822144,
+          "difference": 1619242,
+          "percent": 9.41260957017601,
+          "statistic": "pooled p95",
+          "count": 751,
+          "reference_count": 1371,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        },
+        "writer_wait": {
+          "reference": 2975176680,
+          "comparison": 1700245237,
+          "difference": -1274931443,
+          "percent": -42.85229349807891,
+          "statistic": "pooled p95",
+          "count": 834,
+          "reference_count": 1000,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-compact-probes/pg",
+      "version": "advanced",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 3097828470,
+          "comparison": 1709276893,
+          "difference": -1388551577,
+          "percent": -44.82338484674072,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1640996531,
+          "comparison": 264806313,
+          "difference": -1376190218,
+          "percent": -83.86307904998247,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 43324,
+          "comparison": 43136,
+          "difference": -188,
+          "percent": -0.43393961776382606,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1943486464,
+          "comparison": 1935519744,
+          "difference": -7966720,
+          "percent": -0.40991898567707236,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1987379200,
+          "comparison": 1979686912,
+          "difference": -7692288,
+          "percent": -0.3870568837592745,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 173620,
+          "comparison": 173620,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 942,
+          "comparison": 3290,
+          "difference": 2348,
+          "percent": 249.2569002123142,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "reference": 17391491,
+          "comparison": 18204475,
+          "difference": 812984,
+          "percent": 4.674607829771467,
+          "statistic": "pooled p95",
+          "count": 742,
+          "reference_count": 1390,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        },
+        "writer_wait": {
+          "reference": 3011612037,
+          "comparison": 1637419125,
+          "difference": -1374192912,
+          "percent": -45.62981204474446,
+          "statistic": "pooled p95",
+          "count": 810,
+          "reference_count": 1000,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-compact-probes/pg",
+      "version": "ordinary-all",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 3043146259,
+          "comparison": 3151093986,
+          "difference": 107947727,
+          "percent": 3.5472408426229376,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1632526600,
+          "comparison": 1760433720,
+          "difference": 127907120,
+          "percent": 7.834917973158905,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 43140,
+          "comparison": 47672,
+          "difference": 4532,
+          "percent": 10.505331478905887,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1945346048,
+          "comparison": 1981386752,
+          "difference": 36040704,
+          "percent": 1.852662873890908,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1989521408,
+          "comparison": 2030202880,
+          "difference": 40681472,
+          "percent": 2.04478684353016,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 173620,
+          "comparison": 193627,
+          "difference": 20007,
+          "percent": 11.523441999769613,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 75322,
+          "comparison": 98548,
+          "difference": 23226,
+          "percent": 30.835612437269322,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "reference": 17202902,
+          "comparison": 17619413,
+          "difference": 416511,
+          "percent": 2.421167079833391,
+          "statistic": "pooled p95",
+          "count": 1456,
+          "reference_count": 1371,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        },
+        "writer_wait": {
+          "reference": 2975176680,
+          "comparison": 3137606157,
+          "difference": 162429477,
+          "percent": 5.4594901234571385,
+          "statistic": "pooled p95",
+          "count": 1000,
+          "reference_count": 1000,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-compact-probes/pg",
+      "version": "ordinary-all",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 3097828470,
+          "comparison": 3065520685,
+          "difference": -32307785,
+          "percent": -1.0429171696520694,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1640996531,
+          "comparison": 1716406460,
+          "difference": 75409929,
+          "percent": 4.5953740654190325,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 43324,
+          "comparison": 47432,
+          "difference": 4108,
+          "percent": 9.482042286030836,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1943486464,
+          "comparison": 1984176128,
+          "difference": 40689664,
+          "percent": 2.093642778260173,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1987379200,
+          "comparison": 2032107520,
+          "difference": 44728320,
+          "percent": 2.250618301731245,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 173620,
+          "comparison": 193627,
+          "difference": 20007,
+          "percent": 11.523441999769613,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 942,
+          "comparison": 98548,
+          "difference": 97606,
+          "percent": 10361.571125265393,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "reference": 17391491,
+          "comparison": 17176557,
+          "difference": -214934,
+          "percent": -1.2358572361622129,
+          "statistic": "pooled p95",
+          "count": 1405,
+          "reference_count": 1390,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        },
+        "writer_wait": {
+          "reference": 3011612037,
+          "comparison": 3065472250,
+          "difference": 53860213,
+          "percent": 1.788418041178124,
+          "statistic": "pooled p95",
+          "count": 1000,
+          "reference_count": 1000,
+          "allowance_percent": 10,
+          "status": "within observed target"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-divided/neo4j",
+      "version": "advanced",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 988321515,
+          "comparison": 1005159493,
+          "difference": 16837978,
+          "percent": 1.7036943691345219,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 595925398,
+          "comparison": 599311801,
+          "difference": 3386403,
+          "percent": 0.5682595525153301,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 38904,
+          "comparison": 38848,
+          "difference": -56,
+          "percent": -0.14394406744807733,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3699490816,
+          "comparison": 3699924992,
+          "difference": 434176,
+          "percent": 0.01173610157706633,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3737870336,
+          "comparison": 3738886144,
+          "difference": 1015808,
+          "percent": 0.027176116576773626,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 413030,
+          "comparison": 413030,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 20979,
+          "comparison": 20978,
+          "difference": -1,
+          "percent": -0.0047666714333381,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-divided/neo4j",
+      "version": "advanced",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 927783407,
+          "comparison": 900008182,
+          "difference": -27775225,
+          "percent": -2.9937186621834035,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 570039732,
+          "comparison": 569067471,
+          "difference": -972261,
+          "percent": -0.17056021631839516,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 38336,
+          "comparison": 38036,
+          "difference": -300,
+          "percent": -0.7825542570951586,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3699490816,
+          "comparison": 3699871744,
+          "difference": 380928,
+          "percent": 0.010296768364784608,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3738091520,
+          "comparison": 3738284032,
+          "difference": 192512,
+          "percent": 0.005150007670224189,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 413030,
+          "comparison": 413030,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 20978,
+          "comparison": 20979,
+          "difference": 1,
+          "percent": 0.004766898655734579,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-divided/neo4j",
+      "version": "ordinary-all",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 988321515,
+          "comparison": 2301249189,
+          "difference": 1312927674,
+          "percent": 132.84418623629782,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 595925398,
+          "comparison": 1913568761,
+          "difference": 1317643363,
+          "percent": 221.10877761246215,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 38904,
+          "comparison": 42012,
+          "difference": 3108,
+          "percent": 7.988895743368291,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3699490816,
+          "comparison": 3700539392,
+          "difference": 1048576,
+          "percent": 0.028343792488009247,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3737870336,
+          "comparison": 3743498240,
+          "difference": 5627904,
+          "percent": 0.15056445232454418,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 413030,
+          "comparison": 413030,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 20979,
+          "comparison": 24368,
+          "difference": 3389,
+          "percent": 16.15424948758282,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-divided/neo4j",
+      "version": "ordinary-all",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 927783407,
+          "comparison": 2232735180,
+          "difference": 1304951773,
+          "percent": 140.65263111565866,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 570039732,
+          "comparison": 1899595629,
+          "difference": 1329555897,
+          "percent": 233.23916252911297,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 38336,
+          "comparison": 42224,
+          "difference": 3888,
+          "percent": 10.141903171953254,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3699490816,
+          "comparison": 3700539392,
+          "difference": 1048576,
+          "percent": 0.028343792488009247,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3738091520,
+          "comparison": 3741921280,
+          "difference": 3829760,
+          "percent": 0.10245228024807697,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 413030,
+          "comparison": 413030,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 20978,
+          "comparison": 24368,
+          "difference": 3390,
+          "percent": 16.159786442940224,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-divided/pg",
+      "version": "advanced",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 11183351731,
+          "comparison": 1142694636,
+          "difference": -10040657095,
+          "percent": -89.78218101794585,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 10757487689,
+          "comparison": 664901153,
+          "difference": -10092586536,
+          "percent": -93.81917811832692,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 42328,
+          "comparison": 42332,
+          "difference": 4,
+          "percent": 0.00945000945000945,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1997021184,
+          "comparison": 1912844288,
+          "difference": -84176896,
+          "percent": -4.215122837675416,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 2040135680,
+          "comparison": 1955344384,
+          "difference": -84791296,
+          "percent": -4.15615965306778,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 413075,
+          "comparison": 413075,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 24413,
+          "comparison": 24412,
+          "difference": -1,
+          "percent": -0.0040961782656781225,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-divided/pg",
+      "version": "advanced",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 11027027337,
+          "comparison": 1138348371,
+          "difference": -9888678966,
+          "percent": -89.67674300416037,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 10525951597,
+          "comparison": 652067656,
+          "difference": -9873883941,
+          "percent": -93.80514293656978,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 42648,
+          "comparison": 42412,
+          "difference": -236,
+          "percent": -0.5533670981054211,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1995026432,
+          "comparison": 1912889344,
+          "difference": -82137088,
+          "percent": -4.117092720303367,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 2038644736,
+          "comparison": 1955954688,
+          "difference": -82690048,
+          "percent": -4.056128394506104,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 413075,
+          "comparison": 413075,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 89949,
+          "comparison": 24413,
+          "difference": -65536,
+          "percent": -72.85906458104037,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-divided/pg",
+      "version": "ordinary-all",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 11183351731,
+          "comparison": 1642483968,
+          "difference": -9540867763,
+          "percent": -85.31313324030513,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 10757487689,
+          "comparison": 1161896496,
+          "difference": -9595591193,
+          "percent": -89.19918358644193,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 42328,
+          "comparison": 46344,
+          "difference": 4016,
+          "percent": 9.48780948780949,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1997021184,
+          "comparison": 1942007808,
+          "difference": -55013376,
+          "percent": -2.7547717791260045,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 2040135680,
+          "comparison": 1989464064,
+          "difference": -50671616,
+          "percent": -2.48373755220045,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 413075,
+          "comparison": 413074,
+          "difference": -1,
+          "percent": -0.0002420867881135387,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 24413,
+          "comparison": 89948,
+          "difference": 65535,
+          "percent": 268.44304264121575,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-divided/pg",
+      "version": "ordinary-all",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 11027027337,
+          "comparison": 1635257516,
+          "difference": -9391769821,
+          "percent": -85.17045921784315,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 10525951597,
+          "comparison": 1180989193,
+          "difference": -9344962404,
+          "percent": -88.78021448116297,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 42648,
+          "comparison": 46336,
+          "difference": 3688,
+          "percent": 8.64753329581692,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1995026432,
+          "comparison": 1941413888,
+          "difference": -53612544,
+          "percent": -2.6873099594101015,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 2038644736,
+          "comparison": 1988210688,
+          "difference": -50434048,
+          "percent": -2.4739007787573635,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 413075,
+          "comparison": 413075,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 89949,
+          "comparison": 89949,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "advanced",
+      "workload": "changed",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1861191121,
+          "comparison": 1863990680,
+          "difference": 2799559,
+          "percent": 0.15041759916068287,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 162571715,
+          "comparison": 147023179,
+          "difference": -15548536,
+          "percent": -9.564108984148934,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 39304,
+          "comparison": 39944,
+          "difference": 640,
+          "percent": 1.628332994097293,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5635604480,
+          "comparison": 5637935104,
+          "difference": 2330624,
+          "percent": 0.04135535075733349,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5675782144,
+          "comparison": 5678653440,
+          "difference": 2871296,
+          "percent": 0.05058855197667009,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 214028,
+          "comparison": 214028,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 29012,
+          "comparison": 29014,
+          "difference": 2,
+          "percent": 0.0068936991589687024,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "advanced",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 3960962413,
+          "comparison": 2920473686,
+          "difference": -1040488727,
+          "percent": -26.268583705441994,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1040729923,
+          "comparison": 1030459955,
+          "difference": -10269968,
+          "percent": -0.9868043354029709,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 44156,
+          "comparison": 43360,
+          "difference": -796,
+          "percent": -1.8026995198840476,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5635543040,
+          "comparison": 5637398528,
+          "difference": 1855488,
+          "percent": 0.032924741889647606,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5680758784,
+          "comparison": 5681651712,
+          "difference": 892928,
+          "percent": 0.0157184635706581,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 1055278,
+          "comparison": 1055278,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 293235,
+          "comparison": 131518,
+          "difference": -161717,
+          "percent": -55.149282998277826,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "advanced",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 3070990264,
+          "comparison": 2517913394,
+          "difference": -553076870,
+          "percent": -18.009723980030177,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 886105927,
+          "comparison": 730365463,
+          "difference": -155740464,
+          "percent": -17.575829170590797,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 43188,
+          "comparison": 43492,
+          "difference": 304,
+          "percent": 0.7038992312679448,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5635448832,
+          "comparison": 5637873664,
+          "difference": 2424832,
+          "percent": 0.04302819655163893,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5679071232,
+          "comparison": 5682270208,
+          "difference": 3198976,
+          "percent": 0.05632921069865531,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 1055278,
+          "comparison": 1055278,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 291040,
+          "comparison": 662264,
+          "difference": 371224,
+          "percent": 127.55085211654756,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "advanced",
+      "workload": "last-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1903623005,
+          "comparison": 1905361133,
+          "difference": 1738128,
+          "percent": 0.0913063140881721,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 162871773,
+          "comparison": 143431682,
+          "difference": -19440091,
+          "percent": -11.93582573697408,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 39512,
+          "comparison": 39500,
+          "difference": -12,
+          "percent": -0.030370520348248633,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5636665344,
+          "comparison": 5639565312,
+          "difference": 2899968,
+          "percent": 0.051448291197328175,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5676097536,
+          "comparison": 5680013312,
+          "difference": 3915776,
+          "percent": 0.06898711615092303,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 214028,
+          "comparison": 214028,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 732,
+          "comparison": 0,
+          "difference": -732,
+          "percent": -100.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "advanced",
+      "workload": "one-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 2130769081,
+          "comparison": 2065411504,
+          "difference": -65357577,
+          "percent": -3.067323323901751,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 317261406,
+          "comparison": 309071341,
+          "difference": -8190065,
+          "percent": -2.5814879607512045,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 44256,
+          "comparison": 44112,
+          "difference": -144,
+          "percent": -0.32537960954446854,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5636460544,
+          "comparison": 5639352320,
+          "difference": 2891776,
+          "percent": 0.05130482112712186,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5681369088,
+          "comparison": 5683400704,
+          "difference": 2031616,
+          "percent": 0.03575926803085391,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 674277,
+          "comparison": 674278,
+          "difference": 1,
+          "percent": 0.0001483070014252303,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 131014,
+          "comparison": 543263,
+          "difference": 412249,
+          "percent": 314.6602653151572,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "advanced",
+      "workload": "unchanged",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 153394972,
+          "comparison": 142352993,
+          "difference": -11041979,
+          "percent": -7.198396959191074,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 35992,
+          "comparison": 36180,
+          "difference": 188,
+          "percent": 0.5223382973994221,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5635448832,
+          "comparison": 5637812224,
+          "difference": 2363392,
+          "percent": 0.04193795508495888,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5671706624,
+          "comparison": 5674278912,
+          "difference": 2572288,
+          "percent": 0.04535298051410637,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "ordinary-all",
+      "workload": "changed",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1861191121,
+          "comparison": 2557942633,
+          "difference": 696751512,
+          "percent": 37.43578529568968,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 162571715,
+          "comparison": 773202292,
+          "difference": 610630577,
+          "percent": 375.606898776949,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 39304,
+          "comparison": 42368,
+          "difference": 3064,
+          "percent": 7.79564420924079,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5635604480,
+          "comparison": 5646974976,
+          "difference": 11370496,
+          "percent": 0.20176178155071664,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5675782144,
+          "comparison": 5690359808,
+          "difference": 14577664,
+          "percent": 0.256839738209656,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 214028,
+          "comparison": 214028,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 29012,
+          "comparison": 184,
+          "difference": -28828,
+          "percent": -99.36577967737487,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "ordinary-all",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 3960962413,
+          "comparison": 4161432106,
+          "difference": 200469693,
+          "percent": 5.061135958827894,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1040729923,
+          "comparison": 2408709415,
+          "difference": 1367979492,
+          "percent": 131.44423560501392,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 44156,
+          "comparison": 45880,
+          "difference": 1724,
+          "percent": 3.9043391611559017,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5635543040,
+          "comparison": 5645848576,
+          "difference": 10305536,
+          "percent": 0.18286677835398096,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5680758784,
+          "comparison": 5692829696,
+          "difference": 12070912,
+          "percent": 0.21248767037949273,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 1055278,
+          "comparison": 1055278,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 293235,
+          "comparison": 662264,
+          "difference": 369029,
+          "percent": 125.84752843282692,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "ordinary-all",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 3070990264,
+          "comparison": 3894744082,
+          "difference": 823753818,
+          "percent": 26.823719620883825,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 886105927,
+          "comparison": 2152096798,
+          "difference": 1265990871,
+          "percent": 142.87127897746248,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 43188,
+          "comparison": 46960,
+          "difference": 3772,
+          "percent": 8.733907566916736,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5635448832,
+          "comparison": 5646241792,
+          "difference": 10792960,
+          "percent": 0.19151908431346043,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5679071232,
+          "comparison": 5694152704,
+          "difference": 15081472,
+          "percent": 0.2655622967893071,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 1055278,
+          "comparison": 1055278,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 291040,
+          "comparison": 489844,
+          "difference": 198804,
+          "percent": 68.30813633864761,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "ordinary-all",
+      "workload": "last-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1903623005,
+          "comparison": 2521105508,
+          "difference": 617482503,
+          "percent": 32.43722635091815,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 162871773,
+          "comparison": 874529069,
+          "difference": 711657296,
+          "percent": 436.9432977192433,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 39512,
+          "comparison": 41984,
+          "difference": 2472,
+          "percent": 6.256327191739218,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5636665344,
+          "comparison": 5647712256,
+          "difference": 11046912,
+          "percent": 0.19598310926439844,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5676097536,
+          "comparison": 5690269696,
+          "difference": 14172160,
+          "percent": 0.24968140364246202,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 214028,
+          "comparison": 214028,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 732,
+          "comparison": 250,
+          "difference": -482,
+          "percent": -65.84699453551912,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "ordinary-all",
+      "workload": "one-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 2130769081,
+          "comparison": 3121229898,
+          "difference": 990460817,
+          "percent": 46.48372392071518,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 317261406,
+          "comparison": 1394551858,
+          "difference": 1077290452,
+          "percent": 339.55925039303395,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 44256,
+          "comparison": 47408,
+          "difference": 3152,
+          "percent": 7.122198120028922,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5636460544,
+          "comparison": 5647507456,
+          "difference": 11046912,
+          "percent": 0.19599023028307036,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5681369088,
+          "comparison": 5695127552,
+          "difference": 13758464,
+          "percent": 0.24216810749120615,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 674277,
+          "comparison": 674278,
+          "difference": 1,
+          "percent": 0.0001483070014252303,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 131014,
+          "comparison": 477786,
+          "difference": 346772,
+          "percent": 264.6831636313677,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/neo4j",
+      "version": "ordinary-all",
+      "workload": "unchanged",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 153394972,
+          "comparison": 141276537,
+          "difference": -12118435,
+          "percent": -7.900151381754547,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 35992,
+          "comparison": 40152,
+          "difference": 4160,
+          "percent": 11.55812402756168,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 5635448832,
+          "comparison": 5646241792,
+          "difference": 10792960,
+          "percent": 0.19151908431346043,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 5671706624,
+          "comparison": 5687357440,
+          "difference": 15650816,
+          "percent": 0.27594544354203887,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "advanced",
+      "workload": "changed",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 43737499105,
+          "comparison": 4882816692,
+          "difference": -38854682413,
+          "percent": -88.83608621453666,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 37975861050,
+          "comparison": 52244986,
+          "difference": -37923616064,
+          "percent": -99.86242580271923,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 43616,
+          "comparison": 43864,
+          "difference": 248,
+          "percent": 0.5685986793837124,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3585757184,
+          "comparison": 2467528704,
+          "difference": -1118228480,
+          "percent": -31.185281730443016,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3630419968,
+          "comparison": 2511876096,
+          "difference": -1118543872,
+          "percent": -30.810316212980897,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 214028,
+          "comparison": 214028,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 876,
+          "comparison": 0,
+          "difference": -876,
+          "percent": -100.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "advanced",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 46813454713,
+          "comparison": 5274493878,
+          "difference": -41538960835,
+          "percent": -88.73295314277397,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 40825718376,
+          "comparison": 288919442,
+          "difference": -40536798934,
+          "percent": -99.29231020667147,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 47000,
+          "comparison": 47100,
+          "difference": 100,
+          "percent": 0.2127659574468085,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3585626112,
+          "comparison": 2468151296,
+          "difference": -1117474816,
+          "percent": -31.165402668732018,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3633348608,
+          "comparison": 2515886080,
+          "difference": -1117462528,
+          "percent": -30.75572009631948,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 1056319,
+          "comparison": 1056320,
+          "difference": 1,
+          "percent": 9.46683719596069e-05,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 131518,
+          "comparison": 0,
+          "difference": -131518,
+          "percent": -100.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "advanced",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 42419163183,
+          "comparison": 5157259986,
+          "difference": -37261903197,
+          "percent": -87.84214586282354,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 37737223557,
+          "comparison": 299045300,
+          "difference": -37438178257,
+          "percent": -99.20755881908401,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 47332,
+          "comparison": 47268,
+          "difference": -64,
+          "percent": -0.13521507648102765,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3587997696,
+          "comparison": 2479828992,
+          "difference": -1108168704,
+          "percent": -30.885435217403217,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3636465664,
+          "comparison": 2528231424,
+          "difference": -1108234240,
+          "percent": -30.475586528183428,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 1056320,
+          "comparison": 1056320,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 130409,
+          "comparison": 327017,
+          "difference": 196608,
+          "percent": 150.76260074074642,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "advanced",
+      "workload": "last-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 42908546353,
+          "comparison": 5094268107,
+          "difference": -37814278246,
+          "percent": -88.12761433330675,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 38182214550,
+          "comparison": 55262067,
+          "difference": -38126952483,
+          "percent": -99.85526751747824,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 42696,
+          "comparison": 43260,
+          "difference": 564,
+          "percent": 1.320966835300731,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3586007040,
+          "comparison": 2474385408,
+          "difference": -1111621632,
+          "percent": -30.998869204673955,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3629617152,
+          "comparison": 2518335488,
+          "difference": -1111281664,
+          "percent": -30.617049056748563,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 214028,
+          "comparison": 214028,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 1126,
+          "comparison": 736,
+          "difference": -390,
+          "percent": -34.63587921847247,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "advanced",
+      "workload": "one-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 43480933440,
+          "comparison": 4889247080,
+          "difference": -38591686360,
+          "percent": -88.75542291025847,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 38704174577,
+          "comparison": 186765911,
+          "difference": -38517408666,
+          "percent": -99.51745279923632,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 47140,
+          "comparison": 47432,
+          "difference": 292,
+          "percent": 0.6194314806957997,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3585421312,
+          "comparison": 2467594240,
+          "difference": -1117827072,
+          "percent": -31.17700751816137,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3633643520,
+          "comparison": 2516164608,
+          "difference": -1117478912,
+          "percent": -30.753674812877623,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 675320,
+          "comparison": 675320,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 130409,
+          "comparison": 737,
+          "difference": -129672,
+          "percent": -99.4348549563297,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "advanced",
+      "workload": "unchanged",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 28048061,
+          "comparison": 27368692,
+          "difference": -679369,
+          "percent": -2.4221603054842187,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 38556,
+          "comparison": 38452,
+          "difference": -104,
+          "percent": -0.2697375246394854,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 2186485760,
+          "comparison": 2188636160,
+          "difference": 2150400,
+          "percent": 0.09834960004495982,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 2225967104,
+          "comparison": 2228011008,
+          "difference": 2043904,
+          "percent": 0.09182094363960557,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "ordinary-all",
+      "workload": "changed",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 43737499105,
+          "comparison": 6411073666,
+          "difference": -37326425439,
+          "percent": -85.34192901471339,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 37975861050,
+          "comparison": 689895075,
+          "difference": -37285965975,
+          "percent": -98.18333263308588,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 43616,
+          "comparison": 45952,
+          "difference": 2336,
+          "percent": 5.355832721936904,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3585757184,
+          "comparison": 2514399232,
+          "difference": -1071357952,
+          "percent": -29.878151169312417,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3630419968,
+          "comparison": 2561064960,
+          "difference": -1069355008,
+          "percent": -29.455407843327507,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 214028,
+          "comparison": 214028,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 876,
+          "comparison": 184,
+          "difference": -692,
+          "percent": -78.99543378995433,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "ordinary-all",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 46813454713,
+          "comparison": 12141492445,
+          "difference": -34671962268,
+          "percent": -74.06409648799466,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 40825718376,
+          "comparison": 5858109742,
+          "difference": -34967608634,
+          "percent": -85.65093285549196,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 47000,
+          "comparison": 51052,
+          "difference": 4052,
+          "percent": 8.621276595744682,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3585626112,
+          "comparison": 2569719808,
+          "difference": -1015906304,
+          "percent": -28.33274502882692,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3633348608,
+          "comparison": 2621763584,
+          "difference": -1011585024,
+          "percent": -27.84167260396281,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 1056319,
+          "comparison": 1056320,
+          "difference": 1,
+          "percent": 9.46683719596069e-05,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 131518,
+          "comparison": 490886,
+          "difference": 359368,
+          "percent": 273.246247661917,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "ordinary-all",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 42419163183,
+          "comparison": 11722028264,
+          "difference": -30697134919,
+          "percent": -72.36619634991351,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 37737223557,
+          "comparison": 5769767276,
+          "difference": -31967456281,
+          "percent": -84.71067362100689,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 47332,
+          "comparison": 51164,
+          "difference": 3832,
+          "percent": 8.09600270430153,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3587997696,
+          "comparison": 2568495104,
+          "difference": -1019502592,
+          "percent": -28.414248792204354,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3636465664,
+          "comparison": 2620149760,
+          "difference": -1016315904,
+          "percent": -27.947903208910923,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 1056320,
+          "comparison": 1056320,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 130409,
+          "comparison": 663305,
+          "difference": 532896,
+          "percent": 408.6343733944743,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "ordinary-all",
+      "workload": "last-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 42908546353,
+          "comparison": 6271119196,
+          "difference": -36637427157,
+          "percent": -85.3849180897233,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 38182214550,
+          "comparison": 653342776,
+          "difference": -37528871774,
+          "percent": -98.28888192133424,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 42696,
+          "comparison": 47176,
+          "difference": 4480,
+          "percent": 10.492786209480983,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3586007040,
+          "comparison": 2513661952,
+          "difference": -1072345088,
+          "percent": -29.90359684291083,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3629617152,
+          "comparison": 2561167360,
+          "difference": -1068449792,
+          "percent": -29.436983220427543,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 214028,
+          "comparison": 214028,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 1126,
+          "comparison": 250,
+          "difference": -876,
+          "percent": -77.797513321492,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "ordinary-all",
+      "workload": "one-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 43480933440,
+          "comparison": 10658181585,
+          "difference": -32822751855,
+          "percent": -75.4876891046799,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 38704174577,
+          "comparison": 4727101801,
+          "difference": -33977072776,
+          "percent": -87.78658412777756,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 47140,
+          "comparison": 51020,
+          "difference": 3880,
+          "percent": 8.230801866779805,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3585421312,
+          "comparison": 2568933376,
+          "difference": -1016487936,
+          "percent": -28.350585539220447,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3633643520,
+          "comparison": 2620133376,
+          "difference": -1013510144,
+          "percent": -27.892393362791957,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 675320,
+          "comparison": 675320,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 130409,
+          "comparison": 359813,
+          "difference": 229404,
+          "percent": 175.9111717749542,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-million/pg",
+      "version": "ordinary-all",
+      "workload": "unchanged",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 28048061,
+          "comparison": 32943966,
+          "difference": 4895905,
+          "percent": 17.455413406295715,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 38556,
+          "comparison": 41860,
+          "difference": 3304,
+          "percent": 8.569353667392884,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 2186485760,
+          "comparison": 2190430208,
+          "difference": 3944448,
+          "percent": 0.18040126636818343,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 2225967104,
+          "comparison": 2233294848,
+          "difference": 7327744,
+          "percent": 0.3291937237900889,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "advanced",
+      "workload": "changed",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 670819974,
+          "comparison": 615274541,
+          "difference": -55545433,
+          "percent": -8.280229443495967,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 303798651,
+          "comparison": 291519266,
+          "difference": -12279385,
+          "percent": -4.041948494366421,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 36244,
+          "comparison": 36260,
+          "difference": 16,
+          "percent": 0.04414523783246882,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3916742656,
+          "comparison": 3914502144,
+          "difference": -2240512,
+          "percent": -0.057203451867530605,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3952930816,
+          "comparison": 3950981120,
+          "difference": -1949696,
+          "percent": -0.049322795939366115,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 21228,
+          "comparison": 21228,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 858,
+          "comparison": 871,
+          "difference": 13,
+          "percent": 1.5151515151515151,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "advanced",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1025434840,
+          "comparison": 1008658574,
+          "difference": -16776266,
+          "percent": -1.6360148246962234,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 595926667,
+          "comparison": 596036686,
+          "difference": 110019,
+          "percent": 0.018461835338541746,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 37376,
+          "comparison": 37060,
+          "difference": -316,
+          "percent": -0.8454623287671234,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3916095488,
+          "comparison": 3914145792,
+          "difference": -1949696,
+          "percent": -0.049786732881626806,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3953909760,
+          "comparison": 3951321088,
+          "difference": -2588672,
+          "percent": -0.06547119578166599,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 118736,
+          "comparison": 118736,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 26228,
+          "comparison": 42493,
+          "difference": 16265,
+          "percent": 62.01387829800213,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "advanced",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 890795710,
+          "comparison": 908399075,
+          "difference": 17603365,
+          "percent": 1.9761394001324948,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 570475148,
+          "comparison": 555276671,
+          "difference": -15198477,
+          "percent": -2.6641786330716726,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 37536,
+          "comparison": 37212,
+          "difference": -324,
+          "percent": -0.8631713554987211,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3916840960,
+          "comparison": 3914141696,
+          "difference": -2699264,
+          "percent": -0.0689143120071947,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3955277824,
+          "comparison": 3952246784,
+          "difference": -3031040,
+          "percent": -0.07663279635145043,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 118736,
+          "comparison": 118736,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 29042,
+          "comparison": 79422,
+          "difference": 50380,
+          "percent": 173.4729013153364,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "advanced",
+      "workload": "last-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 651291809,
+          "comparison": 642124751,
+          "difference": -9167058,
+          "percent": -1.4075193136660498,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 291027358,
+          "comparison": 307812239,
+          "difference": 16784881,
+          "percent": 5.767458123301247,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 36604,
+          "comparison": 36288,
+          "difference": -316,
+          "percent": -0.8632936291115725,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3916144640,
+          "comparison": 3915915264,
+          "difference": -229376,
+          "percent": -0.005857189176751142,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3952168960,
+          "comparison": 3952513024,
+          "difference": 344064,
+          "percent": 0.008705700679355572,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 21228,
+          "comparison": 21228,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 936,
+          "comparison": 938,
+          "difference": 2,
+          "percent": 0.2136752136752137,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "advanced",
+      "workload": "one-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 886745420,
+          "comparison": 985206353,
+          "difference": 98460933,
+          "percent": 11.103630284326702,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 520740268,
+          "comparison": 572416999,
+          "difference": 51676731,
+          "percent": 9.923705573696868,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 37388,
+          "comparison": 37044,
+          "difference": -344,
+          "percent": -0.920081309511073,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3915935744,
+          "comparison": 3914657792,
+          "difference": -1277952,
+          "percent": -0.032634651933655424,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3953414144,
+          "comparison": 3952590848,
+          "difference": -823296,
+          "percent": -0.020824936877647797,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 80636,
+          "comparison": 80636,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 67521,
+          "comparison": 42494,
+          "difference": -25027,
+          "percent": -37.06550554642259,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "advanced",
+      "workload": "unchanged",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 181362985,
+          "comparison": 194013627,
+          "difference": 12650642,
+          "percent": 6.975316380020984,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 33340,
+          "comparison": 33396,
+          "difference": 56,
+          "percent": 0.16796640671865626,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3916840960,
+          "comparison": 3914289152,
+          "difference": -2551808,
+          "percent": -0.06514964549390333,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3950833664,
+          "comparison": 3948457984,
+          "difference": -2375680,
+          "percent": -0.06013110654713708,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "ordinary-all",
+      "workload": "changed",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 670819974,
+          "comparison": 2039671013,
+          "difference": 1368851039,
+          "percent": 204.05639248303004,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 303798651,
+          "comparison": 1682995523,
+          "difference": 1379196872,
+          "percent": 453.9838697308764,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 36244,
+          "comparison": 39140,
+          "difference": 2896,
+          "percent": 7.990288047676857,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3916742656,
+          "comparison": 3909091328,
+          "difference": -7651328,
+          "percent": -0.19534926524414475,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3952930816,
+          "comparison": 3947343872,
+          "difference": -5586944,
+          "percent": -0.141336751389276,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 21228,
+          "comparison": 21228,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 858,
+          "comparison": 898,
+          "difference": 40,
+          "percent": 4.662004662004662,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "ordinary-all",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1025434840,
+          "comparison": 2239678602,
+          "difference": 1214243762,
+          "percent": 118.41257139263963,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 595926667,
+          "comparison": 1859241722,
+          "difference": 1263315055,
+          "percent": 211.99169712604925,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 37376,
+          "comparison": 40420,
+          "difference": 3044,
+          "percent": 8.144263698630137,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3916095488,
+          "comparison": 3909001216,
+          "difference": -7094272,
+          "percent": -0.18115676754407067,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3953909760,
+          "comparison": 3949903872,
+          "difference": -4005888,
+          "percent": -0.1013146035988439,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 118736,
+          "comparison": 118736,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 26228,
+          "comparison": 42494,
+          "difference": 16266,
+          "percent": 62.01769101723349,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "ordinary-all",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 890795710,
+          "comparison": 2201774959,
+          "difference": 1310979249,
+          "percent": 147.16946144700225,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 570475148,
+          "comparison": 1846516068,
+          "difference": 1276040920,
+          "percent": 223.68036968369393,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 37536,
+          "comparison": 40732,
+          "difference": 3196,
+          "percent": 8.51449275362319,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3916840960,
+          "comparison": 3909210112,
+          "difference": -7630848,
+          "percent": -0.19482149206282812,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3955277824,
+          "comparison": 3950919680,
+          "difference": -4358144,
+          "percent": -0.11018553421343683,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 118736,
+          "comparison": 118736,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 29042,
+          "comparison": 42494,
+          "difference": 13452,
+          "percent": 46.319124027270846,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "ordinary-all",
+      "workload": "last-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 651291809,
+          "comparison": 2042450968,
+          "difference": 1391159159,
+          "percent": 213.59997773286904,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 291027358,
+          "comparison": 1719369626,
+          "difference": 1428342268,
+          "percent": 490.79312605380557,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 36604,
+          "comparison": 38768,
+          "difference": 2164,
+          "percent": 5.911922194295705,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3916144640,
+          "comparison": 3909197824,
+          "difference": -6946816,
+          "percent": -0.17738915792446316,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3952168960,
+          "comparison": 3948589056,
+          "difference": -3579904,
+          "percent": -0.09058074278281868,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 21228,
+          "comparison": 21228,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 936,
+          "comparison": 964,
+          "difference": 28,
+          "percent": 2.9914529914529915,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "ordinary-all",
+      "workload": "one-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 886745420,
+          "comparison": 2191754352,
+          "difference": 1305008932,
+          "percent": 147.16838706649312,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 520740268,
+          "comparison": 1874219247,
+          "difference": 1353478979,
+          "percent": 259.91440688815715,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 37388,
+          "comparison": 40032,
+          "difference": 2644,
+          "percent": 7.07178773938162,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3915935744,
+          "comparison": 3909521408,
+          "difference": -6414336,
+          "percent": -0.16380084912853973,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3953414144,
+          "comparison": 3949563904,
+          "difference": -3850240,
+          "percent": -0.09739025206462154,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 80636,
+          "comparison": 83518,
+          "difference": 2882,
+          "percent": 3.574086016171437,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 67521,
+          "comparison": 42494,
+          "difference": -25027,
+          "percent": -37.06550554642259,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/neo4j",
+      "version": "ordinary-all",
+      "workload": "unchanged",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 181362985,
+          "comparison": 243979468,
+          "difference": 62616483,
+          "percent": 34.52550309535322,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "calculation_ns": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 33340,
+          "comparison": 37072,
+          "difference": 3732,
+          "percent": 11.19376124775045,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 3916840960,
+          "comparison": 3909197824,
+          "difference": -7643136,
+          "percent": -0.19513521427226904,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 3950833664,
+          "comparison": 3946635264,
+          "difference": -4198400,
+          "percent": -0.10626617967381985,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "advanced",
+      "workload": "changed",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1639169607,
+          "comparison": 552534362,
+          "difference": -1086635245,
+          "percent": -66.29181265682166,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1121568724,
+          "comparison": 98783359,
+          "difference": -1022785365,
+          "percent": -91.19239357462682,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 39784,
+          "comparison": 41068,
+          "difference": 1284,
+          "percent": 3.2274281118037402,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1934348288,
+          "comparison": 1903271936,
+          "difference": -31076352,
+          "percent": -1.6065541140024522,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1975021568,
+          "comparison": 1944141824,
+          "difference": -30879744,
+          "percent": -1.563514267404699,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 21428,
+          "comparison": 21428,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 875,
+          "comparison": 0,
+          "difference": -875,
+          "percent": -100.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "advanced",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1836379870,
+          "comparison": 720904861,
+          "difference": -1115475009,
+          "percent": -60.74315163343628,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1365335620,
+          "comparison": 242829760,
+          "difference": -1122505860,
+          "percent": -82.21464697449261,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 41656,
+          "comparison": 41880,
+          "difference": 224,
+          "percent": 0.5377376608411754,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1952223232,
+          "comparison": 1923231744,
+          "difference": -28991488,
+          "percent": -1.4850498408575439,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1994477568,
+          "comparison": 1965424640,
+          "difference": -29052928,
+          "percent": -1.4566685765803509,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 118861,
+          "comparison": 118861,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 13618,
+          "comparison": 13618,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "advanced",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1755409498,
+          "comparison": 692094779,
+          "difference": -1063314719,
+          "percent": -60.5735995054984,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1251830495,
+          "comparison": 226709628,
+          "difference": -1025120867,
+          "percent": -81.88975033716525,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 42020,
+          "comparison": 42352,
+          "difference": 332,
+          "percent": 0.7900999524036173,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1934422016,
+          "comparison": 1896857600,
+          "difference": -37564416,
+          "percent": -1.9418935314681613,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1976991744,
+          "comparison": 1939099648,
+          "difference": -37892096,
+          "percent": -1.9166542356587606,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 118861,
+          "comparison": 118861,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 13114,
+          "comparison": 0,
+          "difference": -13114,
+          "percent": -100.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "advanced",
+      "workload": "last-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1638303101,
+          "comparison": 540224365,
+          "difference": -1098078736,
+          "percent": -67.02537127163748,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1162392425,
+          "comparison": 94109951,
+          "difference": -1068282474,
+          "percent": -91.90377113821953,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 40584,
+          "comparison": 40676,
+          "difference": 92,
+          "percent": 0.22669032130889022,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1936465920,
+          "comparison": 1905602560,
+          "difference": -30863360,
+          "percent": -1.593798252850223,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1976950784,
+          "comparison": 1947254784,
+          "difference": -29696000,
+          "percent": -1.5021112432508588,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 21428,
+          "comparison": 21428,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 942,
+          "comparison": 250,
+          "difference": -692,
+          "percent": -73.46072186836517,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "advanced",
+      "workload": "one-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1653310830,
+          "comparison": 635552740,
+          "difference": -1017758090,
+          "percent": -61.55878686163327,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1267367910,
+          "comparison": 179739695,
+          "difference": -1087628215,
+          "percent": -85.81787548968319,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 41872,
+          "comparison": 42184,
+          "difference": 312,
+          "percent": 0.7451280091708062,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1935159296,
+          "comparison": 1896083456,
+          "difference": -39075840,
+          "percent": -2.0192570234796836,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1976983552,
+          "comparison": 1939144704,
+          "difference": -37838848,
+          "percent": -1.9139687814661193,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 80761,
+          "comparison": 80760,
+          "difference": -1,
+          "percent": -0.0012382214187541016,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 23828,
+          "comparison": 0,
+          "difference": -23828,
+          "percent": -100.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "advanced",
+      "workload": "unchanged",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 51876601,
+          "comparison": 51390222,
+          "difference": -486379,
+          "percent": -0.9375691364204837,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 36528,
+          "comparison": 36784,
+          "difference": 256,
+          "percent": 0.700832238282961,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1863741440,
+          "comparison": 1864024064,
+          "difference": 282624,
+          "percent": 0.015164335241695328,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1899892736,
+          "comparison": 1901076480,
+          "difference": 1183744,
+          "percent": 0.06230583324889348,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "ordinary-all",
+      "workload": "changed",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1639169607,
+          "comparison": 1588834813,
+          "difference": -50334794,
+          "percent": -3.070749590832305,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1121568724,
+          "comparison": 1137210771,
+          "difference": 15642047,
+          "percent": 1.3946579166556716,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 39784,
+          "comparison": 44984,
+          "difference": 5200,
+          "percent": 13.07058113814599,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1934348288,
+          "comparison": 1940897792,
+          "difference": 6549504,
+          "percent": 0.33858969662447885,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1975021568,
+          "comparison": 1985888256,
+          "difference": 10866688,
+          "percent": 0.5502060421043463,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 21428,
+          "comparison": 21428,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 875,
+          "comparison": 184,
+          "difference": -691,
+          "percent": -78.97142857142858,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "ordinary-all",
+      "workload": "first",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1836379870,
+          "comparison": 1921222445,
+          "difference": 84842575,
+          "percent": 4.620099380636317,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1365335620,
+          "comparison": 1460167012,
+          "difference": 94831392,
+          "percent": 6.945646961147912,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 41656,
+          "comparison": 45936,
+          "difference": 4280,
+          "percent": 10.274630305358173,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1952223232,
+          "comparison": 1941458944,
+          "difference": -10764288,
+          "percent": -0.5513861234492266,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1994477568,
+          "comparison": 1988497408,
+          "difference": -5980160,
+          "percent": -0.299835911716807,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 118861,
+          "comparison": 118861,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 13618,
+          "comparison": 42619,
+          "difference": 29001,
+          "percent": 212.9607871934205,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "ordinary-all",
+      "workload": "full",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1755409498,
+          "comparison": 1876034954,
+          "difference": 120625456,
+          "percent": 6.871641980827427,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1251830495,
+          "comparison": 1411981921,
+          "difference": 160151426,
+          "percent": 12.793379506224603,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "review required"
+        },
+        "app_max_rss_kib": {
+          "reference": 42020,
+          "comparison": 45644,
+          "difference": 3624,
+          "percent": 8.624464540694907,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1934422016,
+          "comparison": 1960464384,
+          "difference": 26042368,
+          "percent": 1.3462609391641664,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1976991744,
+          "comparison": 2006282240,
+          "difference": 29290496,
+          "percent": 1.4815689589445247,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 118861,
+          "comparison": 118861,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 13114,
+          "comparison": 42619,
+          "difference": 29505,
+          "percent": 224.98856184230593,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "review required"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "ordinary-all",
+      "workload": "last-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1638303101,
+          "comparison": 1589995092,
+          "difference": -48308009,
+          "percent": -2.9486612685108993,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1162392425,
+          "comparison": 1119619709,
+          "difference": -42772716,
+          "percent": -3.6797139313773486,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 40584,
+          "comparison": 44712,
+          "difference": 4128,
+          "percent": 10.17149615612064,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1936465920,
+          "comparison": 1940017152,
+          "difference": 3551232,
+          "percent": 0.18338727076591155,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1976950784,
+          "comparison": 1985802240,
+          "difference": 8851456,
+          "percent": 0.4477327443676008,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 21428,
+          "comparison": 21428,
+          "difference": 0,
+          "percent": 0.0,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 942,
+          "comparison": 250,
+          "difference": -692,
+          "percent": -73.46072186836517,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "ordinary-all",
+      "workload": "one-support",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 1653310830,
+          "comparison": 1772737066,
+          "difference": 119426236,
+          "percent": 7.223459366076977,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 1267367910,
+          "comparison": 1320456250,
+          "difference": 53088340,
+          "percent": 4.188865725659726,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 41872,
+          "comparison": 45768,
+          "difference": 3896,
+          "percent": 9.30454719144058,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1935159296,
+          "comparison": 1940566016,
+          "difference": 5406720,
+          "percent": 0.27939405356322666,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1976983552,
+          "comparison": 1987235840,
+          "difference": 10252288,
+          "percent": 0.5185823619841629,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 80761,
+          "comparison": 83768,
+          "difference": 3007,
+          "percent": 3.7233318061935834,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 23828,
+          "comparison": 13409,
+          "difference": -10419,
+          "percent": -43.72586872586873,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    },
+    {
+      "study": "final-small/pg",
+      "version": "ordinary-all",
+      "workload": "unchanged",
+      "reference": "starting",
+      "checks": {
+        "engine_ns": {
+          "reference": 51876601,
+          "comparison": 48304867,
+          "difference": -3571734,
+          "percent": -6.885057870310354,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "calculation_ns": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "median",
+          "allowance_percent": 10.0,
+          "status": "within observed target"
+        },
+        "app_max_rss_kib": {
+          "reference": 36528,
+          "comparison": 39496,
+          "difference": 2968,
+          "percent": 8.12527376259308,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "database_sampled_max_bytes": {
+          "reference": 1863741440,
+          "comparison": 1864335360,
+          "difference": 593920,
+          "percent": 0.031867081305011924,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "combined_observed_peaks_bytes": {
+          "reference": 1899892736,
+          "comparison": 1904357376,
+          "difference": 4464640,
+          "percent": 0.2349943191740273,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "runner_temporary_peak_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "temporary_sampled_max_bytes": {
+          "reference": 0,
+          "comparison": 0,
+          "difference": 0,
+          "percent": null,
+          "statistic": "maximum",
+          "allowance_percent": 20.0,
+          "status": "within observed target"
+        },
+        "search": {
+          "status": "not measured"
+        },
+        "writer_wait": {
+          "status": "not measured"
+        }
+      },
+      "search_errors": 0,
+      "writer_errors": 0
+    }
+  ]
+}

@@ -213,6 +213,13 @@ func calculateQueries(ctx context.Context, database Database, transaction Transa
 		answers[query.Parameter] = file
 		report.Queries = append(report.Queries, query.Name)
 		report.QueryRows[query.Name] = int(file.rows)
+		if space.observeAnswer != nil {
+			if err := file.each(ctx, func(row map[string]any) error {
+				return space.observeAnswer(query.Name, row)
+			}); err != nil {
+				return nil, fmt.Errorf("record answers from %s: %w", query.Name, err)
+			}
+		}
 		for _, binding := range plan.Schema.Nodes {
 			if binding.Query != query.Name {
 				continue

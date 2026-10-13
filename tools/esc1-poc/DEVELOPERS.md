@@ -1,5 +1,7 @@
 # Build an extension
 
+For complex analyses, start with the [ordinary ESC1 example](examples/esc1-cypher/README.md). Experienced authors can also use [optional advanced controls](ADVANCED_CONTROLS.md). Both approaches use the same schema, input declarations, and safe saving rules.
+
 An extension describes **which connections should exist in BloodHound**. You provide a schema and read-only Cypher queries. BloodHound runs the queries after its own analysis, checks their answers, and saves the connections.
 
 In this guide, a **node** is an object, a **relationship** is a connection, a **kind** is its type, and a **schema** describes those types. An object's `objectid` is its stable identifier.
