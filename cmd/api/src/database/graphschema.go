@@ -177,7 +177,7 @@ func (s *BloodhoundDB) GetGraphSchemaExtensions(ctx context.Context, extensionFi
 		return extensions, 0, err
 	} else {
 
-		sqlStr := fmt.Sprintf(`SELECT id, name, display_name, version, is_builtin, namespace, created_at, updated_at, deleted_at
+		sqlStr := fmt.Sprintf(`SELECT id, name, display_name, version, is_builtin, namespace, definition, created_at, updated_at, deleted_at
 								FROM %s %s %s %s`,
 			model.GraphSchemaExtension{}.TableName(),
 			filterAndPagination.WhereClause,

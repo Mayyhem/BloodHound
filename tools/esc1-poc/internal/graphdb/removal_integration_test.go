@@ -60,7 +60,7 @@ func TestRuleRemovalAndRollbackOnBothDatabases(t *testing.T) {
 				t.Fatalf("baseline: %+v %v", report, err)
 			}
 			before := selectionSnapshot(t, backend.database)
-			change := ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"selected_helper.cypher"}}
+			change := ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"PoC/selected_helper.cypher"}}
 			preview, err := store.Preview(change)
 			if err != nil {
 				t.Fatal(err)
@@ -111,7 +111,7 @@ func TestRuleRemovalAndRollbackOnBothDatabases(t *testing.T) {
 			if err != nil || !report.Skipped {
 				t.Fatalf("unchanged removal revision: %+v %v", report, err)
 			}
-			change = ruleservice.Change{BaseRevision: removed.Revision, Remove: []string{"independent_helper.cypher"}}
+			change = ruleservice.Change{BaseRevision: removed.Revision, Remove: []string{"PoC/independent_helper.cypher"}}
 			preview, err = store.Preview(change)
 			if err != nil {
 				t.Fatal(err)

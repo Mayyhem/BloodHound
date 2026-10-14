@@ -12,6 +12,8 @@ The current experimental branches prove the main ideas, but their commits mix co
 
 This is a clean migration of the final design. It is not a replay of every experiment. Superseded fields and formats must not be reintroduced just because they appear in an older commit.
 
+TODO 3's future [analysis workspace](../../_plans/opengraph-analysis-workspace.md) starts with a read-only MVP for current activated rules and matching completed reports, using BloodHound's sequential layout and coordinated graph, table, and query details. Its query nodes and dependency arrows must never enter the collected-data graph. Management remains on the current rules page during the MVP; later phases add management, grouping, live/historical inspection, and isolated testing. MVP completion is separate from full TODO 3 completion. The workspace plan does not authorize this migration or a rule-storage move. Add its tested implementation to the migration inventory only when that work exists, without inventing completed commits or additional DAWGS requirements now.
+
 ## Decision about timing
 
 Do the full migration after the behavior and author-facing file formats are stable. Migrating now would make later experiments harder because every reversal would need to be repeated on two branches.
@@ -63,7 +65,7 @@ The local `origin/main` references were last observed to be stale. Their age mea
 - Do not claim Enterprise support or capacity at 100 million objects.
 - Do not claim that browser checks are load tests.
 - Do not claim that released BloodHound gives users incorrect native findings. The released DAWGS failure was reproduced for a custom query, but native ESC1 uses a different path.
-- Do not claim that the PostgreSQL `WITH ... LIMIT` write problem is fixed. Selecting explicit IDs is only a narrow workaround; TODO 10 remains open.
+- Carry the separate TODO 10 write-selection correction and its tests together. The earlier study's explicit-ID cleanup is a historical workaround, not evidence that the general correction existed during that study.
 - Do not silently delete helper objects or stale collected facts.
 - Do not promise coordination with other BloodHound servers or direct database writers. This design coordinates one modified Community Edition server.
 - Do not change extension author requirements without explicit approval.
@@ -131,8 +133,8 @@ After each DAWGS code change, run `make format` and focused tests. Before a DAWG
 The intended repository order is:
 
 1. BloodHound B01, which prepares the nested worktree safely.
-2. DAWGS D01 through D25.
-3. BloodHound B02 through B70.
+2. DAWGS D01 through D26.
+3. BloodHound B02 through B71.
 
 If a change is already present on the newly fetched `main`, record that in the migration inventory and omit the empty commit. If two adjacent changes cannot compile independently, combine only those changes and explain why in the final map.
 
@@ -165,6 +167,7 @@ If a change is already present on the newly fetched `main`, record that in the m
 | D23 | `perf: Reuse selected path endpoints` | PostgreSQL repeated work after it had already found the starting endpoint. Reuse that endpoint because it is exactly the object selected by the query. | Plan inspection and the unchanged membership query's complete answers on both databases. |
 | D24 | `fix: Keep path results with their input` | PostgreSQL could join a path found for one `UNWIND` row to another row. Keep each path search inside its input row so result pairs stay correct. | All 33 path-input answer cases on both databases, plus PostgreSQL with optimizations disabled. |
 | D25 | `fix: Preserve repeated optional input rows` | Optional matches can collapse separate rows that happen to contain equal values. Number incoming rows privately and join by that identity. | Required and optional matches, repeated inputs, filters, bounds, routes, counts, `SET`, and `CREATE` cases. |
+| D26 | `fix: Preserve row selection before writes` | Intermediate WITH steps lost ordering, skipped rows and limits. Retain the selected rows before writes, with sorting after the completed projection and attached filters after a limited selection. | Shared written-answer cases and graph checks on both databases, PostgreSQL with optimizations disabled, failure preservation, parser cases and generated SQL. |
 
 Do not merge D24 into a new reachability feature. It is a correction to ordinary Cypher input handling. D23 through D25 may become one commit only if their internal data structures cannot be separated without an uncompilable intermediate state.
 
@@ -281,12 +284,18 @@ Do not merge D24 into a new reachability feature. It is a correction to ordinary
 | B67 | `test: Measure corrected path input handling` | The DAWGS correction needs exact-answer and focused performance evidence. Preserve the 33-case matrix, optimizer-disabled repeat, membership plans, and complete example hashes. | Validate record counts, answer hashes, both backends, and source versions. |
 | B68 | `docs: Explain the path input correction` | Reviewers need a plain-English account of wrong input/path pairing and the direct fix. Explain the 267 versus 26,967 intermediate rows without promising a reliable whole-run speedup. | Recalculate figures and cross-check DAWGS behavior and TODO statuses. |
 
+### BloodHound write-selection follow-up commit
+
+| # | Proposed subject | Problem, choice, and downstream effect | Proof required |
+| --- | --- | --- | --- |
+| B69 | `docs: Record the write selection correction` | The earlier comparison found an unsafe limited deletion. Preserve the separate correction evidence, explain supported writes and remaining forms, and update TODO 10 without revising historical results. | Both database results, failure checks, source fingerprints and unchanged earlier evidence. |
+
 ### BloodHound migration validation and handoff commits
 
 | # | Proposed subject | Problem, choice, and downstream effect | Proof required |
 | --- | --- | --- | --- |
-| B69 | `test: Validate OpenGraph analysis on current main` | Historical results do not prove the rebased branch. Run a smaller fresh correctness and safety set on the exact new commits and store a separate manifest. | Both database suites, exact ESC1/vault/cross-extension answers, query validation, limits, shared producers, write coordination, uncertain saves, rule selection fallbacks, containers, and image/commit IDs. |
-| B70 | `docs: Record the OpenGraph migration handoff` | Reviewers need the final map from old work to new commits and a clear list of remaining risks. Record every old path/hunk as migrated, upstream, superseded, or historical evidence. | Fresh status, commit map, test results, limitations, unresolved TODOs, and link checks. |
+| B70 | `test: Validate OpenGraph analysis on current main` | Historical results do not prove the rebased branch. Run a smaller fresh correctness and safety set on the exact new commits and store a separate manifest. | Both database suites, exact ESC1/vault/cross-extension answers, query validation, limits, shared producers, write coordination, uncertain saves, rule selection fallbacks, containers, and image/commit IDs. |
+| B71 | `docs: Record the OpenGraph migration handoff` | Reviewers need the final map from old work to new commits and a clear list of remaining risks. Record every old path/hunk as migrated, upstream, superseded, or historical evidence. | Fresh status, commit map, test results, limitations, unresolved TODOs, and link checks. |
 
 ## Safety gates that control the order
 
@@ -300,7 +309,7 @@ The following rules take priority over commit numbering:
 6. A failed report write retries the report only. It must not rerun a confirmed graph save.
 7. Selective execution is permitted only when the complete change set is known. Any uncertainty runs all enabled rules and records the reason.
 8. Removing the silent path depth cap must retain cycle handling, cancellation, and explicit resource limits. Shortest-path meaning must remain unchanged.
-9. The PostgreSQL write-limit TODO remains separate. The explicit-ID cleanup used by a study is not general query parity.
+9. Keep the PostgreSQL write-selection correction separate from the earlier study workaround. D26 must retain the selected objects and their number on both databases; explicit-ID cleanup alone does not prove that behavior.
 10. Security checks for the local API must land with the first reachable endpoint, never as a later hardening commit.
 
 ## Mapping the old history to the new series
@@ -317,6 +326,7 @@ The following rules take priority over commit numbering:
 | BloodHound `7110b5c36`, `2f25f4935`, and `b0a2dc934` | One final B53 proposal commit. |
 | DAWGS `5f16c574` | D01 through D21, omitting anything already on the fetched main. |
 | Uncommitted DAWGS path-input work | D22 through D25. Preserve tracked and untracked content through the backup. |
+| Uncommitted TODO 10 follow-up | DAWGS D26 and BloodHound B69. Preserve it separately from the earlier path-input source and historical evidence. |
 
 During execution, maintain a path-and-hunk inventory. Every old change must end in one of four states: present in a new commit, already upstream, deliberately superseded by the final design, or retained only as historical evidence. An unexplained omission blocks completion.
 
@@ -332,6 +342,7 @@ Use the smallest useful test while building each commit, then broaden testing at
 - Run the full race/unit and integration suites on fresh PostgreSQL and Neo4j databases before the DAWGS series is handed to BloodHound.
 - Compare coverage with the starting branch and do not accept a decrease.
 - For D24 and D25, run all 33 path-input cases on both databases and repeat PostgreSQL with its optimizer disabled.
+- For D26, run the shared write-selection cases and failure-preservation checks on both databases, repeat PostgreSQL selection with optimizations disabled, and include the generated SQL fixtures.
 
 ### BloodHound and the pilot
 

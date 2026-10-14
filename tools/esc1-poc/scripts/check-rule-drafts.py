@@ -23,6 +23,8 @@ import secrets
 import socket
 import subprocess
 import time
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import urllib.error
 import urllib.request
 
@@ -31,19 +33,26 @@ from playwright.sync_api import expect, sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def extension_files(name, other):
+def extension_schema(name, other):
     schema = {
-        "schema": {"name": name, "display_name": name.title(), "namespace": "PoC_" + name, "version": "v1"},
+        "schema": {"name": name, "display_name": name.title(), "namespace": "PoC_" + name, "version": "v1.0.0"},
         "node_kinds": [{"name": "PoC_" + name + "_Node"}],
         "relationship_kinds": [{"name": "PoC_" + name + "_Link", "compatible_kinds": [
             {"source_kind": "PoC_" + name + "_Node", "target_kind": "PoC_" + other + "_Node"}]}],
     }
-    return {name + ".schema.json": json.dumps(schema),
-        name + ".cypher": "// depends-on: none\nRETURN 'source' AS source, 'target' AS target, 'PoC_" + name + "_Link' AS kind"}
+    return {"id": 10 if name == "first" else 11, "name": name, "namespace": "PoC_" + name,
+        "version": "v1.0.0", "definition": schema}
+
+
+def extension_files(name, other):
+    return {"PoC_" + name + "/" + name + ".cypher":
+        "// namespace: PoC_" + name + "\n// version: v1.0.0\n// depends-on: none\n"
+        "RETURN 'source' AS source, 'target' AS target, 'PoC_" + name + "_Link' AS kind"}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--binary", type=Path, default=ROOT / "esc1-poc")
     parser.add_argument("--browser")
     parser.add_argument("--library-path")
     parser.add_argument("--output", type=Path, required=True)
@@ -53,8 +62,26 @@ def main():
     directory.mkdir(parents=True, exist_ok=False)
     environment = dict(os.environ)
     environment["POSTPROCESSOR_RULE_TOKEN"] = secrets.token_hex(32)
-    for name in ("BLOODHOUND_API_URL", "BLOODHOUND_API_TOKEN_ID", "BLOODHOUND_API_TOKEN_KEY"):
-        environment.pop(name, None)
+    installed = []
+
+    class Native(BaseHTTPRequestHandler):
+        def log_message(self, *arguments):
+            pass
+
+        def do_GET(self):
+            assert self.headers.get("Authorization", "").startswith("bhesignature ")
+            data = {"/api/v2/extensions/definitions": {"definitions": installed},
+                "/api/v2/analysis/status": {"request_type": ""},
+                "/api/v2/datapipe/status": {"status": "idle"}}[self.path]
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(json.dumps({"data": data}).encode())
+
+    native = ThreadingHTTPServer(("127.0.0.1", 0), Native)
+    threading.Thread(target=native.serve_forever, daemon=True).start()
+    environment.update(BLOODHOUND_API_URL="http://127.0.0.1:" + str(native.server_port),
+        BLOODHOUND_API_TOKEN_ID="12345678-1234-1234-1234-123456789abc",
+        BLOODHOUND_API_TOKEN_KEY=secrets.token_hex(32))
     if arguments.library_path:
         environment["LD_LIBRARY_PATH"] = arguments.library_path
     client = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -78,7 +105,7 @@ def main():
 
                 def start():
                     nonlocal process
-                    process = subprocess.Popen([str(ROOT / "esc1-poc"), "serve", "-listen", "127.0.0.1:" + str(port),
+                    process = subprocess.Popen([str(arguments.binary.resolve()), "serve", "-listen", "127.0.0.1:" + str(port),
                         "-state", str(directory / first), "-local-ui-origin", address], env=environment, stdout=log, stderr=log)
                     deadline = time.monotonic() + 10
                     while time.monotonic() < deadline:
@@ -107,16 +134,20 @@ def main():
                     page.locator("#upload-controls > summary").click()
 
                 def upload(files):
-                    page.locator("#files").set_input_files([{"name": name, "mimeType": "text/plain", "buffer": contents.encode()} for name, contents in files.items()])
+                    page.locator("#files").set_input_files([{"name": name.split("/")[-1], "mimeType": "text/plain", "buffer": contents.encode()} for name, contents in files.items()])
                     page.locator("#preview").click()
 
                 connect()
-                base = {path.name: path.read_text() for path in (ROOT / "examples/vault/extension").iterdir() if path.is_file()}
+                vault = json.loads((ROOT / "examples/vault/extension/schema.json").read_text())
+                installed[:] = [{"id": 1, "definition": vault, **{key: vault["schema"][key] for key in ["name", "namespace", "version"]}}]
+                base = {vault["schema"]["namespace"] + "/" + path.name: path.read_text()
+                    for path in (ROOT / "examples/vault/extension").glob("*.cypher")}
                 upload(base)
                 expect(page.locator("#review")).to_be_visible()
                 page.locator("#activate").click()
                 expect(page.locator("#message")).to_contain_text("activated")
                 active = api("rules")
+                installed.append(extension_schema(first, other))
                 upload(extension_files(first, other))
                 expect(page.locator("#draft-state")).to_contain_text("cannot be activated")
                 expect(page.locator("#draft-state")).to_contain_text("PoC_" + other + "_Node")
@@ -128,6 +159,7 @@ def main():
                 start()
                 connect()
                 assert api("draft") == saved
+                installed.append(extension_schema(other, first))
                 upload(extension_files(other, first))
                 expect(page.locator("#review")).to_be_visible()
                 assert api("rules") == active
@@ -141,7 +173,7 @@ def main():
                 applied = api("rules")
                 assert applied["files"] == {**base, **extension_files(first, other), **extension_files(other, first)}
                 assert not api("draft")["revision"]
-                name = first + ".cypher"
+                name = "PoC_" + first + "/" + first + ".cypher"
                 upload({name: applied["files"][name] + "\n// first draft edit"})
                 expect(page.locator("#overwrite-dialog")).to_be_visible()
                 page.locator("#overwrite-file").click()
@@ -169,6 +201,8 @@ def main():
                 process.terminate()
                 process.wait(timeout=10)
             browser.close()
+            native.shutdown()
+            native.server_close()
     results["passed"] = True
     (directory / "checks.json").write_text(json.dumps(results, indent=2) + "\n")
     print("Draft browser checks passed for both upload orders, restart, activation, and stale review.")

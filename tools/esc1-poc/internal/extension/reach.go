@@ -38,12 +38,8 @@ type Reachability struct {
 
 func parseReachability(text string, dependencies []Dependency) (*Reachability, error) {
 	var result *Reachability
-	for _, line := range strings.Split(text, "\n") {
+	for _, line := range leadingComments(text) {
 		var comment = strings.TrimSpace(line)
-		if !strings.HasPrefix(comment, "//") {
-			continue
-		}
-		comment = strings.TrimSpace(strings.TrimPrefix(comment, "//"))
 		if !strings.HasPrefix(comment, "reachability:") {
 			continue
 		}
@@ -93,12 +89,8 @@ func parseReachability(text string, dependencies []Dependency) (*Reachability, e
 // disjoint chunks produces the same relationship set as the complete input.
 func parseBatchDependency(text string, dependencies []Dependency) (string, error) {
 	var result string
-	for _, line := range strings.Split(text, "\n") {
+	for _, line := range leadingComments(text) {
 		var comment = strings.TrimSpace(line)
-		if !strings.HasPrefix(comment, "//") {
-			continue
-		}
-		comment = strings.TrimSpace(strings.TrimPrefix(comment, "//"))
 		if !strings.HasPrefix(comment, "batch-on:") {
 			continue
 		}
@@ -106,14 +98,14 @@ func parseBatchDependency(text string, dependencies []Dependency) (string, error
 			return "", fmt.Errorf("batch-on directive may appear only once")
 		}
 		result = strings.TrimSpace(strings.TrimPrefix(comment, "batch-on:"))
-		if !queryFilename.MatchString(result) {
-			return "", fmt.Errorf("batch-on requires one snake_case.cypher prerequisite")
+		if !identifier.MatchString(result) {
+			return "", fmt.Errorf("batch-on requires one prerequisite parameter name (without $)")
 		}
 	}
 	if result != "" {
 		var declared bool
 		for _, dependency := range dependencies {
-			if dependency.Type == "query" && dependency.Name == result {
+			if dependency.Type == "query" && dependency.AnswerParameter() == result {
 				declared = true
 			}
 		}
@@ -132,12 +124,8 @@ type GroupOverlap struct {
 
 func parseGroupOverlap(text string, dependencies []Dependency) (*GroupOverlap, error) {
 	var result *GroupOverlap
-	for _, line := range strings.Split(text, "\n") {
+	for _, line := range leadingComments(text) {
 		var comment = strings.TrimSpace(line)
-		if !strings.HasPrefix(comment, "//") {
-			continue
-		}
-		comment = strings.TrimSpace(strings.TrimPrefix(comment, "//"))
 		if !strings.HasPrefix(comment, "group-overlap:") {
 			continue
 		}
@@ -158,12 +146,12 @@ func parseGroupOverlap(text string, dependencies []Dependency) (*GroupOverlap, e
 	if result == nil {
 		return nil, nil
 	}
-	if !queryFilename.MatchString(result.Memberships) {
-		return nil, fmt.Errorf("group-overlap requires a memberships query filename")
+	if !identifier.MatchString(result.Memberships) {
+		return nil, fmt.Errorf("group-overlap requires the membership prerequisite parameter name (without $)")
 	}
 	var declared bool
 	for _, dependency := range dependencies {
-		if dependency.Type == "query" && dependency.Name == result.Memberships {
+		if dependency.Type == "query" && dependency.AnswerParameter() == result.Memberships {
 			declared = true
 		}
 	}

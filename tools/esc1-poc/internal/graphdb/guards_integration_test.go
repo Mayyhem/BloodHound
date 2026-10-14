@@ -156,7 +156,7 @@ func TestChangeCoverageControlsPublication(t *testing.T) {
 		t.Fatalf("confirmed enrollment deletion: %+v, %v", removed, err)
 	}
 	for _, name := range removed.Queries {
-		if name == "domain_helpers.cypher" {
+		if name == "PoC/domain_helpers.cypher" {
 			t.Fatal("an enrollment deletion reran the unrelated domain-name helper")
 		}
 	}

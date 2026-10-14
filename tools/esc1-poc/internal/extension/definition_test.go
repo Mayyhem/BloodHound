@@ -74,13 +74,33 @@ func TestDefinitionKeepsExactPairs(t *testing.T) {
 	}
 }
 
+func TestCollectedSchemaDoesNotNeedAnalysisEndpointPairs(t *testing.T) {
+	var definition, err = extension.ParseDefinition([]byte(`{"schema":{"name":"ordinary extension","namespace":"PoC","version":"1.0.0"},"relationship_kinds":[{"name":"PoC_CollectedLink"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Ordinary installed schemas may omit optional arrays, display names and
+	// analysis endpoint pairs. Reading them must not invent any missing pairs.
+	if err := extension.ValidateDefinitions([]extension.Definition{definition}); err != nil {
+		t.Fatal(err)
+	}
+	if len(definition.RelationshipKinds[0].CompatibleKinds) != 0 {
+		t.Fatal("reading a collected schema invented endpoint pairs")
+	}
+	_, err = extension.LoadFiles([]extension.Definition{definition}, map[string]string{
+		"PoC/link.cypher": "// namespace: PoC\n// version: v1.0.0\n// depends-on: none\nRETURN 'u' AS source, 'd' AS target, 'PoC_CollectedLink' AS kind",
+	})
+	if err == nil {
+		t.Fatal("analysis output needs explicit endpoint pairs even though collected data does not")
+	}
+}
+
 func TestDefinitionRejectsIncompleteOrAmbiguousPairs(t *testing.T) {
 	var cases = []struct {
 		name    string
 		change  func(*extension.Definition)
 		message string
 	}{
-		{"missing pairs", func(definition *extension.Definition) { definition.RelationshipKinds[0].CompatibleKinds = nil }, "explicit compatible_kinds"},
 		{"duplicate pair", func(definition *extension.Definition) {
 			definition.RelationshipKinds[0].CompatibleKinds = append(definition.RelationshipKinds[0].CompatibleKinds, definition.RelationshipKinds[0].CompatibleKinds[0])
 		}, "duplicate endpoint pair"},
@@ -186,7 +206,7 @@ func TestCollectedKindsDoNotBecomeManagedOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"helper.cypher", "access.cypher"} {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte("// depends-on: none\nRETURN 1"), 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(directory, name), []byte("// namespace: PoC\n// version: v1.0.0\n// depends-on: none\nRETURN 1"), 0600); err != nil {
 			t.Fatal(err)
 		}
 	}

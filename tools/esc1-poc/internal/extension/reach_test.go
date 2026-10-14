@@ -19,9 +19,10 @@ SPDX-License-Identifier: Apache-2.0
 package extension
 
 import (
-	"github.com/specterops/dawgs/cypher/frontend"
 	"path/filepath"
 	"testing"
+
+	"github.com/specterops/dawgs/cypher/frontend"
 )
 
 func TestReachabilityDirective(t *testing.T) {
@@ -49,11 +50,11 @@ func TestReachabilityDirective(t *testing.T) {
 
 func TestBatchDependencyDirective(t *testing.T) {
 	var dependencies = []Dependency{{Type: "query", Name: "seeds.cypher"}}
-	var name, err = parseBatchDependency("// batch-on: seeds.cypher", dependencies)
-	if err != nil || name != "seeds.cypher" {
+	var name, err = parseBatchDependency("// batch-on: seeds", dependencies)
+	if err != nil || name != "seeds" {
 		t.Fatalf("name %q error %v", name, err)
 	}
-	for _, text := range []string{"// batch-on:", "// batch-on: absent.cypher", "// batch-on: seeds.cypher, other.cypher", "// batch-on: seeds.cypher\n// batch-on: seeds.cypher"} {
+	for _, text := range []string{"// batch-on:", "// batch-on: absent", "// batch-on: seeds, other.cypher", "// batch-on: seeds\n// batch-on: seeds"} {
 		if _, err := parseBatchDependency(text, dependencies); err == nil {
 			t.Errorf("accepted %s", text)
 		}
@@ -76,12 +77,12 @@ func TestShippedQuerySyntaxIncludesReachSeeds(t *testing.T) {
 
 func TestGroupOverlapDirective(t *testing.T) {
 	var dependencies = []Dependency{{Type: "query", Name: "membership.cypher"}}
-	var valid = `// group-overlap: {"memberships":"membership.cypher"}`
+	var valid = `// group-overlap: {"memberships":"membership"}`
 	var config, err = parseGroupOverlap(valid, dependencies)
-	if err != nil || config.Memberships != "membership.cypher" {
+	if err != nil || config.Memberships != "membership" {
 		t.Fatalf("configuration %+v error %v", config, err)
 	}
-	for _, text := range []string{`// group-overlap: {"memberships":"absent.cypher"}`, `// group-overlap: {"memberships":"membership.cypher","unknown":true}`, `// group-overlap: {}`, valid + "\n" + valid, valid + " {}"} {
+	for _, text := range []string{`// group-overlap: {"memberships":"absent.cypher"}`, `// group-overlap: {"memberships":"membership","unknown":true}`, `// group-overlap: {}`, valid + "\n" + valid, valid + " {}"} {
 		if _, err := parseGroupOverlap(text, dependencies); err == nil {
 			t.Errorf("accepted %s", text)
 		}

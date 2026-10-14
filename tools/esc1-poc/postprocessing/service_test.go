@@ -18,6 +18,7 @@ package postprocessing
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -86,6 +87,10 @@ func newServiceTest(t *testing.T) (*Service, *serviceTestClient, *time.Time, *in
 		calls   int
 		service = &Service{gate: NewGate(), client: client, clock: func() time.Time { return now }, configuration: Configuration{Directory: t.TempDir()}}
 	)
+	installed := client.bundle.Schemas
+	service.configuration.ReadSchemas = func(context.Context) ([]byte, error) {
+		return json.Marshal(ruleservice.SchemaSnapshot{Definitions: installed})
+	}
 	service.execute = func(ctx context.Context, plan extension.Plan, options runner.Options) (runner.Report, error) {
 		calls++
 		if !options.IngestionComplete || !options.WritersPaused || options.BatchID == "" {
@@ -279,38 +284,35 @@ func TestServiceFailedNativeAnalysisInvalidatesPendingRetry(t *testing.T) {
 	}
 }
 
-func TestServiceRegistersStandardSchemaBeforePublishing(t *testing.T) {
+func TestServiceReadsInstalledSchemaBeforeEveryRun(t *testing.T) {
 	service, _, now, calls := newServiceTest(t)
-	var registrations int
-	service.configuration.RegisterSchema = func(ctx context.Context, payload []byte) error {
-		registrations++
-		if strings.Contains(string(payload), "post_processing") || strings.Contains(string(payload), "existing_edge_policy") || strings.Contains(string(payload), "compatible_kinds") {
-			t.Fatal("proposed fields leaked to native schema")
-		}
+	var reads int
+	original := service.configuration.ReadSchemas
+	service.configuration.ReadSchemas = func(ctx context.Context) ([]byte, error) {
+		reads++
 		_, release, err := service.gate.EnterWrite(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 		release()
-		return nil
+		return original(ctx)
 	}
-	if _, err := service.AfterAnalysis(context.Background()); err != nil {
+	if _, err := service.AfterAnalysis(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	*now = now.Add(time.Minute)
-	if _, err := service.AfterAnalysis(context.Background()); err != nil {
+	if _, err := service.AfterAnalysis(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if registrations != 1 || *calls != 2 {
-		t.Fatalf("registration %d runs %d", registrations, *calls)
+	if reads != 2 || *calls != 2 {
+		t.Fatalf("schema reads %d runs %d", reads, *calls)
 	}
-	service.registeredSchema = nil
-	service.configuration.RegisterSchema = func(context.Context, []byte) error { return errors.New("schema rejected") }
-	if _, err := service.AfterAnalysis(context.Background()); err == nil {
-		t.Fatal("accepted failed schema registration")
+	service.configuration.ReadSchemas = func(context.Context) ([]byte, error) { return nil, errors.New("schema read failed") }
+	if _, err := service.AfterAnalysis(t.Context()); err == nil {
+		t.Fatal("accepted failed schema read")
 	}
 	if *calls != 2 {
-		t.Fatal("published before schema registration succeeded")
+		t.Fatal("published without installed schema check")
 	}
 }
 
@@ -344,5 +346,44 @@ func TestServiceRetriesReportDeliveryWithoutRepeatingSavedWork(t *testing.T) {
 	}
 	if *calls != 1 || len(client.statuses) != 2 || client.statuses[1].State != "success" || len(service.reports) != 0 {
 		t.Fatal("report retry recalculated or lost success")
+	}
+}
+
+func TestSchemaDeletionWaitsForRunningCalculationAndPreventsOldRetry(t *testing.T) {
+	var (
+		service, _, _, _ = newServiceTest(t)
+		reading          = make(chan struct{})
+		finish           = make(chan struct{})
+		runDone          = make(chan error, 1)
+		changeDone       = make(chan error, 1)
+	)
+	service.execute = func(context.Context, extension.Plan, runner.Options) (runner.Report, error) {
+		close(reading)
+		<-finish
+		return runner.Report{Committed: true}, nil
+	}
+	go func() { _, err := service.AfterAnalysis(context.Background()); runDone <- err }()
+	<-reading
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	err := service.WithSchemaChange(ctx, func(context.Context) error {
+		t.Error("schema changed while the old calculation could still publish")
+		return nil
+	})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("deletion did not wait: %v", err)
+	}
+	go func() {
+		changeDone <- service.WithSchemaChange(context.Background(), func(context.Context) error { return nil })
+	}()
+	close(finish)
+	if err := <-runDone; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-changeDone; err != nil {
+		t.Fatal(err)
+	}
+	if service.changes.Snapshot().CoverageKnown {
+		t.Fatal("schema change did not require fresh calculation")
 	}
 }

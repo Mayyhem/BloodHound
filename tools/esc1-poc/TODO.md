@@ -4,28 +4,50 @@ Give extension authors a clear path from an idea to working rules: create an ext
 
 Open items describe proposed improvements; completed work is listed under [Done](#done). Keep the engine's existing shared calculations, scope and identity checks, complete-result validation, and all-or-nothing saving. The interactive execution graph below replaces the earlier suggestion for a separate development-mode execution preview.
 
-Earlier validation and useful execution reports are implemented. Next, build the interactive graph and its testing controls. Starter tooling and easier sharing build on those capabilities. Keep the completed authoring documentation current as the engine changes. Coordinate the Cypher work with the existing [implementation plan](CYPHER_IMPLEMENTATION_PLAN.md).
+Earlier validation and useful execution reports are implemented. Next, build a read-only analysis workspace MVP for current rules and completed runs. Management, collapsed views, live progress, and interactive testing follow in later phases. Keep the completed authoring documentation current as the engine changes. Coordinate the Cypher work with the existing [implementation plan](CYPHER_IMPLEMENTATION_PLAN.md).
 
-## 3. Build an interactive execution graph, like Ghidra/IDA
+## 3. Build an interactive analysis workspace using BloodHound's sequential layout
 
-Make a connected graph the main workspace for understanding and testing rules. Use the block-and-arrow navigation familiar from Ghidra and IDA: each block represents a query, and an arrow leads from a prerequisite to the query that consumes its answer. Show the chains, their branches, and where they join, including dependencies between extensions.
+Follow the [analysis workspace plan](../../_plans/opengraph-analysis-workspace.md). Reuse BloodHound's familiar sequential graph display, navigation, styling, table, and details-panel patterns in a dedicated analysis page. Each node represents a query and each dependency arrow explains what its consumer needs. Show branches, shared prerequisites, and dependencies between extensions. This replaces the Ghidra/IDA presentation proposal.
 
-Bring the details and actions currently available in the rule table into this graph. The picture must follow the actual execution plan and distinguish dependency order from observed execution timing.
+**The execution diagram is display information only. Never store query nodes, dependency arrows, or collapsed groups in BloodHound's collected-data graph.** Build it from rule definitions, the execution plan, and the selected run's reports. Keep normal Explore behavior intact; actual relationships produced by analysis can still be opened there.
 
-- [ ] Lay out query blocks in dependency order. Show a shared prerequisite once, with arrows to all its consumers. Label connections with the supplied answer or parameter where useful.
+The MVP links to the current rules page for upload, activation, rule management, and Run Analysis. Move those controls into the workspace in a later phase, after their replacement is ready. Schema uploads stay on OpenGraph Management; TODO 6's extension association and version checks serve both pages.
+
+### MVP: understand current rules and completed runs
+
+- [ ] Draw the current activated rules in sequential layout, using complete runner-derived dependencies and showing shared prerequisites once. No new execution modes, storage, or DAWGS changes are required by the MVP.
+- [ ] Reuse pan, zoom, fit, search, extension filters, and keyboard navigation. Highlight prerequisites and downstream consumers; explain filtered-out dependencies and let the author reveal them.
+- [ ] Coordinate one focused query between graph, basic rule table, and details panel. Show existing properties, full Cypher, enabled/disabled choice and blocking reasons; provide individual download tied to the displayed revision.
+- [ ] Show existing completed-run counts, timings, failures, and saving outcomes on the graph only when the report matches its revision. Explain older or unavailable reports separately. Existing overall running status must not imply live per-query progress.
+- [ ] Provide Refresh and links to existing management controls. Handle no active rules and missing reports clearly. Keep existing permissions and normal Explore behavior intact; loading or navigating the page writes no collected graph data.
+
+**MVP done when:** an author can inspect the current ESC1 or cross-extension rules, follow prerequisites and consumers, inspect/download a query, understand its availability and matching completed outcome, and reach existing management controls. Full TODO 3 remains open after this milestone.
+
+### Roadmap: complete TODO 3
+
+After the MVP, add rule management, then focused/collapsed views, then historical diagrams/live progress, then isolated testing and answer inspection. The complete checklist below retains all original requirements across these phases; it is not the MVP release gate. The picture must always distinguish dependency order from observed execution timing.
+
+- [ ] Supply complete dependency connections from the runner's plan before drawing the graph. Show a shared prerequisite once, with arrows to all its consumers. Label supplied answers/parameters and dependencies through calculated graph data distinctly; shared-output availability does not itself establish execution order.
 - [ ] Support pan, zoom, fit, search, extension filtering, and expanding or collapsing chains. Selecting a query should highlight its prerequisites and downstream consumers, with navigation in both directions.
+- [ ] Coordinate graph focus, table rows, and query details. Let the table show selected rules, prerequisites, downstream consumers, or the whole highlighted chain. Keep explanatory highlighting separate from the explicit selection used for actions; preserve selection between views of the same revision and show hidden selection counts. Historical runs are read-only; changing revisions clears action selections.
+- [ ] Keep invalid/incomplete drafts usable through a file table and validation explanations when no execution plan can be drawn. Retained rules whose schemas are missing remain visible and downloadable. Do not invent execution order or enable Test/Activate before their required checks pass.
 - [ ] Show each query's name, extension, order, stage, date added, and enabled state. Explain when a query is paused because a prerequisite is disabled.
 - [ ] Open a details panel from a query block with its full Cypher, graph inputs, prerequisite parameters, consumers, helper types and ID prefixes, relationship types, allowed endpoints, and existing-edge policy. Include any optional reachability, group-overlap, and batching instructions and explain their effect on the answer and execution.
-- [ ] Provide query download, individual and multiple selection, enable, disable, and delete actions directly from the graph. Before a change, highlight every affected query, including consumers in other extensions. Preserve the existing review and activation checks.
+- [ ] Provide query download, individual and multiple selection, enable, disable, and delete actions through the graph and table. Right-click is an optional shortcut to visible, keyboard-accessible controls. Distinguish all filtered rules from all rules in the displayed revision, with counts. Highlight requested changes and every additional effect in both graph and table, revealing affected groups and other extensions. Preserve the existing review and activation checks and show the target revision.
 - [ ] Make upload review, activation, refresh, and Run Analysis available from the graph workspace. Clearly identify the proposed, activated, running, and last successfully applied revisions.
-- [ ] Overlay actual execution state on the graph: waiting, running, succeeded, failed, skipped, or disabled. Show row counts and durations when available, and explain why a rule ran, was skipped, or could not proceed. Do not imply that queries at the same stage necessarily run together.
+- [ ] Show enabled/disabled choice and any blocking reason separately from execution and saving: idle/waiting/running/succeeded/failed/skipped/canceled, and confirmed/uncertain/unavailable saved results. Add bounded live updates, counts, durations, and reasons when available. Identify stale updates and retain bounded historical plans rather than substituting today's files. Keep positions stable; queries at the same stage need not run together.
+- [ ] Jump from a failure to its query, reveal it inside a collapsed group, and explain the phase, reason, and dependent work that could not proceed. Keep shared setup and saving failures at run level when no individual query is responsible.
 - [ ] Let authors test a proposed revision or selected chain from this workspace, including all required prerequisites. Show intermediate answers, validation failures, and proposed relationship additions, removals, and property changes beside the relevant query.
-- [ ] Use the production calculation and validation code for those tests, with isolated test data or a consistent database view that cannot publish preview changes. Account for helper objects and database preparation as well as final relationship writes. Testing a draft must not activate it.
+- [ ] Use the production calculation and validation code for tests. Begin with configured isolated test targets and repeatable baselines, accounting for helper objects, preparation, cleanup, and final writes. Tests cannot publish to the live graph or activate drafts. Current-application-data testing requires a separately verified consistent view or isolated copy.
 - [ ] Distinguish a limited display of results from a complete calculation. A sample must never be treated as a complete replacement for published relationships.
+- [ ] Bound retained inspection data separately from calculation data, with expiry and access checks. Progress or optional inspection failures cannot fail, repeat, or indefinitely delay ordinary analysis.
 - [ ] Support small collection files and written expected results, without requiring Go tests. Cover empty answers, duplicate support, removal of one or the last support, failure preserving previous results, and collectors arriving in either order. Run the same cases through each supported database.
-- [ ] Keep the graph usable with many rules through focused chain views and collapsed groups. Provide keyboard navigation and readable state labels as well as colors.
+- [ ] Keep the graph usable with many rules through focused chain views and nonoverlapping collapsed groups showing rule, selection, and state counts. Preserve boundary connections and explain hidden cross-extension dependencies. Provide keyboard navigation and readable state labels as well as colors.
 
-**Done when:** an author can follow a chain, inspect its query and intermediate answers, understand a failure, manage the rules, and review the effects of a proposed change from the graph workspace. Activating rules remains a separate, explicit action.
+Keep changes concentrated in the new page, authenticated server access, and our existing runner/service. Retain current rule storage. No additional DAWGS work is expected for display or reporting; propose it only for a demonstrated missing capability. Safe tests and answer inspection need runner work regardless of the display style, and must preserve complete shared-output calculations.
+
+**Full TODO 3 done when:** an author can follow a chain, inspect its query and intermediate answers, understand a failure, manage the rules, and review the effects of a proposed change from the graph workspace. Activating rules remains a separate, explicit action.
 
 Start in [the rule page](internal/ruleservice/upload.html), [the existing plan details](internal/ruleservice/view.go), [change review](internal/ruleservice/changes.go), and [the runner](internal/runner).
 
@@ -47,20 +69,28 @@ Start in [USAGE.md](USAGE.md), [the build scripts](scripts), and [the command en
 
 ## 6. Make shared queries easier to distribute and change
 
-Schema filenames, query filenames, and answer parameter names are currently shared across all installed extensions. Uploading another extension's `schema.json` therefore looks like replacing the existing file. Users should be able to install supplied extensions without renaming their files or coordinating names with other authors. The complete saved set also has a 32-file limit.
+**Status: open — code implemented; verification and review unfinished (14 October 2026).** The checked items below describe implemented code and documentation. Schemas upload through OpenGraph Management and analyses stay on the rules page. The experimental parser reads installed definitions. Namespaces separate filenames, analysis versions are independent of schema versions, and optional requirements-style conditions constrain shared queries. No condition means the latest activated local query. Shared answers use descriptive Cypher columns and ordinary documentation.
 
-- [ ] Identify every schema and rule by both its extension and its filename. Allow different extensions to each contain `schema.json` and identically named rules, such as `users.cypher`.
-- [ ] Make uploads, drafts, overwrite choices, downloads, updates, and rule controls distinguish which extension a file belongs to. Updating one extension must not overwrite another extension's same-named file. Continue reviewing genuine effects on rules in other extensions before activation or deletion.
-- [ ] Keep references within an extension simple, and make references to another extension's rules explicit. Keep their calculated answers distinguishable even when the rule filenames match.
-- [ ] Provide explicit references to shared queries, with a clear way to identify the version a consumer expects.
-- [ ] Describe shared answer columns, their meanings, and their value types, and catch incompatible changes before activation where possible.
-- [ ] Revisit limits for files and extension packages while keeping total storage and execution work bounded.
-- [ ] Publish small reusable examples for identity matching and membership calculations, with expected results and dependency explanations.
-- [ ] Check installing three extensions at different times with matching schema and rule filenames, updating one, and deleting one rule. Confirm that filenames alone never cause changes to another extension and that intended connections between their rules still work. Update [END_USERS.md](END_USERS.md) when the filename restriction is removed.
+See the [approved integration plan](../../_plans/opengraph-analysis-extension-integration.md) and [verification record](evidence/extension-integration/README.md). The future deletion checkbox and TODO 3 management page are outside this implementation. The existing 32-file/4 MiB limits remain; no measurements justify increasing them yet.
 
-**Done when:** users can install and update supplied extensions without renaming files, and authors can reuse another extension's calculation without coordinating filenames or discovering changed answer shapes during execution.
+- [x] Identify every schema and rule by both its extension and its filename. Allow different extensions to each contain `schema.json` and identically named rules, such as `users.cypher`.
+- [x] Resolve analyses against schemas already installed through OpenGraph Management, preserving the definition information the engine needs. Avoid a second schema upload to the rules page, and prevent retained analyses from reinstalling a deleted schema.
+- [x] Make uploads, drafts, overwrite choices, downloads, updates, and rule controls distinguish which extension a file belongs to. Updating one extension must not overwrite another extension's same-named file. Continue reviewing genuine effects on rules in other extensions before activation or deletion.
+- [x] Keep references within an extension simple, and make references to another extension's rules explicit. Keep their calculated answers distinguishable even when the rule filenames match.
+- [x] Provide explicit references to shared queries with optional requirements-style version conditions and local answer names. No version condition means latest. Keep an analysis's own version separate from the extension versions it supports, so compatible upgrades do not require editing unchanged files.
+- [x] Describe shared answer columns, their meanings, and their value types, and catch incompatible changes before activation where possible.
+- [x] Review limits and retain the current bounded file count, total storage and execution work; no analysis archive was introduced.
+- [x] Publish small reusable examples for identity matching and membership calculations, with expected results and dependency explanations.
+- [x] Update [END_USERS.md](END_USERS.md) to explain the separate upload pages and removal of the global filename restriction.
+- [ ] Verify the complete workflow through the real BloodHound pages: install three extensions at different times with matching schema and rule filenames, upload and run their analyses, update one, and delete one rule. Cover either upload order and schema deletion while analysis files remain. Confirm that filenames alone never cause changes to another extension and that intended connections between their rules still work. Existing browser checks used a simulated schema reader; the complete real-app walkthrough is still outstanding.
+- [ ] Investigate the UI failures from `CI=true just test`, rerun the checks, and record the outcome. Failures in unchanged files have not yet been established as unrelated baseline failures.
+- [ ] Complete `just prepare-for-codereview` in a clean checkout without the ignored lab history. The previous run stopped during recursive formatting; later checks did not finish.
+- [ ] Run `just gen-spec` with the required generator available and review its output. The affected OpenAPI JSON was updated locally, but standard generation failed because the tool was not cached.
+- [ ] Review the complete patch and address findings before closing TODO 6. Nothing has been staged, committed, or deployed.
 
-Start in [the definition registry](internal/extension/registry.go), [saved-file validation](internal/ruleservice/validation.go), and [the cross-extension example](examples/cross-platform/README.md). Agree on the author-facing format before implementing it.
+**Done when:** the real-app workflow and remaining checks above are completed and reviewed, showing that users can install and update supplied extensions without renaming files, and authors can reuse another extension's calculation without coordinating filenames or discovering changed answer shapes during execution. The plan's deferred deletion control and TODO 3 workspace move are separate future work.
+
+Start in [the definition registry](internal/extension/registry.go), [saved-file validation](internal/ruleservice/validation.go), and [the cross-extension example](examples/cross-platform/README.md). The author-facing declarations and shared-answer approach were approved before implementation.
 
 ## 7. Implement the Cypher simplification plan
 
@@ -103,11 +133,13 @@ Start in [change tracking](postprocessing/observe.go), [tracking for updates and
 
 ## 10. Preserve limits before PostgreSQL writes
 
-The comparison cleanup exposed a separate DAWGS problem: `MATCH (n) WITH n LIMIT 2000 DETACH DELETE n` was translated without the limit, causing a much larger deletion than requested. The isolated test graph was preserved in its original snapshot, and the measurement tool now selects an explicit list of IDs before deleting. This workaround does not correct general query translation.
+**Completed: 13 October 2026.** DAWGS now preserves `WITH` ordering, skipped rows and limits before supported writes. The complete DAWGS suites pass on PostgreSQL and Neo4j, including 38 shared selection cases and checks of the saved graph after failed or canceled writes. PostgreSQL also passes the same selection cases with optimizations disabled. See [the correction and evidence](evidence/write-limit-followup/README.md) for the explanation, source fingerprints, results and remaining unsupported forms.
 
-- [ ] Add small matching tests on both databases for limits and ordering before writes, including deletion.
-- [ ] Correct PostgreSQL translation so the selected objects and their number are preserved.
-- [ ] Check other supported writes after `WITH` and document unsupported forms clearly.
+The comparison cleanup exposed this separate DAWGS problem: `MATCH (n) WITH n LIMIT 2000 DETACH DELETE n` was translated without the limit, causing a much larger deletion than requested. The isolated test graph was preserved in its original snapshot, and the measurement tool selects an explicit list of IDs before deleting. That earlier workaround and its historical evidence remain unchanged; the general correction is this separate follow-up.
+
+- [x] Add small matching tests on both databases for limits and ordering before writes, including deletion.
+- [x] Correct PostgreSQL translation so the selected objects and their number are preserved.
+- [x] Check other supported writes after `WITH` and document unsupported forms clearly.
 
 **Done when:** a limited write affects exactly the objects selected by the preceding query on both databases. Keep this separate from the completed read-query corrections and the measurement-only cleanup workaround.
 

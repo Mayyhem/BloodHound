@@ -394,6 +394,8 @@ paths:
   # opengraph extensions
   /api/v2/extensions:
     $ref: './paths/opengraph.extensions.yaml'
+  /api/v2/extensions/definitions:
+    $ref: './paths/opengraph.extension-definitions.yaml'
   /api/v2/extensions/{extension_id}:
     $ref: './paths/opengraph.extension-delete.yaml'
   /api/v2/extensions-edges:

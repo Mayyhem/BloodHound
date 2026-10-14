@@ -22,8 +22,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -58,7 +56,7 @@ func multiSchemaServiceBundle(t *testing.T, disabled bool) ruleservice.Bundle {
 		t.Fatal(err)
 	}
 	if disabled {
-		change := ruleservice.Change{BaseRevision: bundle.Revision, Disable: []string{"ad_users.cypher"}}
+		change := ruleservice.Change{BaseRevision: bundle.Revision, Disable: []string{"PoC_AD/ad_users.cypher"}}
 		preview, err := store.Preview(change)
 		if err != nil {
 			t.Fatal(err)
@@ -72,110 +70,51 @@ func multiSchemaServiceBundle(t *testing.T, disabled bool) ruleservice.Bundle {
 	return bundle
 }
 
-func registeredSchemaName(t *testing.T, payload []byte) string {
-	t.Helper()
-	var definition struct {
-		Schema struct {
-			Name string `json:"name"`
-		} `json:"schema"`
-	}
-	if err := json.Unmarshal(payload, &definition); err != nil {
-		t.Fatal(err)
-	}
-	for _, field := range []string{"post_processing", "existing_edge_policy", "external_node_kinds", "external_relationship_kinds", "compatible_kinds"} {
-		if strings.Contains(string(payload), `"`+field+`"`) {
-			t.Fatal("proposal fields leaked into native schema", field)
+func TestServiceChecksCombinedInstalledSchemasAndPausesDeletedExtension(t *testing.T) {
+	service, client, _, _ := newServiceTest(t)
+	client.bundle = multiSchemaServiceBundle(t, false)
+	snapshot := ruleservice.SchemaSnapshot{Definitions: client.bundle.Schemas[1:]}
+	// Remove Directory, independently of the saved rule files.
+	snapshot.Definitions = nil
+	for _, schema := range client.bundle.Schemas {
+		if schema.Namespace != "PoC_AD" {
+			snapshot.Definitions = append(snapshot.Definitions, schema)
 		}
 	}
-	return definition.Schema.Name
-}
-
-func TestServiceRegistersEachSchemaBeforeExecutingCombinedPlan(t *testing.T) {
-	var (
-		service, client, now, calls = newServiceTest(t)
-		registrations               []string
-		original                    = service.execute
-	)
-	client.bundle = multiSchemaServiceBundle(t, true)
-	service.configuration.RegisterSchema = func(_ context.Context, payload []byte) error {
-		registrations = append(registrations, registeredSchemaName(t, payload))
-		if *calls != 0 {
-			t.Fatal("schema registration followed query execution")
-		}
-		return nil
-	}
-	service.execute = func(ctx context.Context, plan extension.Plan, options runner.Options) (runner.Report, error) {
-		if !reflect.DeepEqual(registrations, []string{"active_directory", "cyberark"}) || len(plan.Definitions) != 2 || len(plan.Queries) != 3 {
-			t.Fatal("runner did not receive registered combined plan", registrations, plan)
+	service.configuration.ReadSchemas = func(context.Context) ([]byte, error) { return json.Marshal(snapshot) }
+	service.execute = func(_ context.Context, plan extension.Plan, _ runner.Options) (runner.Report, error) {
+		if len(plan.Queries) != 3 {
+			t.Fatal("retained files disappeared")
 		}
 		for _, query := range plan.Queries {
-			expectedDisabled := query.Name == "ad_users.cypher" || query.Name == "cyberark_links.cypher"
-			if (query.DisabledReason != "") != expectedDisabled {
-				t.Fatal("runner lost selective disabled state", query)
+			wantPaused := query.Name != "PoC_CyberArk/cyberark_accounts.cypher"
+			if (query.DisabledReason != "") != wantPaused {
+				t.Fatalf("wrong pause for %s: %s", query.Name, query.DisabledReason)
 			}
 		}
-		return original(ctx, plan, options)
+		return runner.Report{Committed: true}, nil
 	}
-	if committed, err := service.AfterAnalysis(context.Background()); err != nil || !committed {
-		t.Fatal("first run failed", committed, err)
+	if _, err := service.AfterAnalysis(t.Context()); err != nil {
+		t.Fatal(err)
 	}
-	*now = now.Add(time.Minute)
-	if committed, err := service.AfterAnalysis(context.Background()); err != nil || !committed {
-		t.Fatal("second run failed", committed, err)
-	}
-	if len(registrations) != 2 || *calls != 2 {
-		t.Fatal("unchanged schemas were registered again", registrations, *calls)
+	if len(snapshot.Definitions) != 1 {
+		t.Fatal("analysis recreated deleted schema")
 	}
 }
 
-func TestServiceRetriesAllSchemasAfterPartialRegistrationFailure(t *testing.T) {
-	var (
-		service, client, now, calls = newServiceTest(t)
-		registrations               []string
-		failSecond                  = true
-		original                    = service.execute
-		registrationError           = errors.New("second schema rejected")
-	)
-	client.bundle = multiSchemaServiceBundle(t, false)
-	service.configuration.RegisterSchema = func(_ context.Context, payload []byte) error {
-		name := registeredSchemaName(t, payload)
-		registrations = append(registrations, name)
-		if failSecond && name == "cyberark" {
-			return registrationError
-		}
-		return nil
+func TestServiceRetriesSchemaReadWithoutChangingPinnedFiles(t *testing.T) {
+	service, client, now, calls := newServiceTest(t)
+	original := service.configuration.ReadSchemas
+	service.configuration.ReadSchemas = func(context.Context) ([]byte, error) { return nil, errors.New("schema source unavailable") }
+	if _, err := service.AfterAnalysis(t.Context()); err == nil || *calls != 0 {
+		t.Fatal("read failure allowed execution")
 	}
-	service.execute = func(ctx context.Context, plan extension.Plan, options runner.Options) (runner.Report, error) {
-		if !reflect.DeepEqual(registrations, []string{"active_directory", "cyberark", "active_directory", "cyberark"}) {
-			t.Fatal("executed before complete registration retry", registrations)
-		}
-		return original(ctx, plan, options)
-	}
-	if committed, err := service.AfterAnalysis(context.Background()); committed || !errors.Is(err, registrationError) {
-		t.Fatal("registration failure was hidden", committed, err)
-	}
-	if *calls != 0 || len(service.registeredSchema) != 0 || service.pending == nil {
-		t.Fatal("partial registration was cached or executed", *calls, service.pending)
-	}
-	failSecond = false
-	if committed, err := service.Retry(context.Background()); committed || err != nil {
-		t.Fatal("retry ignored registration backoff", committed, err)
-	}
-	if len(registrations) != 2 || *calls != 0 {
-		t.Fatal("retried before backoff elapsed", registrations, *calls)
+	service.configuration.ReadSchemas = original
+	if _, err := service.Retry(t.Context()); err != nil || *calls != 0 {
+		t.Fatal("retry ignored backoff")
 	}
 	*now = now.Add(time.Minute)
-	if committed, err := service.Retry(context.Background()); err != nil || !committed {
-		t.Fatal("registration retry failed", committed, err)
-	}
-	if *calls != 1 || len(service.registeredSchema) == 0 || client.fetches != 1 || service.pending != nil {
-		t.Fatal("retry did not complete pinned bundle", *calls, client.fetches, service.pending)
-	}
-	*now = now.Add(time.Minute)
-	if _, err := service.AfterAnalysis(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if len(registrations) != 4 || *calls != 2 {
-		t.Fatal("complete schema list was not cached", registrations, *calls)
+	if committed, err := service.Retry(t.Context()); err != nil || !committed || *calls != 1 || client.fetches != 1 {
+		t.Fatal("retry changed pinned files", err)
 	}
 }

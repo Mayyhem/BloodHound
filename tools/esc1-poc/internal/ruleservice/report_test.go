@@ -49,7 +49,7 @@ func TestRecentReportsKeepConfirmedRevisionAcrossFailureAndRestart(t *testing.T)
 	if !store.LatestStatus().ResultsStale {
 		t.Fatal("unavailable attempt claims current results")
 	}
-	changed, err := store.Update(map[string]string{"account_users.cypher": initial.Files["account_users.cypher"] + "\n// changed\n"})
+	changed, err := store.Update(map[string]string{"PoC_Vault/account_users.cypher": initial.Files["PoC_Vault/account_users.cypher"] + "\n// changed\n"})
 	if err != nil {
 		t.Fatal(err)
 	}

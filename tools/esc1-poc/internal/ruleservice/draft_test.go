@@ -37,11 +37,11 @@ import (
 func mutualSchemaFiles(name, other string) map[string]string {
 	return map[string]string{
 		name + ".schema.json": fmt.Sprintf(`{
-            "schema":{"name":%q,"display_name":%q,"namespace":"PoC_%s","version":"v1"},
+            "schema":{"name":%q,"display_name":%q,"namespace":"PoC_%s","version":"v1.0.0"},
             "node_kinds":[{"name":"PoC_%s_Node"}],
             "relationship_kinds":[{"name":"PoC_%s_Link","compatible_kinds":[{"source_kind":"PoC_%s_Node","target_kind":"PoC_%s_Node"}]}]
         }`, name, name, name, name, name, name, other),
-		name + ".cypher": fmt.Sprintf("// depends-on: node:PoC_%s_Node, node:PoC_%s_Node\nRETURN 'source' AS source, 'target' AS target, 'PoC_%s_Link' AS kind", name, other, name),
+		"PoC_" + name + "/" + name + ".cypher": fmt.Sprintf("// namespace: PoC_%s\n// version: v1.0.0\n// depends-on: node:PoC_%s_Node, node:PoC_%s_Node\nRETURN 'source' AS source, 'target' AS target, 'PoC_%s_Link' AS kind", name, name, other, name),
 	}
 }
 
@@ -63,7 +63,7 @@ func TestDraftMissingSchemaPersistsAndActivatesInEitherUploadOrder(t *testing.T)
 			if err != nil {
 				t.Fatal(err)
 			}
-			draft, err := store.SaveDraft(ruleservice.Change{BaseRevision: active.Revision, Files: mutualSchemaFiles(first, other)})
+			draft, err := store.SaveDraft(ruleservice.Change{BaseRevision: active.Revision, Files: installSchemas(t, store, mutualSchemaFiles(first, other))})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -77,6 +77,7 @@ func TestDraftMissingSchemaPersistsAndActivatesInEitherUploadOrder(t *testing.T)
 			if err != nil {
 				t.Fatal(err)
 			}
+			installSchemas(t, store, mutualSchemaFiles(first, other))
 			restored := store.Draft()
 			if !reflect.DeepEqual(restored, draft) {
 				t.Fatal("draft did not survive restart")
@@ -85,7 +86,7 @@ func TestDraftMissingSchemaPersistsAndActivatesInEitherUploadOrder(t *testing.T)
 			if err != nil || !reflect.DeepEqual(unchanged, active) {
 				t.Fatal("draft changed active rules", err)
 			}
-			draft, err = store.SaveDraft(ruleservice.Change{BaseRevision: active.Revision, DraftRevision: draft.Revision, Files: mutualSchemaFiles(other, first)})
+			draft, err = store.SaveDraft(ruleservice.Change{BaseRevision: active.Revision, DraftRevision: draft.Revision, Files: installSchemas(t, store, joinedFiles(mutualSchemaFiles(first, other), mutualSchemaFiles(other, first)))})
 			if err != nil || !draft.Ready {
 				t.Fatal("complete draft not ready", err, draft.ValidationError)
 			}
@@ -105,7 +106,7 @@ func TestDraftMissingSchemaPersistsAndActivatesInEitherUploadOrder(t *testing.T)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if applied.Revision != review.Revision || len(applied.Files) != len(active.Files)+4 {
+			if applied.Revision != review.Revision || len(applied.Files) != len(active.Files)+2 {
 				t.Fatal("activated a different set of files")
 			}
 			if err := store.DiscardDraft(draft.Revision); err != nil {
@@ -128,11 +129,11 @@ func TestDraftRequiresFreshRevisionsAndOverwriteChoices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	change := ruleservice.Change{BaseRevision: active.Revision, Files: map[string]string{"account_users.cypher": active.Files["account_users.cypher"] + "\n// draft"}}
+	change := ruleservice.Change{BaseRevision: active.Revision, Files: map[string]string{"PoC_Vault/account_users.cypher": active.Files["PoC_Vault/account_users.cypher"] + "\n// draft"}}
 	if _, err := store.SaveDraft(change); !errors.Is(err, ruleservice.ErrConflict) {
 		t.Fatal("replacement did not require an overwrite choice", err)
 	}
-	change.Overwrite = []string{"account_users.cypher"}
+	change.Overwrite = []string{"PoC_Vault/account_users.cypher"}
 	draft, err := store.SaveDraft(change)
 	if err != nil || !draft.Ready {
 		t.Fatal(err, draft.ValidationError)
@@ -144,12 +145,12 @@ func TestDraftRequiresFreshRevisionsAndOverwriteChoices(t *testing.T) {
 		t.Fatal("stale discard accepted", err)
 	}
 	copy := store.Draft()
-	copy.Files["account_users.cypher"] = "changed"
+	copy.Files["PoC_Vault/account_users.cypher"] = "changed"
 	copy.Overwrite[0] = "changed"
 	if !reflect.DeepEqual(store.Draft(), draft) {
 		t.Fatal("caller changed stored draft")
 	}
-	if _, err := store.Update(map[string]string{"account_users.cypher": active.Files["account_users.cypher"] + "\n// independent active edit"}); err != nil {
+	if _, err := store.Update(map[string]string{"PoC_Vault/account_users.cypher": active.Files["PoC_Vault/account_users.cypher"] + "\n// independent active edit"}); err != nil {
 		t.Fatal(err)
 	}
 	if store.Draft().Ready || !strings.Contains(store.Draft().ValidationError, "Active rules changed") {
@@ -162,7 +163,7 @@ func TestDraftRequiresFreshRevisionsAndOverwriteChoices(t *testing.T) {
 
 func TestDraftAcceptsQueryBeforeSchemaAndRejectsUnsafeFiles(t *testing.T) {
 	var store = open(t)
-	draft, err := store.SaveDraft(ruleservice.Change{Files: map[string]string{"future.cypher": "// depends-on: none\nRETURN 1"}})
+	draft, err := store.SaveDraft(ruleservice.Change{Files: map[string]string{"PoC_Vault/future.cypher": "// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: none\nRETURN 1"}})
 	if err != nil || draft.Ready || !strings.Contains(draft.ValidationError, "schema") {
 		t.Fatal(err, draft.ValidationError)
 	}
@@ -171,7 +172,7 @@ func TestDraftAcceptsQueryBeforeSchemaAndRejectsUnsafeFiles(t *testing.T) {
 	}
 	for _, files := range []map[string]string{
 		{"../outside.cypher": "RETURN 1"},
-		{"large.cypher": strings.Repeat("x", ruleservice.MaxFileBytes+1)},
+		{"PoC_Vault/large.cypher": strings.Repeat("x", ruleservice.MaxFileBytes+1)},
 		{"broken.schema.json": `{"schema":{},"schema":{}}`},
 	} {
 		if _, err := store.SaveDraft(ruleservice.Change{DraftRevision: draft.Revision, Files: files}); err == nil {
@@ -197,7 +198,7 @@ func TestDraftHTTPAndAuthentication(t *testing.T) {
 			t.Fatal("draft access bypassed authentication", response.Code)
 		}
 	}
-	contents, err := json.Marshal(ruleservice.Change{Files: mutualSchemaFiles("first", "second")})
+	contents, err := json.Marshal(ruleservice.Change{Files: installSchemas(t, store, mutualSchemaFiles("first", "second"))})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +241,7 @@ func TestDraftStorageFailurePreservesActiveAndPreviousDraft(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	draft, err := store.SaveDraft(ruleservice.Change{BaseRevision: active.Revision, Files: mutualSchemaFiles("first", "second")})
+	draft, err := store.SaveDraft(ruleservice.Change{BaseRevision: active.Revision, Files: installSchemas(t, store, mutualSchemaFiles("first", "second"))})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +251,7 @@ func TestDraftStorageFailurePreservesActiveAndPreviousDraft(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(directory, "draft.json"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.SaveDraft(ruleservice.Change{BaseRevision: active.Revision, DraftRevision: draft.Revision, Files: mutualSchemaFiles("second", "first")}); err == nil {
+	if _, err := store.SaveDraft(ruleservice.Change{BaseRevision: active.Revision, DraftRevision: draft.Revision, Files: installSchemas(t, store, mutualSchemaFiles("second", "first"))}); err == nil {
 		t.Fatal("failed persistence reported success")
 	}
 	if store.Draft().Revision != draft.Revision {
@@ -269,9 +270,9 @@ func TestCompleteDraftWithCircularCalculationsCannotActivate(t *testing.T) {
 	for name, contents := range mutualSchemaFiles("second", "first") {
 		files[name] = contents
 	}
-	files["first.cypher"] = strings.Replace(files["first.cypher"], "// depends-on:", "// depends-on: relationship:PoC_second_Link,", 1)
-	files["second.cypher"] = strings.Replace(files["second.cypher"], "// depends-on:", "// depends-on: relationship:PoC_first_Link,", 1)
-	draft, err := store.SaveDraft(ruleservice.Change{Files: files})
+	files["PoC_first/first.cypher"] = strings.Replace(files["PoC_first/first.cypher"], "// depends-on:", "// depends-on: relationship:PoC_second_Link,", 1)
+	files["PoC_second/second.cypher"] = strings.Replace(files["PoC_second/second.cypher"], "// depends-on:", "// depends-on: relationship:PoC_first_Link,", 1)
+	draft, err := store.SaveDraft(ruleservice.Change{Files: installSchemas(t, store, files)})
 	if err != nil || draft.Ready || !strings.Contains(draft.ValidationError, "cycle") {
 		t.Fatal("circular calculations were not kept inactive", err, draft.ValidationError)
 	}
@@ -311,14 +312,14 @@ func TestDraftWaitsForSchemaOfDeclaredGraphInput(t *testing.T) {
 				if inputType == "relationship" {
 					inputKind = "PoC_" + other + "_Collected"
 				}
-				declared[name+".cypher"] = "// depends-on: " + inputType + ":" + inputKind + "\nRETURN 'user' AS source, 'domain' AS target, 'PoC_" + name + "_Link' AS kind"
+				declared["PoC_"+name+"/"+name+".cypher"] = "// namespace: PoC_" + name + "\n// version: v1.0.0\n// depends-on: " + inputType + ":" + inputKind + "\nRETURN 'user' AS source, 'domain' AS target, 'PoC_" + name + "_Link' AS kind"
 				uploads[name] = declared
 			}
-			draft, err := store.SaveDraft(ruleservice.Change{Files: uploads["first"]})
+			draft, err := store.SaveDraft(ruleservice.Change{Files: installSchemas(t, store, uploads["first"])})
 			if err != nil || draft.Ready || !strings.Contains(draft.ValidationError, "depends-on references unknown "+inputType+" kind") {
 				t.Fatal(err, draft.ValidationError)
 			}
-			draft, err = store.SaveDraft(ruleservice.Change{DraftRevision: draft.Revision, Files: uploads["second"]})
+			draft, err = store.SaveDraft(ruleservice.Change{DraftRevision: draft.Revision, Files: installSchemas(t, store, joinedFiles(uploads["first"], uploads["second"]))})
 			if err != nil || !draft.Ready {
 				t.Fatal("mutual references to collected kinds failed", err, draft.ValidationError)
 			}
@@ -330,8 +331,8 @@ func TestDraftWaitsForSchemaOfDeclaredGraphInput(t *testing.T) {
 // draft too, including after a restart. Activation checks the same files again.
 func TestInvalidQueryDraftCannotActivate(t *testing.T) {
 	for _, source := range []string{
-		"// depends-on: none\nMACH (person) RETURN person.objectid AS source, 'target' AS target, 'PoC_Vault_HasAccountFor' AS kind",
-		"// depends-on: node:User, node:Group\nMATCH (person:User)-[:MemberOf]->(group:Group) RETURN person.objectid AS source, group.objectid AS target, 'PoC_Vault_HasAccountFor' AS kind",
+		"// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: none\nMACH (person) RETURN person.objectid AS source, 'target' AS target, 'PoC_Vault_HasAccountFor' AS kind",
+		"// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: node:User, node:Group\nMATCH (person:User)-[:MemberOf]->(group:Group) RETURN person.objectid AS source, group.objectid AS target, 'PoC_Vault_HasAccountFor' AS kind",
 	} {
 		directory := t.TempDir()
 		store, err := ruleservice.Open(directory)
@@ -342,8 +343,8 @@ func TestInvalidQueryDraftCannotActivate(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		draft, err := store.SaveDraft(ruleservice.Change{BaseRevision: active.Revision, Files: map[string]string{"account_users.cypher": source}, Overwrite: []string{"account_users.cypher"}})
-		if err != nil || draft.Ready || !strings.Contains(draft.ValidationError, "account_users.cypher: line 2") && !strings.Contains(draft.ValidationError, "account_users.cypher: file syntax: line 2") {
+		draft, err := store.SaveDraft(ruleservice.Change{BaseRevision: active.Revision, Files: map[string]string{"PoC_Vault/account_users.cypher": source}, Overwrite: []string{"PoC_Vault/account_users.cypher"}})
+		if err != nil || draft.Ready || !strings.Contains(draft.ValidationError, "account_users.cypher: line 4") && !strings.Contains(draft.ValidationError, "account_users.cypher: file syntax: line 4") {
 			t.Fatalf("draft: %+v %v", draft, err)
 		}
 		store, err = ruleservice.Open(directory)
@@ -361,4 +362,14 @@ func TestInvalidQueryDraftCannotActivate(t *testing.T) {
 			t.Fatal("bad query changed active rules")
 		}
 	}
+}
+
+func joinedFiles(groups ...map[string]string) map[string]string {
+	var result = map[string]string{}
+	for _, group := range groups {
+		for name, contents := range group {
+			result[name] = contents
+		}
+	}
+	return result
 }

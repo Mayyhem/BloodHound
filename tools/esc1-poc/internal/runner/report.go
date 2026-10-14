@@ -28,14 +28,16 @@ import (
 // Execution contains only rule names, counts, timings, and fixed explanations.
 // It can be stored in the rule service without copying any graph answers.
 type Execution struct {
-	Calculation string        `json:"calculation"`
-	Save        string        `json:"save"`
-	Phase       string        `json:"phase"`
-	Failure     *Failure      `json:"failure,omitempty"`
-	Queries     []QueryReport `json:"queries"`
-	Proposed    ChangesCount  `json:"proposed"`
-	Saved       *ChangesCount `json:"saved,omitempty"`
-	Elapsed     time.Duration `json:"elapsed_nanoseconds"`
+	CleanupPending bool          `json:"cleanup_pending,omitempty"`
+	SchemaRevision string        `json:"schema_revision,omitempty"`
+	Calculation    string        `json:"calculation"`
+	Save           string        `json:"save"`
+	Phase          string        `json:"phase"`
+	Failure        *Failure      `json:"failure,omitempty"`
+	Queries        []QueryReport `json:"queries"`
+	Proposed       ChangesCount  `json:"proposed"`
+	Saved          *ChangesCount `json:"saved,omitempty"`
+	Elapsed        time.Duration `json:"elapsed_nanoseconds"`
 }
 
 type ChangesCount struct {
@@ -50,14 +52,17 @@ type ChangesCount struct {
 // empty answer. Saved outputs describe this query's contribution, including
 // connections that already existed, rather than the number of new writes.
 type QueryReport struct {
-	Name     string        `json:"name"`
-	Stage    int           `json:"stage"`
-	State    string        `json:"state"`
-	Reason   string        `json:"reason"`
-	Rows     *int64        `json:"rows,omitempty"`
-	Elapsed  time.Duration `json:"elapsed_nanoseconds"`
-	Proposed *int64        `json:"proposed_outputs,omitempty"`
-	Saved    *int64        `json:"saved_outputs,omitempty"`
+	SchemaPaused  bool          `json:"schema_paused,omitempty"`
+	Version       string        `json:"version,omitempty"`
+	SchemaVersion string        `json:"schema_version,omitempty"`
+	Name          string        `json:"name"`
+	Stage         int           `json:"stage"`
+	State         string        `json:"state"`
+	Reason        string        `json:"reason"`
+	Rows          *int64        `json:"rows,omitempty"`
+	Elapsed       time.Duration `json:"elapsed_nanoseconds"`
+	Proposed      *int64        `json:"proposed_outputs,omitempty"`
+	Saved         *int64        `json:"saved_outputs,omitempty"`
 }
 
 type Failure struct {
@@ -113,7 +118,7 @@ func FailureMessage(err error) string {
 }
 
 func newExecution(plan extension.Plan) *Execution {
-	var result = &Execution{Calculation: "not-started", Save: "not-started", Phase: "preparation", Queries: []QueryReport{}}
+	var result = &Execution{CleanupPending: plan.CleanupPending, SchemaRevision: plan.SchemaRevision, Calculation: "not-started", Save: "not-started", Phase: "preparation", Queries: []QueryReport{}}
 	var stages = map[string]int{}
 	for _, query := range plan.Queries {
 		stage := 1
@@ -121,7 +126,7 @@ func newExecution(plan extension.Plan) *Execution {
 			stage = max(stage, stages[name]+1)
 		}
 		stages[query.Name] = stage
-		detail := QueryReport{Name: query.Name, Stage: stage, State: "waiting", Reason: "Waiting for this run to reach the query."}
+		detail := QueryReport{SchemaPaused: query.SchemaPaused, Version: query.Version, SchemaVersion: query.SchemaVersion, Name: query.Name, Stage: stage, State: "waiting", Reason: "Waiting for this run to reach the query."}
 		if query.DisabledReason != "" {
 			detail.State = "disabled"
 			detail.Reason = query.DisabledReason

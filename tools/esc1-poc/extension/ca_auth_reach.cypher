@@ -1,3 +1,5 @@
+// namespace: PoC
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,8 +16,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: query:usable_cas.cypher, relationship:TrustedForNTAuth,
-// relationship:NTAuthStoreFor
+// depends-on: query:usable_cas
+// depends-on: relationship:TrustedForNTAuth
+// depends-on: relationship:NTAuthStoreFor
 // reachability: {"direction":"outgoing","relationships":["TrustedForNTAuth","NTAuthStoreFor"],"include_start":true,"expand_results":false,"reject_cycles":true}
 
 // The final trust edges are checked separately in trusted_cas. Identity reach

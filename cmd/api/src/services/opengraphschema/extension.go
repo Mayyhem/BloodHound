@@ -30,6 +30,19 @@ import (
 // UpsertOpenGraphExtension - validates the incoming graph schema, passes it to the DB layer for upserting and if successful
 // updates the in memory kinds map.
 func (s *OpenGraphSchemaService) UpsertOpenGraphExtension(ctx context.Context, openGraphExtension model.GraphExtensionInput) (bool, error) {
+	if s.coordinateChange == nil {
+		return s.upsertOpenGraphExtension(ctx, openGraphExtension)
+	}
+	var updated bool
+	err := s.coordinateChange(ctx, func(changeContext context.Context) error {
+		var changeError error
+		updated, changeError = s.upsertOpenGraphExtension(changeContext, openGraphExtension)
+		return changeError
+	})
+	return updated, err
+}
+
+func (s *OpenGraphSchemaService) upsertOpenGraphExtension(ctx context.Context, openGraphExtension model.GraphExtensionInput) (bool, error) {
 	var (
 		err    error
 		result model.GraphExtensionUpsertResult
@@ -188,6 +201,15 @@ func (s *OpenGraphSchemaService) ListExtensions(ctx context.Context) (model.Grap
 }
 
 func (s *OpenGraphSchemaService) DeleteExtension(ctx context.Context, extensionID int32) error {
+	if s.coordinateChange != nil {
+		return s.coordinateChange(ctx, func(changeContext context.Context) error {
+			return s.deleteExtension(changeContext, extensionID)
+		})
+	}
+	return s.deleteExtension(ctx, extensionID)
+}
+
+func (s *OpenGraphSchemaService) deleteExtension(ctx context.Context, extensionID int32) error {
 	if err := s.openGraphSchemaRepository.DeleteGraphSchemaExtension(ctx, extensionID); err != nil {
 		return fmt.Errorf("error deleting graph extension: %w", err)
 	} else if err := s.graphDBKindRepository.RefreshKinds(ctx); err != nil {

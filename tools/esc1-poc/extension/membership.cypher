@@ -1,3 +1,5 @@
+// namespace: PoC
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,7 +16,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: query:membership_reach.cypher, query:special_groups.cypher
+// depends-on: query:membership_reach
+// depends-on: query:special_groups
 
 // Graph reach is generic and reused. These label and SID decisions remain
 // extension rules, including native's Group-only special-principal rule.

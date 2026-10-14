@@ -1,3 +1,5 @@
+// namespace: PoC_Vault
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -16,9 +18,9 @@
 
 // existing-edge-policy: keep-existing
 
-// depends-on: query:vault_helpers.cypher,
-// node:PoC_Vault_Container, node:PoC_Vault_Account, node:User,
-// relationship:PoC_Vault_ContainsAccount
+// depends-on: query:vault_helpers
+// depends-on: node:PoC_Vault_Container, node:PoC_Vault_Account, node:User
+// depends-on: relationship:PoC_Vault_ContainsAccount
 
 // Use this run's helper rows to choose vaults, then read the collected evidence.
 // The account and directory user stay separate; the SID is the joining value.

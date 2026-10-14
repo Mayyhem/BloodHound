@@ -1,3 +1,5 @@
+// namespace: PoC
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,9 +16,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: query:trusted_cas.cypher, query:eligible_templates.cypher,
-// node:Base, node:CertTemplate, node:EnterpriseCA, relationship:PublishedTo,
-// relationship:Enroll, relationship:GenericAll, relationship:AllExtendedRights
+// depends-on: query:trusted_cas
+// depends-on: query:eligible_templates
+// depends-on: node:Base, node:CertTemplate, node:EnterpriseCA, relationship:PublishedTo
+// depends-on: relationship:Enroll, relationship:GenericAll, relationship:AllExtendedRights
 
 // Only enrollment principals for eligible, published template/CA pairs seed
 // membership work. Nested members still retain every native node kind.

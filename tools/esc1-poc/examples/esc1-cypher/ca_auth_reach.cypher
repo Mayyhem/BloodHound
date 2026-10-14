@@ -1,3 +1,5 @@
+// namespace: PoC
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,7 +16,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: query:usable_cas.cypher, relationship:TrustedForNTAuth, relationship:NTAuthStoreFor
+// depends-on: query:usable_cas
+// depends-on: relationship:TrustedForNTAuth, relationship:NTAuthStoreFor
 
 // Follow the permitted certificate links. Keep a row even when no
 // object is reachable; later queries decide whether a domain qualifies.

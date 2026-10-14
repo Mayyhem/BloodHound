@@ -2,7 +2,7 @@
 
 This is a synthetic demonstration of two separate schemas. It is not an official CyberArk collector or schema. The account data and directory SIDs are artificial, and the rules make no changes to production collection queries or data.
 
-Upload the five files in [extension](extension) together, or add the CyberArk schema and its two queries after activating the Active Directory schema and its query. Filenames are unique across the bundle. The rule service keeps both schemas and builds one dependency order across them.
+Upload the two schemas in [extension](extension) through OpenGraph Management. Upload their `.cypher` files through the rules page, together or at different times. Each query’s namespace determines its extension; filenames need only be unique within that namespace. The rule service reads the installed definitions and builds one dependency order.
 
 | Schema file | Display name | Namespace | Rules |
 | --- | --- | --- | --- |
@@ -19,7 +19,7 @@ The schemas describe types and directed `compatible_kinds` pairs. Native kinds n
 
 Load all five files when checking the complete example. The link query cannot be tested by pasting it alone into the normal query interface without supplying its prerequisite rows. For a smaller introduction, start with [the single-extension walkthrough](../../DEVELOPERS.md#quick-start).
 
-The directory rule reads native `User` nodes and returns `PoC_AD_User_<sid>` helper nodes with `properties.user_sid`. It preserves the native user's identity. The CyberArk account rule independently summarizes collected `PoC_CyberArk_Account` nodes. The CyberArk link rule declares `query:ad_users.cypher` as a prerequisite and consumes those result rows through `$ad_users`. It joins each account's `user_sid` to the native user's `objectid`. The prerequisite supplies fresh rows directly; it does not rely on a graph read seeing new calculated relationships before publication.
+The directory rule reads native `User` nodes and returns `PoC_AD_User_<sid>` helper nodes with `properties.user_sid`. It preserves the native user's identity. The CyberArk account rule independently summarizes collected `PoC_CyberArk_Account` nodes. The CyberArk link rule declares `query:PoC_AD/ad_users` as a prerequisite and consumes those result rows through `$ad_users`. It joins each account's `user_sid` to the native user's `objectid`. The prerequisite supplies fresh rows directly; it does not rely on a graph read seeing new calculated relationships before publication.
 
 The final relationship, `PoC_CyberArk_AccountFor`, goes from the collected account to the native `User`. It records a factual account identity association. It is not traversable and makes no claim about credential access, risk, or an attack path. The helper nodes remain separate identities and use distinct kinds and ID prefixes.
 

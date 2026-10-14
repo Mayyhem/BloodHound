@@ -353,6 +353,18 @@ func (s Resources) ListExtensions(response http.ResponseWriter, request *http.Re
 	}
 }
 
+// Analysis readers use the accepted declarations; ordinary extension listing
+// remains small and keeps its existing response shape and display names.
+func (s Resources) ListExtensionDefinitions(response http.ResponseWriter, request *http.Request) {
+	var ctx = request.Context()
+	extensions, err := s.OpenGraphSchemaService.ListExtensions(ctx)
+	if err != nil {
+		api.WriteErrorResponse(ctx, api.BuildErrorResponse(http.StatusInternalServerError, api.ErrorResponseDetailsInternalServerError, request), response)
+		return
+	}
+	api.WriteBasicResponse(ctx, extensions.DefinitionsResponse(), http.StatusOK, response)
+}
+
 func (s Resources) DeleteExtension(response http.ResponseWriter, request *http.Request) {
 	var (
 		ctx         = request.Context()

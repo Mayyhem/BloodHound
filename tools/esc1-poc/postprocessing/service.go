@@ -17,9 +17,7 @@
 package postprocessing
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -41,9 +39,9 @@ import (
 // never constructs this service and never installs its write gate.
 type Configuration struct {
 	URL, Token, Directory, Backend string
-	// Reuse BloodHound's normal schema registration, without teaching its API
-	// about the proposed fields in our local definition.
-	RegisterSchema func(context.Context, []byte) error
+	// Read installed definitions while holding the same turn as graph writes.
+	// Stored analysis files never install or recreate an extension schema.
+	ReadSchemas func(context.Context) ([]byte, error)
 }
 
 type ruleClient interface {
@@ -62,16 +60,15 @@ type pendingRun struct {
 // Service is called by the single native import loop, never by an HTTP request
 // from the rule container. Its mutex also prevents accidental overlapping calls.
 type Service struct {
-	mutex            sync.Mutex
-	gate             *Gate
-	client           ruleClient
-	configuration    Configuration
-	pending          *pendingRun
-	reports          []ruleservice.Status
-	clock            func() time.Time
-	registeredSchema []byte
-	changes          changeTracker
-	execute          func(context.Context, extension.Plan, runner.Options) (runner.Report, error)
+	mutex         sync.Mutex
+	gate          *Gate
+	client        ruleClient
+	configuration Configuration
+	pending       *pendingRun
+	reports       []ruleservice.Status
+	clock         func() time.Time
+	changes       changeTracker
+	execute       func(context.Context, extension.Plan, runner.Options) (runner.Report, error)
 }
 
 func New(configuration Configuration, database *graph.DatabaseSwitch) (*Service, error) {
@@ -121,6 +118,15 @@ func (s *Service) WithAnalysis(ctx context.Context, action func(context.Context)
 	})
 }
 
+// WithSchemaChange uses the same turn as analysis, so a completed deletion
+// cannot be followed by publication from a run that used the deleted schema.
+func (s *Service) WithSchemaChange(ctx context.Context, action func(context.Context) error) error {
+	return s.WithAnalysis(ctx, func(changeContext context.Context) error {
+		s.changes.Unknown(changeContext)
+		return action(changeContext)
+	})
+}
+
 // AfterAnalysis records one successful native analysis, which may cover several
 // uploads. A newer success replaces pending older work: only the newest complete
 // graph matters. Uploading rules alone does not start a graph calculation.
@@ -157,7 +163,7 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 	if pending.bundle.Revision == "" {
 		bundle, err := s.client.Fetch(ctx)
 		if errors.Is(err, ruleservice.ErrNoActive) {
-			s.report(ctx, "no-rules", "No rules are active. Upload a schema and its queries before the next ingest.")
+			s.report(ctx, "no-rules", "No analyses are active. Upload schemas in OpenGraph Management and analysis files on the rules page.")
 			s.pending = nil
 			return false, nil
 		}
@@ -183,35 +189,20 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 		// Our own output writes must not become next time's input changes.
 		changes := s.changes.Snapshot()
 		turnContext = withoutChangeObservation(turnContext)
-		if s.configuration.RegisterSchema != nil {
-			var (
-				definitions = plan.Definitions
-				payloads    [][]byte
-			)
-			if len(definitions) == 0 {
-				definitions = []extension.Definition{plan.Definition}
-			}
-			for _, definition := range definitions {
-				payload, err := definition.BloodHoundJSON()
-				if err != nil {
-					return err
-				}
-				payloads = append(payloads, payload)
-			}
-			// Register each extension under its own name. Remember the complete
-			// list only after every registration succeeds, so retries are safe.
-			combined, err := json.Marshal(payloads)
-			if err != nil {
-				return err
-			}
-			if !bytes.Equal(s.registeredSchema, combined) {
-				for index, payload := range payloads {
-					if err := s.configuration.RegisterSchema(turnContext, payload); err != nil {
-						return fmt.Errorf("register extension %s: %w", definitions[index].Schema.Name, err)
-					}
-				}
-				s.registeredSchema = combined
-			}
+		if s.configuration.ReadSchemas == nil {
+			return fmt.Errorf("installed schema reader is not configured")
+		}
+		contents, err := s.configuration.ReadSchemas(turnContext)
+		if err != nil {
+			return fmt.Errorf("cannot read installed schemas; previous results were kept")
+		}
+		snapshot, err := ruleservice.ParseSchemas(contents)
+		if err != nil {
+			return err
+		}
+		plan, err = ruleservice.ValidateInstalledBundle(pending.bundle, snapshot)
+		if err != nil {
+			return err
 		}
 		var runError error
 		report, runError = s.execute(turnContext, plan, runner.Options{

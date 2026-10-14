@@ -117,7 +117,7 @@ func TestOpenGraphFailuresPreservePublishedGraph(t *testing.T) {
 				runOptions.IngestionComplete = false
 			}
 			for index := range plan.Queries {
-				if plan.Queries[index].Name != "account_users.cypher" {
+				if plan.Queries[index].Name != "PoC_Vault/account_users.cypher" {
 					continue
 				}
 				switch failure {

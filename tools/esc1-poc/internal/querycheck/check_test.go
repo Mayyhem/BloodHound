@@ -50,3 +50,26 @@ func TestLanguageErrorsPreserveOriginalLines(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedColumnsKeepDescriptiveNamesAndRespectScope(t *testing.T) {
+	for _, testCase := range []struct {
+		source  string
+		fields  []querycheck.SharedField
+		known   bool
+		columns []string
+	}{
+		{"UNWIND $directory_users AS person RETURN person.user_id AS identity, person.details AS display_name", []querycheck.SharedField{{Parameter: "directory_users", Column: "user_id", Line: 1}, {Parameter: "directory_users", Column: "details", Line: 1}}, true, []string{"identity", "display_name"}},
+		{"UNWIND $people AS person WITH {different: 1} AS person RETURN person.different AS value", nil, true, []string{"value"}},
+		{"UNWIND $people AS person UNWIND [{different: 1}] AS person RETURN person.different AS value", nil, true, []string{"value"}},
+		{"RETURN null AS optional_value, [] AS memberships, {label:'x'} AS details", nil, true, []string{"optional_value", "memberships", "details"}},
+		{"WITH 1 AS value RETURN *", nil, false, nil},
+	} {
+		result, err := querycheck.Check(testCase.source)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(result.SharedFields, testCase.fields) || result.ColumnsKnown != testCase.known || !reflect.DeepEqual(result.Columns, testCase.columns) {
+			t.Fatalf("unexpected columns: %+v", result)
+		}
+	}
+}

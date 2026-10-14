@@ -84,6 +84,23 @@ func NewHandlerWithAnalysis(store *Store, token string, analysis AnalysisControl
 			analysisRequests.ServeHTTP(writer, request)
 			return
 		}
+		// Read current definitions before reviewing or activating. Downloads
+		// and reports remain available during a BloodHound connection outage.
+		if request.URL.Path == "/v1/plan" || request.URL.Path == "/v1/preview" || request.URL.Path == "/v1/rules" && request.Method == http.MethodPut || request.URL.Path == "/v1/draft" {
+			if reader, available := analysis.(SchemaReader); available {
+				snapshot, err := reader.Schemas(request.Context())
+				if err == nil {
+					err = store.RefreshSchemas(snapshot)
+				}
+				if err != nil {
+					store.SchemasUnavailable()
+				}
+				if err != nil && request.URL.Path != "/v1/draft" {
+					fail(writer, http.StatusBadGateway, "Cannot read installed schemas. Check the BloodHound connection and OpenGraph read permission.")
+					return
+				}
+			}
+		}
 		if request.Method == http.MethodGet {
 			if request.URL.Path == "/v1/draft" {
 				respond(writer, http.StatusOK, store.Draft())

@@ -53,6 +53,13 @@ type OpenGraphSchemaService struct {
 	graphDBKindRepository     GraphDBKindRepository
 	featureFlag               featureFlagReader
 	markdownValidator         *markdownValidator
+	// When experimental analysis is enabled, schema changes wait for the
+	// current calculation to finish before changing definitions or graph kinds.
+	coordinateChange func(context.Context, func(context.Context) error) error
+}
+
+func (s *OpenGraphSchemaService) SetAnalysisCoordinator(coordinate func(context.Context, func(context.Context) error) error) {
+	s.coordinateChange = coordinate
 }
 
 func NewOpenGraphSchemaService(openGraphSchemaExtensionRepository OpenGraphSchemaRepository, graphDBKindRepository GraphDBKindRepository, featureFlag featureFlagReader) *OpenGraphSchemaService {

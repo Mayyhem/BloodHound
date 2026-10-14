@@ -156,11 +156,11 @@ func replaceESC1Query(plan *extension.Plan, text string) {
 		plan.Queries[index].Overlap = nil
 		plan.Queries[index].BatchDependency = ""
 		for _, dependency := range plan.Queries[index].Dependencies {
-			if dependency.Type == "query" && dependency.Name == "domain_helpers.cypher" {
+			if dependency.Type == "query" && dependency.Name == "PoC/domain_helpers.cypher" {
 				return
 			}
 		}
-		plan.Queries[index].Dependencies = append(plan.Queries[index].Dependencies, extension.Dependency{Type: "query", Name: "domain_helpers.cypher"})
+		plan.Queries[index].Dependencies = append(plan.Queries[index].Dependencies, extension.Dependency{Type: "query", Name: "PoC/domain_helpers.cypher"})
 		return
 	}
 }

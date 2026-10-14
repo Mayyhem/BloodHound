@@ -1,0 +1,22 @@
+{
+  "checks": [
+    {
+      "first_upload": "first",
+      "inactive_restart": true,
+      "mutual_references": true,
+      "explicit_activation": true,
+      "active_preserved": true,
+      "stale_draft_rejected": true
+    },
+    {
+      "first_upload": "second",
+      "inactive_restart": true,
+      "mutual_references": true,
+      "explicit_activation": true,
+      "active_preserved": true,
+      "stale_draft_rejected": true
+    }
+  ],
+  "browser_errors": [],
+  "passed": true
+}

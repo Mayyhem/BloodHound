@@ -61,6 +61,11 @@ func (s *Store) Draft() DraftView {
 // missing queries, and other rule validation errors. Review reports those errors
 // and activation always repeats the complete existing checks.
 func (s *Store) SaveDraft(change Change) (DraftView, error) {
+	var normalizeError error
+	change, normalizeError = normalizeChange(change)
+	if normalizeError != nil {
+		return DraftView{}, normalizeError
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	var (

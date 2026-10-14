@@ -79,10 +79,11 @@ def main():
                 return None
             raise
 
+    # Install the cross-platform schemas through OpenGraph Management before an isolated run.
     before = active()
     if arguments.isolated and before is not None:
         raise SystemExit('--isolated requires an empty service; refusing to modify existing rules.')
-    candidate = dict(before['files']) if before else {path.name: path.read_text() for path in (ROOT / 'examples' / 'cross-platform' / 'extension').iterdir() if path.name.endswith('.json') or path.suffix == '.cypher'}
+    candidate = dict(before['files']) if before else {next(line.split(':', 1)[1].strip() for line in path.read_text().splitlines() if line.startswith('// namespace:')) + '/' + path.name: path.read_text() for path in (ROOT / 'examples' / 'cross-platform' / 'extension').iterdir() if path.suffix == '.cypher'}
     filename = sorted(name for name in candidate if name.endswith('.cypher'))[0]
     results = {'checked_at_utc': datetime.now(timezone.utc).isoformat(), 'revision': before['revision'] if before else None, 'isolated': arguments.isolated, 'bearer_mode': arguments.bearer_mode, 'checks': [], 'browser_errors': []}
     environment = dict(os.environ)
@@ -90,7 +91,7 @@ def main():
         environment['LD_LIBRARY_PATH'] = arguments.library_path
 
     def payloads(files):
-        return [{'name': name, 'mimeType': 'text/plain', 'buffer': contents.encode()} for name, contents in files.items()]
+        return [{'name': name.split('/')[-1], 'mimeType': 'text/plain', 'buffer': contents.encode()} for name, contents in files.items()]
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path=arguments.browser, env=environment)
@@ -139,7 +140,7 @@ def main():
             assert active() is None, 'Saving a draft must not activate rules.'
             expect(page.locator('#rule-rows > tr')).to_have_count(3)
             expect(page.locator('#rule-rows')).to_contain_text('On activation')
-            results['checks'].append('Two schemas and three rules saved as a draft before activation')
+            results['checks'].append('Three rules for separately installed schemas saved as a draft before activation')
             activate()
         else:
             # Exercise the read-only preview API directly. The upload button now
@@ -159,7 +160,7 @@ def main():
             for key in ['name', 'stage', 'added_at', 'extension', 'order']:
                 page.locator('[data-sort="' + key + '"]').click()
                 expect(page.locator('[data-sort="' + key + '"]').locator('..')).to_have_attribute('aria-sort', 'ascending')
-            orders = row('ad_users.cypher').locator('td').nth(1).inner_text()
+            orders = row('PoC_AD/ad_users.cypher').locator('td').nth(1).inner_text()
             assert orders == '1'
             page.locator('#extension-filter').select_option('cyberark')
             expect(page.locator('#rule-rows > tr')).to_have_count(2)
@@ -172,7 +173,7 @@ def main():
                 expect(checkbox).not_to_be_checked()
             page.locator('#select-all').check()
             # Exercise each bulk button with two selected rules through the real service.
-            bulk_names = ['cyberark_accounts.cypher', 'cyberark_links.cypher']
+            bulk_names = ['PoC_CyberArk/cyberark_accounts.cypher', 'PoC_CyberArk/cyberark_links.cypher']
             page.locator('#disable-selected').click()
             for name in bulk_names:
                 expect(page.locator('#confirm-names')).to_contain_text(name)
@@ -213,27 +214,27 @@ def main():
                 expect(checkbox).not_to_be_checked()
             page.locator('#extension-filter').select_option('')
             results['checks'].append('Sortable execution order and extension-scoped selection work')
-            row('ad_users.cypher').get_by_role('button', name='Disable', exact=True).click()
-            expect(page.locator('#confirm-paused')).to_contain_text('cyberark_links.cypher')
+            row('PoC_AD/ad_users.cypher').get_by_role('button', name='Disable', exact=True).click()
+            expect(page.locator('#confirm-paused')).to_contain_text('PoC_CyberArk/cyberark_links.cypher')
             assert active() == initial
             page.locator('#confirm-change').click()
             expect(page.locator('#message')).to_contain_text('activated')
             disabled = active()
-            assert disabled['disabled'] == ['ad_users.cypher']
+            assert disabled['disabled'] == ['PoC_AD/ad_users.cypher']
             assert disabled['files'] == initial['files'] and disabled.get('retired_relationships', []) == initial.get('retired_relationships', [])
             refreshed()
-            expect(row('ad_users.cypher')).to_contain_text('Disabled')
-            expect(row('cyberark_links.cypher')).to_contain_text('ad_users.cypher')
-            row('ad_users.cypher').get_by_role('button', name='Enable', exact=True).click()
+            expect(row('PoC_AD/ad_users.cypher')).to_contain_text('Disabled')
+            expect(row('PoC_CyberArk/cyberark_links.cypher')).to_contain_text('PoC_AD/ad_users.cypher')
+            row('PoC_AD/ad_users.cypher').get_by_role('button', name='Enable', exact=True).click()
             page.locator('#confirm-change').click()
             expect(page.locator('#message')).to_contain_text('activated')
             assert not active().get('disabled')
             connect()
             assert active()['added_at'] == initial['added_at']
-            expect(row('cyberark_links.cypher')).to_contain_text('Enabled')
+            expect(row('PoC_CyberArk/cyberark_links.cypher')).to_contain_text('Enabled')
             results['checks'].append('Disable pauses cross-schema consumers, preserves files/history, and enable persists after page reload')
             # Every changed existing file requires its own explicit overwrite choice.
-            replacement = {name: candidate[name] + '\n// overwrite browser check\n' for name in ['ad_users.cypher', 'cyberark_accounts.cypher']}
+            replacement = {name: candidate[name] + '\n// overwrite browser check\n' for name in ['PoC_AD/ad_users.cypher', 'PoC_CyberArk/cyberark_accounts.cypher']}
             upload(replacement, list(replacement))
             assert active()['files'] == initial['files']
             activate()
@@ -242,8 +243,8 @@ def main():
             for name, contents in replacement.items():
                 assert updated['files'][name] == contents
             results['checks'].append('Each overwrite is reviewed and original dates survive activation')
-            upload({'ad_users.cypher': replacement['ad_users.cypher'] + '// stale candidate\n'}, ['ad_users.cypher'])
-            other_change = {'base_revision': updated['revision'], 'files': {'ad_users.cypher': replacement['ad_users.cypher'] + '// newer revision\n'}, 'overwrite': ['ad_users.cypher']}
+            upload({'PoC_AD/ad_users.cypher': replacement['PoC_AD/ad_users.cypher'] + '// stale candidate\n'}, ['PoC_AD/ad_users.cypher'])
+            other_change = {'base_revision': updated['revision'], 'files': {'PoC_AD/ad_users.cypher': replacement['PoC_AD/ad_users.cypher'] + '// newer revision\n'}, 'overwrite': ['PoC_AD/ad_users.cypher']}
             other_review = api('preview', 'POST', other_change)
             newer = api('rules', 'PUT', {**other_change, 'confirm_revision': other_review['revision']})
             page.locator('#activate').click()
@@ -251,18 +252,18 @@ def main():
             assert active() == newer
             refreshed()
             results['checks'].append('A stale browser revision cannot overwrite a newer saved revision')
-            row('ad_users.cypher').get_by_role('button', name='Delete ad_users.cypher', exact=True).click()
-            expect(page.locator('#confirm-names')).to_contain_text('ad_users.cypher')
-            expect(page.locator('#confirm-names')).to_contain_text('cyberark_links.cypher')
+            row('PoC_AD/ad_users.cypher').get_by_role('button', name='Delete PoC_AD/ad_users.cypher', exact=True).click()
+            expect(page.locator('#confirm-names')).to_contain_text('PoC_AD/ad_users.cypher')
+            expect(page.locator('#confirm-names')).to_contain_text('PoC_CyberArk/cyberark_links.cypher')
             expect(page.locator('#confirm-description')).to_contain_text('next successful analysis')
             page.locator('#cancel-change').click()
             assert active() == newer
-            row('ad_users.cypher').get_by_role('button', name='Delete ad_users.cypher', exact=True).click()
+            row('PoC_AD/ad_users.cypher').get_by_role('button', name='Delete PoC_AD/ad_users.cypher', exact=True).click()
             page.locator('#confirm-change').click()
             expect(page.locator('#message')).to_contain_text('activated')
             remaining = active()
-            assert 'ad_users.cypher' not in remaining['files'] and 'cyberark_links.cypher' not in remaining['files']
-            assert 'cyberark_accounts.cypher' in remaining['files']
+            assert 'PoC_AD/ad_users.cypher' not in remaining['files'] and 'PoC_CyberArk/cyberark_links.cypher' not in remaining['files']
+            assert 'PoC_CyberArk/cyberark_accounts.cypher' in remaining['files']
             assert 'PoC_CyberArk_AccountFor' in remaining['retired_relationships']
             refreshed()
             expect(page.locator('#rule-rows > tr')).to_have_count(1)

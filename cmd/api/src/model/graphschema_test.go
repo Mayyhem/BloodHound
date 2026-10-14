@@ -1492,6 +1492,10 @@ func Test_GraphExtensionPayload_ToGraphExtensionInput(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				preserved, marshalError := json.Marshal(tt.args.payload)
+				assert.NoError(t, marshalError)
+				assert.JSONEq(t, string(preserved), string(got.Definition))
+				tt.want.Definition = got.Definition
 				assert.Equalf(t, tt.want, got, "ToGraphExtensionInput(%v)", tt.args.payload)
 			}
 		})

@@ -19,7 +19,6 @@ SPDX-License-Identifier: Apache-2.0
 package ruleservice
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -90,6 +89,10 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 		preview   = Preview{BaseRevision: s.active.Revision, Removed: []string{}, Overwritten: []string{}}
 		allowed   = map[string]bool{}
 	)
+	change, normalizeError := normalizeChange(change)
+	if normalizeError != nil {
+		return Bundle{}, extension.Plan{}, preview, normalizeError
+	}
 	if change.DraftRevision != "" {
 		if s.draft.Revision != change.DraftRevision || s.draft.BaseRevision != s.active.Revision {
 			return Bundle{}, extension.Plan{}, preview, ErrConflict
@@ -103,6 +106,14 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 	if change.BaseRevision != s.active.Revision {
 		return Bundle{}, extension.Plan{}, preview, ErrConflict
 	}
+	if err := s.checkUploadedAssociations(change.Files, candidate.Schemas); err != nil {
+		return Bundle{}, extension.Plan{}, preview, err
+	}
+	schemas, err := s.reviewedSchemas(candidate.Schemas, change)
+	if err != nil {
+		return Bundle{}, extension.Plan{}, preview, err
+	}
+	candidate.Schemas, candidate.SchemaRevision = schemas, s.schemas.revision()
 	if len(change.Files)+len(change.Remove)+len(change.Disable)+len(change.Enable) == 0 || len(change.Files) > MaxFiles || len(change.Remove) > MaxFiles || len(change.Overwrite) > MaxFiles || len(change.Disable) > MaxFiles || len(change.Enable) > MaxFiles {
 		return Bundle{}, extension.Plan{}, preview, fmt.Errorf("choose files to upload or rules to remove, disable, or enable; at most %d of each", MaxFiles)
 	}
@@ -122,7 +133,7 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 	if err := checkFiles(candidate.Files); err != nil {
 		return Bundle{}, extension.Plan{}, preview, err
 	}
-	removed, err := removeUnusedRules(candidate.Files, change.Remove)
+	removed, err := removeUnusedRules(candidate.Files, change.Remove, candidate.Schemas)
 	if err != nil {
 		return Bundle{}, extension.Plan{}, preview, err
 	}
@@ -130,14 +141,19 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 	if err := checkFiles(candidate.Files); err != nil {
 		return Bundle{}, extension.Plan{}, preview, err
 	}
-	plan, err := loadFiles(s.directory, candidate.Files)
+	if err := changeEnabledRules(&candidate, change); err != nil {
+		return Bundle{}, extension.Plan{}, preview, err
+	}
+	for name := range candidate.Suspended {
+		if _, exists := candidate.Files[name]; !exists {
+			delete(candidate.Suspended, name)
+		}
+	}
+	plan, err := loadBundle(candidate)
 	if err != nil {
 		return Bundle{}, extension.Plan{}, preview, err
 	}
-	if err := retainRetirements(s.plan, plan, &candidate); err != nil {
-		return Bundle{}, extension.Plan{}, preview, err
-	}
-	if err := changeEnabledRules(&candidate, change); err != nil {
+	if err := retainRetirements(s.plan, plan, s.active.Schemas, &candidate); err != nil {
 		return Bundle{}, extension.Plan{}, preview, err
 	}
 	for name := range candidate.AddedAt {
@@ -152,7 +168,15 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 	if err := applyRuleSettings(candidate, &plan); err != nil {
 		return Bundle{}, extension.Plan{}, preview, err
 	}
-	plan.RetiredRelationships = append([]string(nil), candidate.RetiredRelationships...)
+	plan, err = checkInstalledPlan(candidate, plan, s.schemas)
+	if err != nil {
+		return Bundle{}, extension.Plan{}, preview, err
+	}
+	for _, query := range plan.Queries {
+		if containsName(change.Enable, query.Name) && query.SchemaPaused {
+			return Bundle{}, extension.Plan{}, preview, fmt.Errorf("cannot enable %s: %s", query.Name, query.DisabledReason)
+		}
+	}
 	plan.RetiredEndpoints = copyEndpoints(candidate.RetiredEndpoints)
 	preview.Disabled = append([]string{}, change.Disable...)
 	preview.Enabled = append([]string{}, change.Enable...)
@@ -176,32 +200,30 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 // display information in the schema, but detach its calculation. Finally walk
 // backwards from the remaining outputs and discard unneeded scratch queries.
 // The preview lists every removed file before the user activates this change.
-func removeUnusedRules(files map[string]string, requested []string) ([]string, error) {
+func removeUnusedRules(files map[string]string, requested []string, schemas []InstalledSchema) ([]string, error) {
 	var (
-		definitions  = map[string]extension.Definition{}
 		dependencies = map[string][]extension.Dependency{}
 		outputs      = map[string]bool{}
 		removed      = map[string]bool{}
 		needed       = map[string]bool{}
 		names        = []string{}
 	)
-	for name, contents := range files {
-		if !extension.IsSchemaFile(name) {
+	for _, schema := range schemas {
+		if len(schema.Definition) == 0 || string(schema.Definition) == "null" {
 			continue
 		}
-		current, err := extension.ParseDefinition([]byte(contents))
+		current, err := extension.ParseDefinition(schema.Definition)
 		if err != nil {
 			return nil, err
 		}
-		definitions[name] = current
 		for _, kind := range current.NodeKinds {
 			if kind.PostProcessing != nil {
-				outputs[kind.PostProcessing.Query] = true
+				outputs[savedQueryKey(schema.Namespace, kind.PostProcessing.Query)] = true
 			}
 		}
 		for _, kind := range current.RelationshipKinds {
 			if kind.PostProcessing != nil {
-				outputs[kind.PostProcessing.Query] = true
+				outputs[savedQueryKey(schema.Namespace, kind.PostProcessing.Query)] = true
 			}
 		}
 	}
@@ -265,36 +287,6 @@ func removeUnusedRules(files map[string]string, requested []string) ([]string, e
 		if !needed[name] {
 			delete(files, name)
 			names = append(names, name)
-		}
-	}
-	// Only legacy schemas contain calculation settings to detach. Modern
-	// schema files, including formatting, survive rule removal unchanged.
-	for filename, current := range definitions {
-		var changed, keepsESC1 bool
-		for index := range current.NodeKinds {
-			kind := &current.NodeKinds[index]
-			if kind.PostProcessing != nil && removed[kind.PostProcessing.Query] {
-				kind.PostProcessing, changed = nil, true
-			}
-		}
-		for index := range current.RelationshipKinds {
-			kind := &current.RelationshipKinds[index]
-			if kind.PostProcessing != nil && removed[kind.PostProcessing.Query] {
-				kind.PostProcessing, changed = nil, true
-			}
-			if kind.Name == "PoC_ADCSESC1" && kind.PostProcessing != nil {
-				keepsESC1 = true
-			}
-		}
-		if changed {
-			if current.PostProcessing != nil && !keepsESC1 {
-				current.PostProcessing.CompareNativeESC1 = false
-			}
-			contents, err := json.MarshalIndent(current, "", "  ")
-			if err != nil {
-				return nil, err
-			}
-			files[filename] = string(contents) + "\n"
 		}
 	}
 	sort.Strings(names)

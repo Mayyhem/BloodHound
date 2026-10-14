@@ -8130,6 +8130,91 @@
         }
       }
     },
+    "/api/v2/extensions/definitions": {
+      "get": {
+        "description": "**Experimental** - Reads the accepted definitions of installed, non-built-in extensions for analysis validation. Requires OpenGraph read permission and the extension-management feature flag. This does not activate analyses or install schemas.\n\nA null definition identifies an extension installed before definitions were preserved; upload its schema again through OpenGraph Management to associate analysis files. The declaration includes saved-query and privilege-zone components supplied with the upload. Their execution and availability still follow their existing feature controls.\n",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community",
+          "Enterprise"
+        ],
+        "operationId": "ListExtensionDefinitions",
+        "summary": "Read installed OpenGraph definitions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "definitions"
+                      ],
+                      "properties": {
+                        "definitions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "name",
+                              "namespace",
+                              "version",
+                              "definition"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "format": "int32"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "namespace": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "definition": {
+                                "nullable": true,
+                                "allOf": [
+                                  {
+                                    "$ref": "#/components/schemas/model.graph-extension.payload"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "500": {
+            "$ref": "#/components/responses/internal-server-error"
+          }
+        }
+      }
+    },
     "/api/v2/extensions/{extension_id}": {
       "delete": {
         "description": "**Experimental** - Deletes an OpenGraph Extension by Extension ID",
@@ -26171,6 +26256,27 @@
                 },
                 "info": {
                   "$ref": "#/components/schemas/model.graph-extension.kind-info-definition"
+                },
+                "compatible_kinds": {
+                  "type": "array",
+                  "description": "Optional experimental analysis write boundaries. Each pair permits one source and target kind; ordinary collected relationships do not require this field.",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "source_kind",
+                      "target_kind"
+                    ],
+                    "properties": {
+                      "source_kind": {
+                        "type": "string",
+                        "example": "User"
+                      },
+                      "target_kind": {
+                        "type": "string",
+                        "example": "OGE_Computer"
+                      }
+                    }
+                  }
                 }
               }
             }

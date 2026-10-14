@@ -3,6 +3,7 @@ module github.com/specterops/bloodhound/tools/esc1-poc
 go 1.27.1
 
 require (
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/RoaringBitmap/roaring/v2 v2.19.0
 	github.com/antlr4-go/antlr/v4 v4.13.1
 	github.com/jackc/pgx/v5 v5.10.0
@@ -14,7 +15,6 @@ require (
 require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/axiomhq/hyperloglog v0.2.6 // indirect
 	github.com/beevik/etree v1.6.0 // indirect

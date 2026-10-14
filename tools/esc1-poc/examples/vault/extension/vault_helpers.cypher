@@ -1,3 +1,5 @@
+// namespace: PoC_Vault
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,8 +16,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: node:PoC_Vault_Container, node:PoC_Vault_Account,
-// relationship:PoC_Vault_ContainsAccount
+// depends-on: node:PoC_Vault_Container, node:PoC_Vault_Account
+// depends-on: relationship:PoC_Vault_ContainsAccount
 
 // Keep one helper for each vault, even when it contains no collected accounts.
 // A changing count makes helper rollback observable after a later failure.

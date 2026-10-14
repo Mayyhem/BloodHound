@@ -372,31 +372,32 @@ def execute_phase(name, files, desired_state, bloodhound, registry, args, expect
     return status, experimental
 
 
-def merge_vault_bundle(files):
-    merged = copy.deepcopy(files)
-    schema = json.loads(merged["schema.json"])
-    vault_directory = ROOT / "examples" / "vault"
-    vault_schema = json.loads((vault_directory / "extension" / "schema.json").read_text())
-    for field in ("node_kinds", "relationship_kinds"):
-        declared = {kind["name"]: kind for kind in schema[field]}
-        for kind in vault_schema[field]:
-            existing = declared.get(kind["name"])
-            if existing is not None and existing != kind:
-                raise RuntimeError(f"Conflicting {field} definition for {kind['name']}")
-            if existing is None:
-                schema[field].append(kind)
-                declared[kind["name"]] = kind
-    # This remains one bundle: vault kinds remain in the ESC1 schema for this historical demonstration.
-    merged["schema.json"] = json.dumps(schema)
-    for path in (vault_directory / "extension").glob("*.cypher"):
+def query_files(directory):
+    # Original filenames remain unchanged; the declared namespace scopes storage.
+    result = {}
+    for path in directory.glob("*.cypher"):
         contents = path.read_text()
-        if path.name in merged and merged[path.name] != contents:
-            raise RuntimeError(f"Conflicting query filename {path.name}")
-        merged[path.name] = contents
-    return merged
+        namespace = next(line.split(":", 1)[1].strip() for line in contents.splitlines()
+                         if line.startswith("// namespace:"))
+        result[namespace + "/" + path.name] = contents
+    return result
+
+
+def upload_schema(bloodhound, directory):
+    schema = json.loads((directory / "schema.json").read_text())
+    existing = bloodhound.request("GET", "/api/v2/extensions")
+    # This dedicated demonstration uses the same JSON upload endpoint as the UI.
+    records = existing["data"]["extensions"]
+    expected = 200 if any(record["name"] == schema["schema"]["name"] for record in records) else 201
+    bloodhound.request("POST", "/api/v2/extensions", schema, expected=expected)
+
+
+def merge_vault_bundle(files):
+    return {**files, **query_files(ROOT / "examples" / "vault" / "extension")}
 
 
 def check_opengraph(files, bloodhound, registry, args, expected, previous, result):
+    upload_schema(bloodhound, ROOT / "examples" / "vault" / "extension")
     bundle = activate_rules(registry, merge_vault_bundle(files))
     if bundle["revision"] == previous["revision"]:
         raise RuntimeError("The OpenGraph addition did not receive a new bundle revision")
@@ -466,7 +467,8 @@ def main():
         raise RuntimeError("The local login returned no valid session token")
     registry = Client(REGISTRY, read_rule_token())
     wait_native_idle(bloodhound, time.monotonic() + args.timeout)
-    files = {path.name: path.read_text() for path in (ROOT / "extension").iterdir() if path.name == "schema.json" or path.suffix == ".cypher"}
+    upload_schema(bloodhound, ROOT / "extension")
+    files = query_files(ROOT / "extension")
     monitor = ReadMonitor(bloodhound, registry, args.output)
     monitor.start()
     result = {"state": "failed", "phases": []}
@@ -474,28 +476,28 @@ def main():
         status, baseline = execute_phase("baseline", files, "success", bloodhound, registry, args, expected, registry.request("GET", "/v1/status"))
         result["phases"].append("baseline")
         keep_files = copy.deepcopy(files)
-        keep_files["esc1.cypher"] += "\n// existing-edge-policy: keep-existing\n"
+        keep_files["PoC/esc1.cypher"] += "\n// existing-edge-policy: keep-existing\n"
         status, kept = execute_phase("keep-existing", keep_files, "success", bloodhound, registry, args, expected, status)
         if kept != baseline:
             raise RuntimeError("keep-existing changed edge IDs or properties")
         result["phases"].append("keep-existing")
         active = registry.request("GET", "/v1/rules")
         rejected = registry.request("PUT", "/v1/rules", {
-            "base_revision": active["revision"], "overwrite": ["esc1.cypher"],
-            "files": {"esc1.cypher": keep_files["esc1.cypher"] + "\nCREATE (forbidden)\n"},
+            "base_revision": active["revision"], "overwrite": ["PoC/esc1.cypher"],
+            "files": {"PoC/esc1.cypher": keep_files["PoC/esc1.cypher"] + "\nCREATE (forbidden)\n"},
         }, expected=400)
         write_json(args.output / "rejected-write.json", rejected)
         if registry.request("GET", "/v1/rules") != active:
             raise RuntimeError("Rejected mutation changed the active bundle")
         result["phases"].append("write-query-rejected")
         replacement = copy.deepcopy(files)
-        replacement["esc1.cypher"] += "\n// Persistent-service replacement check.\n"
+        replacement["PoC/esc1.cypher"] += "\n// Persistent-service replacement check.\n"
         status, replaced = execute_phase("replace-existing", replacement, "success", bloodhound, registry, args, expected, status)
         if {row["id"] for row in replaced} & {row["id"] for row in kept}:
             raise RuntimeError("Default replacement retained an old experimental edge ID")
         result["phases"].append("replace-existing")
         broken = copy.deepcopy(replacement)
-        broken["domain_helpers.cypher"] = broken["domain_helpers.cypher"].replace("domain.name", "persistentCheckMissingFunction(domain.name)")
+        broken["PoC/domain_helpers.cypher"] = broken["PoC/domain_helpers.cypher"].replace("domain.name", "persistentCheckMissingFunction(domain.name)")
         status, unchanged = execute_phase("runtime-failure", broken, "failed", bloodhound, registry, args, expected, status)
         if unchanged != replaced:
             raise RuntimeError("Failed rule execution changed prior edge IDs or properties")

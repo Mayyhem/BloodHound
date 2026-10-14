@@ -33,18 +33,17 @@ def main():
     environment = dict(os.environ)
     if args.library_path:
         environment['LD_LIBRARY_PATH'] = args.library_path
-    names = ['seed.cypher', 'consumer.cypher', 'vault.cypher']
+    names = ['PoC_AD/seed.cypher', 'PoC_AD/consumer.cypher', 'PoC_Vault/vault.cypher']
     extensions = [{'name': 'active_directory', 'display_name': 'Active Directory'}, {'name': 'cyberark', 'display_name': 'A CyberArk'}]
     rules = []
     for index, name in enumerate(names):
         rules.append({'name': name, 'order': index + 1, 'stage': 2 if index == 1 else 1,
             'extension': extensions[index // 2]['name'], 'extension_name': extensions[index // 2]['display_name'],
             'added_at': '2026-10-11T12:00:00Z' if index == 0 else '', 'enabled': True, 'disabled_reason': '',
-            'parameter': name[:-7], 'text': "RETURN '<script>window.injected=true</script>'", 'inputs': [],
+            'namespace': name.split('/')[0], 'version': 'v1.0.0', 'schema_version': 'v1.0.0', 'parameter': name.split('/')[-1][:-7], 'text': '// namespace: ' + name.split('/')[0] + '\n// version: v1.0.0\n' + "RETURN '<script>window.injected=true</script>'", 'inputs': [],
             'outputs': [], 'prerequisites': [{'name': names[0], 'parameter': 'seed'}] if index == 1 else [],
             'dependents': [names[1]] if index == 0 else [], 'processing': {}})
     state = {'revision': 'first', 'files': {name: rule['text'] for name, rule in zip(names, rules)}, 'disabled': []}
-    state['files']['active_directory.schema.json'] = '{}'
     writes, changes, errors = [], [], []
     draft = {'revision': '', 'files': {}, 'ready': False}
     stale_activation = False
@@ -120,16 +119,16 @@ def main():
                 if change.get('remove'):
                     removed = [names[0], names[1]] if names[0] in change['remove'] else change['remove']
                     proposed = [rule for rule in proposed if rule['name'] not in removed]
-                if 'new_extension.schema.json' in change.get('files', {}):
+                if 'PoC_New/new_rule.cypher' in change.get('files', {}):
                     new_rule = copy.deepcopy(rules[0])
-                    new_rule.update(name='new_rule.cypher', extension='new_extension', extension_name='New extension', order=4)
+                    new_rule.update(name='PoC_New/new_rule.cypher', namespace='PoC_New', extension='new_extension', extension_name='New extension', order=4)
                     proposed.append(new_rule)
                 disabled = change.get('disable', [])
                 enabled = change.get('enable', [])
                 for rule in proposed:
                     if rule['name'] in disabled or (names[0] in disabled and rule['name'] == names[1]):
                         rule['enabled'] = False
-                        rule['disabled_reason'] = 'Disabled by you.' if rule['name'] in disabled else 'Paused because seed.cypher is disabled.'
+                        rule['disabled_reason'] = 'Disabled by you.' if rule['name'] in disabled else 'Paused because PoC_AD/seed.cypher is disabled.'
                     if rule['name'] in enabled:
                         rule['enabled'] = True
                         rule['disabled_reason'] = ''
@@ -208,22 +207,22 @@ def main():
         assert checking['busy'] == 'true' and checking['text'] == 'Checking status…'
         expect(page.locator('#analysis-state')).to_contain_text('running')
         assert page.locator('table').count() == 1
-        expect(page.locator('#rule-rows').get_by_role('button', name='▸ seed.cypher')).to_be_visible()
-        page.get_by_role('button', name='▸ seed.cypher').click()
+        expect(page.locator('#rule-rows').get_by_role('button', name='▸ PoC_AD/seed.cypher')).to_be_visible()
+        page.get_by_role('button', name='▸ PoC_AD/seed.cypher').click()
         expect(page.locator('#rule-rows')).to_contain_text("<script>window.injected=true</script>")
         assert page.evaluate('window.injected') is None
-        page.get_by_role('button', name='▾ seed.cypher').click()
+        page.get_by_role('button', name='▾ PoC_AD/seed.cypher').click()
         page.get_by_role('button', name='Name', exact=True).click()
-        expect(page.locator('#rule-rows > tr').first).to_contain_text('consumer.cypher')
+        expect(page.locator('#rule-rows > tr').first).to_contain_text('PoC_AD/consumer.cypher')
         page.get_by_role('button', name='Stage', exact=True).click()
-        expect(page.locator('#rule-rows > tr').first).to_contain_text('seed.cypher')
+        expect(page.locator('#rule-rows > tr').first).to_contain_text('PoC_AD/seed.cypher')
         page.get_by_role('button', name='Date added', exact=True).click()
-        expect(page.locator('#rule-rows > tr').first).to_contain_text('consumer.cypher')
+        expect(page.locator('#rule-rows > tr').first).to_contain_text('PoC_AD/consumer.cypher')
         page.get_by_role('button', name='Extension', exact=True).click()
-        expect(page.locator('#rule-rows > tr').first).to_contain_text('vault.cypher')
+        expect(page.locator('#rule-rows > tr').first).to_contain_text('PoC_Vault/vault.cypher')
         page.get_by_role('button', name='Stage', exact=True).click()
         page.get_by_role('button', name='Order', exact=True).click()
-        expect(page.locator('#rule-rows > tr').first).to_contain_text('seed.cypher')
+        expect(page.locator('#rule-rows > tr').first).to_contain_text('PoC_AD/seed.cypher')
         expect(page.locator('#rule-rows > tr').first.locator('td').nth(1)).to_have_text('1')
         page.locator('#extension-filter').select_option('cyberark')
         page.locator('#select-all').check()
@@ -239,10 +238,10 @@ def main():
         expect(page.locator('#select-all')).not_to_be_checked()
         for checkbox in page.locator('[data-select-rule]').all():
             expect(checkbox).not_to_be_checked()
-        page.get_by_role('button', name='Delete seed.cypher', exact=True).click()
+        page.get_by_role('button', name='Delete PoC_AD/seed.cypher', exact=True).click()
         expect(page.locator('#confirm-dialog')).to_be_visible()
         expect(page.locator('#confirm-paused')).not_to_be_visible()
-        expect(page.locator('#confirm-names')).to_contain_text('consumer.cypher')
+        expect(page.locator('#confirm-names')).to_contain_text('PoC_AD/consumer.cypher')
         expect(page.locator('#confirm-description')).to_contain_text('next successful analysis')
         assert not writes
         page.locator('#cancel-change').click()
@@ -251,7 +250,7 @@ def main():
         # Exercise literal names and reasons in the confirmation without saving a change.
         unsafe_name = '<img src=x onerror="window.injected=true">.cypher'
         unsafe_reason = '<script>window.injected=true</script>'
-        page.evaluate('''review => { void confirmAction('disable', ['seed.cypher'], review); }''',
+        page.evaluate('''review => { void confirmAction('disable', ['PoC_AD/seed.cypher'], review); }''',
             {'plan': {'queries': [{'name': unsafe_name, 'disabled_reason': unsafe_reason}]}})
         expect(page.locator('#confirm-paused-rules li')).to_have_count(1)
         expect(page.locator('#confirm-paused-rules strong')).to_have_text(unsafe_name)
@@ -261,23 +260,22 @@ def main():
         page.locator('#cancel-change').click()
         page.locator('#rule-rows > tr').first.get_by_role('button', name='Disable', exact=True).click()
         expect(page.locator('#confirm-paused-rules li')).to_have_count(2)
-        expect(page.locator('#confirm-paused-rules li').first.locator('strong')).to_have_text('seed.cypher')
+        expect(page.locator('#confirm-paused-rules li').first.locator('strong')).to_have_text('PoC_AD/seed.cypher')
         expect(page.locator('#confirm-paused-rules li').first.locator('.muted')).to_have_text('Disabled by you.')
-        expect(page.locator('#confirm-paused-rules li').nth(1).locator('strong')).to_have_text('consumer.cypher')
-        expect(page.locator('#confirm-paused-rules li').nth(1).locator('.muted')).to_have_text('Paused because seed.cypher is disabled.')
+        expect(page.locator('#confirm-paused-rules li').nth(1).locator('strong')).to_have_text('PoC_AD/consumer.cypher')
+        expect(page.locator('#confirm-paused-rules li').nth(1).locator('.muted')).to_have_text('Paused because PoC_AD/seed.cypher is disabled.')
         expect(page.locator('#confirm-description')).to_contain_text('existing graph results will stay')
         page.locator('#confirm-change').click()
         expect(page.locator('#message')).to_contain_text('activated')
-        assert len(writes) == 1 and writes[0]['disable'] == ['seed.cypher']
-        expect(page.locator('#rule-rows')).to_contain_text('Paused because seed.cypher is disabled.')
+        assert len(writes) == 1 and writes[0]['disable'] == ['PoC_AD/seed.cypher']
+        expect(page.locator('#rule-rows')).to_contain_text('Paused because PoC_AD/seed.cypher is disabled.')
         check_action_alignment(page)
         page.locator('#rule-rows > tr').first.get_by_role('button', name='Enable', exact=True).click()
         expect(page.locator('#confirm-title')).to_have_text('Enable these rules?')
         page.locator('#cancel-change').click()
         page.locator('#upload-controls > summary').click()
         page.locator('#files').set_input_files([
-            {'name': 'new_extension.schema.json', 'mimeType': 'application/json', 'buffer': b'{}'},
-            {'name': 'new_rule.cypher', 'mimeType': 'text/plain', 'buffer': b'RETURN 42'}
+            {'name': 'new_rule.cypher', 'mimeType': 'text/plain', 'buffer': b'// namespace: PoC_New\n// version: v1.0.0\nRETURN 42'}
         ])
         page.locator('#preview').click()
         expect(page.locator('#review')).to_be_visible()
@@ -289,7 +287,7 @@ def main():
         assert page.locator('#extension-filter option[value="new_extension"]').count() == 0
         expect(page.locator('#rule-rows > tr')).to_have_count(3)
         page.locator('#files').set_input_files([
-            {'name': name, 'mimeType': 'text/plain', 'buffer': b'RETURN 42'} for name in names[:2]
+            {'name': name.split('/')[-1], 'mimeType': 'text/plain', 'buffer': b'// namespace: PoC_AD\n// version: v1.0.0\nRETURN 42'} for name in names[:2]
         ])
         page.locator('#preview').click()
         expect(page.locator('#overwrite-name')).to_have_text(names[0])

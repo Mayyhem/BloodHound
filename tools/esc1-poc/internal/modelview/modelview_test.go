@@ -75,7 +75,6 @@ func TestRenderRejectsInvalidModels(t *testing.T) {
 		"missing arrays":          `{"schema":{"name":"test"}}`,
 		"invalid schema name":     strings.Replace(fixture, `"example"`, `12`, 1),
 		"missing endpoints":       strings.Replace(fixture, `"compatible_kinds":[{"source_kind":"PoC_A","target_kind":"PoC_B"},{"source_kind":"PoC_B","target_kind":"User"}]`, `"other":[]`, 1),
-		"empty endpoints":         strings.Replace(fixture, `"compatible_kinds":[{"source_kind":"PoC_A","target_kind":"PoC_B"},{"source_kind":"PoC_B","target_kind":"User"}]`, `"compatible_kinds":[]`, 1),
 		"unknown endpoint":        strings.Replace(fixture, `"target_kind":"PoC_B"`, `"target_kind":"Unknown"`, 1),
 		"duplicate relationship":  strings.Replace(fixture, `"PoC_AlsoReaches"`, `"PoC_CanReach"`, 1),
 		"duplicate endpoint pair": strings.Replace(fixture, `{"source_kind":"PoC_B","target_kind":"User"}`, `{ "source_kind":"PoC_A", "target_kind":"PoC_B" }`, 1),
@@ -135,7 +134,7 @@ for (const policy of [null, '', false, 1, {}, [], 'unknown']) {
  invalid.relationship_kinds[0].existing_edge_policy = policy;
  assert.throws(()=>parseModel(invalid), /existing_edge_policy/);
 }
-for (const endpoints of [undefined, [], [{source_kind:'PoC_A', target_kind:'Unknown'}]]) {
+for (const endpoints of [false, [{source_kind:'PoC_A', target_kind:'Unknown'}]]) {
  const invalid = JSON.parse(JSON.stringify(definition));
  invalid.relationship_kinds[0].compatible_kinds = endpoints;
  assert.throws(()=>parseModel(invalid), /compatible_kinds|unknown node kind/);

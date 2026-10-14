@@ -53,8 +53,8 @@ func TestLoadRejectsWritesAndExternalReads(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			var (
-				queries   = map[string]string{"result.cypher": "// depends-on: none\n" + testCase.query}
-				directory = writeExtension(t, schemaFor("result.cypher"), queries)
+				queries   = map[string]string{"PoC/result.cypher": "// depends-on: none\n" + testCase.query}
+				directory = writeExtension(t, schemaFor("PoC/result.cypher"), queries)
 			)
 			_, err := extension.Load(directory)
 			if err == nil || !strings.Contains(err.Error(), testCase.want) {
@@ -78,8 +78,8 @@ func TestLoadAllowsLiteralKeywords(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			var queries = map[string]string{"result.cypher": "// depends-on: none\n" + testCase.query}
-			if _, err := extension.Load(writeExtension(t, schemaFor("result.cypher"), queries)); err != nil {
+			var queries = map[string]string{"PoC/result.cypher": "// depends-on: none\n" + testCase.query}
+			if _, err := extension.Load(writeExtension(t, schemaFor("PoC/result.cypher"), queries)); err != nil {
 				t.Fatalf("read-only query rejected: %v", err)
 			}
 		})
@@ -93,10 +93,10 @@ func TestLoadDefaultExtension(t *testing.T) {
 	var (
 		directory     = filepath.Join("..", "..", "extension")
 		expectedOrder = []string{
-			"enabled_cas.cypher", "forest_reach.cypher", "usable_cas.cypher",
-			"ca_auth_reach.cypher", "ca_root_reach.cypher", "domain_helpers.cypher",
-			"eligible_templates.cypher", "trusted_cas.cypher", "enrollment_principals.cypher",
-			"membership_reach.cypher", "special_groups.cypher", "membership.cypher", "esc1.cypher",
+			"PoC/enabled_cas.cypher", "PoC/forest_reach.cypher", "PoC/usable_cas.cypher",
+			"PoC/ca_auth_reach.cypher", "PoC/ca_root_reach.cypher", "PoC/domain_helpers.cypher",
+			"PoC/eligible_templates.cypher", "PoC/trusted_cas.cypher", "PoC/enrollment_principals.cypher",
+			"PoC/membership_reach.cypher", "PoC/special_groups.cypher", "PoC/membership.cypher", "PoC/esc1.cypher",
 		}
 		actualOrder []string
 	)
@@ -106,7 +106,7 @@ func TestLoadDefaultExtension(t *testing.T) {
 	}
 	for _, query := range plan.Queries {
 		actualOrder = append(actualOrder, query.Name)
-		if query.Parameter != strings.TrimSuffix(query.Name, ".cypher") {
+		if query.Parameter != strings.TrimSuffix(filepath.Base(query.Name), ".cypher") {
 			t.Fatalf("%s has unexpected parameter %q", query.Name, query.Parameter)
 		}
 	}
@@ -116,10 +116,10 @@ func TestLoadDefaultExtension(t *testing.T) {
 	if plan.Schema.Name != "esc1_poc" || plan.Schema.ReferenceCommit != "2cb6dbd37738ffe31e34e1729b3638f3887a93e9" {
 		t.Fatalf("unexpected shipped schema identity: %+v", plan.Schema)
 	}
-	if len(plan.Schema.Nodes) != 1 || plan.Schema.Nodes[0].Kind != "PoC_DomainHelper" || plan.Schema.Nodes[0].Query != "domain_helpers.cypher" {
+	if len(plan.Schema.Nodes) != 1 || plan.Schema.Nodes[0].Kind != "PoC_DomainHelper" || plan.Schema.Nodes[0].Query != "PoC/domain_helpers.cypher" {
 		t.Fatalf("unexpected helper binding: %+v", plan.Schema.Nodes)
 	}
-	if len(plan.Schema.Relationships) != 1 || plan.Schema.Relationships[0].Kind != "PoC_ADCSESC1" || plan.Schema.Relationships[0].Query != "esc1.cypher" {
+	if len(plan.Schema.Relationships) != 1 || plan.Schema.Relationships[0].Kind != "PoC_ADCSESC1" || plan.Schema.Relationships[0].Query != "PoC/esc1.cypher" {
 		t.Fatalf("unexpected relationship binding: %+v", plan.Schema.Relationships)
 	}
 }

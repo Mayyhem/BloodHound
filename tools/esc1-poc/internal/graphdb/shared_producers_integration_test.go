@@ -57,9 +57,9 @@ func TestSharedProducersDisableDeleteAndRollbackOnBothDatabases(t *testing.T) {
 						{"name":"PoC_Shared","existing_edge_policy":"merge-properties","compatible_kinds":[{"source_kind":"User","target_kind":"Domain"},{"source_kind":"Group","target_kind":"Domain"}]},
 						{"name":"PoC_SharedConsumer","existing_edge_policy":"merge-properties","compatible_kinds":[{"source_kind":"User","target_kind":"Domain"},{"source_kind":"Group","target_kind":"Domain"}]}
 					]}`,
-				"a.cypher":        "// depends-on: node:Group\nMATCH (evidence:Group) UNWIND ['PoC_Test_User','PoC_Test_Group'] AS identifier RETURN identifier AS source, 'PoC_Test_Domain' AS target, 'PoC_Shared' AS kind, {name:'a',from_a:true} AS properties",
-				"b.cypher":        "// depends-on: node:User\nMATCH (evidence:User) RETURN evidence.objectid AS source, 'PoC_Test_Domain' AS target, 'PoC_Shared' AS kind, {name:'b',from_b:true} AS properties",
-				"consumer.cypher": "// depends-on: relationship:PoC_Shared\nMATCH (source)-[:PoC_Shared]->(target) RETURN source.objectid AS source, target.objectid AS target, 'PoC_SharedConsumer' AS kind",
+				"PoC/a.cypher":        "// namespace: PoC\n// version: v1.0.0\n// depends-on: node:Group\nMATCH (evidence:Group) UNWIND ['PoC_Test_User','PoC_Test_Group'] AS identifier RETURN identifier AS source, 'PoC_Test_Domain' AS target, 'PoC_Shared' AS kind, {name:'a',from_a:true} AS properties",
+				"PoC/b.cypher":        "// namespace: PoC\n// version: v1.0.0\n// depends-on: node:User\nMATCH (evidence:User) RETURN evidence.objectid AS source, 'PoC_Test_Domain' AS target, 'PoC_Shared' AS kind, {name:'b',from_b:true} AS properties",
+				"PoC/consumer.cypher": "// namespace: PoC\n// version: v1.0.0\n// depends-on: relationship:PoC_Shared\nMATCH (source)-[:PoC_Shared]->(target) RETURN source.objectid AS source, target.objectid AS target, 'PoC_SharedConsumer' AS kind",
 			}
 			store, err := ruleservice.Open(t.TempDir())
 			if err != nil {
@@ -113,7 +113,7 @@ func TestSharedProducersDisableDeleteAndRollbackOnBothDatabases(t *testing.T) {
 			if report, err := nativeIntegrationRun(t, backend, plan, selected); err != nil || !report.Committed || len(report.Queries) != 3 {
 				t.Fatalf("selected shared recalculation: %+v %v", report, err)
 			}
-			plan = change(ruleservice.Change{Disable: []string{"a.cypher"}})
+			plan = change(ruleservice.Change{Disable: []string{"PoC/a.cypher"}})
 			if report, err := nativeIntegrationRun(t, backend, plan, options()); err != nil || !report.Committed || len(report.Queries) != 0 {
 				t.Fatalf("disable did not pause shared output and its consumer: %+v %v", report, err)
 			}
@@ -121,7 +121,7 @@ func TestSharedProducersDisableDeleteAndRollbackOnBothDatabases(t *testing.T) {
 			if !reflect.DeepEqual(before[:2], paused[:2]) {
 				t.Fatal("disabling a producer changed saved connections")
 			}
-			plan = change(ruleservice.Change{Remove: []string{"a.cypher"}})
+			plan = change(ruleservice.Change{Remove: []string{"PoC/a.cypher"}})
 			if len(plan.Queries) != 2 || len(plan.RetiredRelationships) != 0 {
 				t.Fatalf("removing one producer removed a surviving producer or consumer: %+v", plan)
 			}
@@ -139,8 +139,8 @@ func TestSharedProducersDisableDeleteAndRollbackOnBothDatabases(t *testing.T) {
 			if len(after[0]) != 1 || len(after[1]) != 1 || after[0][0]["source"] != "PoC_Test_User" || after[1][0]["source"] != "PoC_Test_User" {
 				t.Fatalf("remaining support and consumer disagree: %v", after)
 			}
-			plan = change(ruleservice.Change{Remove: []string{"b.cypher"}})
-			if len(plan.Queries) != 1 || plan.Queries[0].Name != "consumer.cypher" || !reflect.DeepEqual(plan.RetiredRelationships, []string{"PoC_Shared"}) {
+			plan = change(ruleservice.Change{Remove: []string{"PoC/b.cypher"}})
+			if len(plan.Queries) != 1 || plan.Queries[0].Name != "PoC/consumer.cypher" || !reflect.DeepEqual(plan.RetiredRelationships, []string{"PoC_Shared"}) {
 				t.Fatalf("last producer removal should preserve the graph consumer: %+v", plan)
 			}
 			if report, err := nativeIntegrationRun(t, backend, plan, options()); err != nil || !report.Committed || report.Removed != 2 {

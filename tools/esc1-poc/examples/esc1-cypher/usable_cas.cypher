@@ -1,3 +1,5 @@
+// namespace: PoC
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,7 +16,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: query:enabled_cas.cypher, query:forest_reach.cypher
+// depends-on: query:enabled_cas
+// depends-on: query:forest_reach
 
 // Native accepts any enabled host when the CA domain cannot be resolved.
 UNWIND $enabled_cas AS host

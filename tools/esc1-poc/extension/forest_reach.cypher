@@ -1,3 +1,5 @@
+// namespace: PoC
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,7 +16,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: query:enabled_cas.cypher, node:Domain, relationship:SameForestTrust
+// depends-on: query:enabled_cas
+// depends-on: node:Domain, relationship:SameForestTrust
 // reachability: {"direction":"incoming","relationships":["SameForestTrust"],"include_start":true,"expand_results":false,"node_kinds":["Domain"],"reject_cycles":false}
 
 // The reusable primitive visits each relevant Domain once and permits reciprocal

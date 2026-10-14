@@ -64,10 +64,10 @@ func cypherComparisonPlan(t *testing.T, variant string) extension.Plan {
 		text := string(content)
 		if entry.Name() == "esc1.cypher" {
 			if ordinaryGroups && !noBatch {
-				text = strings.Replace(text, "// depends-on:", "// batch-on: trusted_cas.cypher\n// depends-on:", 1)
+				text = strings.Replace(text, "// depends-on:", "// batch-on: trusted_cas\n// depends-on:", 1)
 			}
 			if noBatch {
-				text = strings.ReplaceAll(text, "// batch-on: trusted_cas.cypher\n", "")
+				text = strings.ReplaceAll(text, "// batch-on: trusted_cas\n", "")
 			}
 		}
 		if err := os.WriteFile(filepath.Join(directory, entry.Name()), []byte(text), 0600); err != nil {

@@ -19,6 +19,7 @@
 package database_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"testing"
@@ -1062,4 +1063,46 @@ func assertFindings(t *testing.T, testSuite IntegrationTestSuite, extensionId in
 		assert.Equalf(t, wantFinding.RemediationInput.ShortDescription, gotRemediation.ShortDescription, "Finding(%v) - short_description mismatch", gotFinding.Name)
 		assert.Equalf(t, wantFinding.RemediationInput.LongDescription, gotRemediation.LongDescription, "Finding(%v) - long_description mismatch", gotFinding.Name)
 	}
+}
+
+func TestInstalledDefinitionIsSavedAndRolledBackWithExtension(t *testing.T) {
+	var (
+		suite   = setupIntegrationTestSuite(t)
+		payload = model.GraphExtensionPayload{
+			GraphSchemaExtension:         model.GraphSchemaExtensionPayload{Name: "analysis_definition", Namespace: "PoC_Definition", Version: "v1.0.0"},
+			GraphSchemaNodeKinds:         []model.GraphSchemaNodeKindsPayload{{Name: "PoC_Definition_Node"}},
+			GraphSchemaRelationshipKinds: []model.GraphSchemaRelationshipKindsPayload{{Name: "PoC_Definition_Link", CompatibleKinds: []model.GraphSchemaEndpoint{{SourceKind: "User", TargetKind: "PoC_Definition_Node"}}}},
+		}
+	)
+	defer teardownIntegrationTestSuite(t, &suite)
+	input, err := payload.ToGraphExtensionInput()
+	require.NoError(t, err)
+	_, err = suite.BHDatabase.UpsertOpenGraphExtension(suite.Context, input)
+	require.NoError(t, err)
+	read := func() model.GraphSchemaExtension {
+		records, _, err := suite.BHDatabase.GetGraphSchemaExtensions(suite.Context, model.Filters{"name": []model.Filter{{Operator: model.Equals, Value: "analysis_definition"}}}, model.Sort{}, 0, 1)
+		require.NoError(t, err)
+		require.Len(t, records, 1)
+		return records[0]
+	}
+	saved := read()
+	require.JSONEq(t, string(input.Definition), string(saved.Definition))
+	// A failing definition save comes after the metadata/kind changes. The
+	// enclosing transaction must roll all of them back together.
+	input.ExtensionInput.Version = "v2.0.0"
+	input.Definition = json.RawMessage(`not JSON`)
+	_, err = suite.BHDatabase.UpsertOpenGraphExtension(suite.Context, input)
+	require.Error(t, err)
+	unchanged := read()
+	require.Equal(t, saved.Version, unchanged.Version)
+	require.JSONEq(t, string(saved.Definition), string(unchanged.Definition))
+	payload.GraphSchemaExtension.Version = "v2.0.0"
+	input, err = payload.ToGraphExtensionInput()
+	require.NoError(t, err)
+	_, err = suite.BHDatabase.UpsertOpenGraphExtension(suite.Context, input)
+	require.NoError(t, err)
+	updated := read()
+	require.Equal(t, saved.ID, updated.ID)
+	require.Equal(t, "v2.0.0", updated.Version)
+	require.JSONEq(t, string(input.Definition), string(updated.Definition))
 }

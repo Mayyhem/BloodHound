@@ -1,3 +1,5 @@
+// namespace: PoC
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,8 +16,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: query:enrollment_principals.cypher, relationship:MemberOf,
-// relationship:MemberOfLocalGroup
+// depends-on: query:enrollment_principals
+// depends-on: relationship:MemberOf
+// depends-on: relationship:MemberOfLocalGroup
 // reachability: {"direction":"incoming","relationships":["MemberOf","MemberOfLocalGroup"],"include_start":false,"expand_results":true,"reject_cycles":true}
 
 // Shared sets cover direct enrollers and all nested candidates used by ESC1.

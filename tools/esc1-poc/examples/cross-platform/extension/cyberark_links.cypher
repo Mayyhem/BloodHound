@@ -1,3 +1,5 @@
+// namespace: PoC_CyberArk
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -16,7 +18,8 @@
 
 // existing-edge-policy: keep-existing
 
-// depends-on: query:ad_users.cypher, node:PoC_CyberArk_Account, node:User
+// depends-on: query:PoC_AD/ad_users
+// depends-on: node:PoC_CyberArk_Account, node:User
 
 // Consume this run's directory summary rows across the schema boundary.
 // The target remains the native User, rather than the summary helper.

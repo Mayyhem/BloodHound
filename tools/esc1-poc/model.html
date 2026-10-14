@@ -592,10 +592,10 @@ function parseModel(input) {
             throw new Error('existing_edge_policy must be replace-existing, merge-properties, or keep-existing.');
         }
         const endpointPairs = new Set();
-        if (!Array.isArray(kind.compatible_kinds) || kind.compatible_kinds.length === 0) {
-            throw new Error('Relationship "' + kind.name + '" requires explicit nonempty compatible_kinds pairs.');
+        if (kind.compatible_kinds !== undefined && !Array.isArray(kind.compatible_kinds)) {
+            throw new Error('Relationship "' + kind.name + '" compatible_kinds must be an array of endpoint pairs.');
         }
-        kind.compatible_kinds.forEach(pair => {
+        (kind.compatible_kinds || []).forEach(pair => {
             if (!pair || !validName(pair.source_kind) || !validName(pair.target_kind)) {
                 throw new Error('Each compatible_kinds pair needs valid source_kind and target_kind names.');
             }

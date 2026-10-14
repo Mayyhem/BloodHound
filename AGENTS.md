@@ -16,6 +16,8 @@ Prioritize ease of use and understanding for extension developers.
 
 Changes to DAWGS and BloodHound are allowed if necessary but should be minimized unless it makes things easier for extension developers or enhances performance significantly. These changes MUST not remove functionality, change API contracts, or otherwise negatively impact the current user experience.
 
+Changes to DAWGS must adhere strictly to the openCypher 9 specification and maintain 100% compatibility with the Cypher dialect used by Neo4j. Do not use proprietary Neo4j features (e.g., modern Cypher 25 syntax or unsupported clauses like MERGE) unless explicitly defined in the DAWGS cypher parser schema or discussed first.
+
 Don't change the requirements for extension authors (e.g., schema.json or .cypher file definitions) based on assumptions without my approval. 
 
 Prioritize code readability over efficiency. Take opportunities to simplify code and remove unnecessary code. No features need to be retained for backwards compatibility reasons. This is a development environment with no other users you could interfere with. 
@@ -28,7 +30,37 @@ Do not add or commit anything to the repository. I will commit manually after re
 
 Do not operate on anything outside of the postprocessing directory except http(s)://bloodhound.localhost or 127.0.0.1 (BloodHound web app and API, Neo4j interfaces)
 
-Multiple subagents may work in parallel as long as they don't step on each other's toes. If they do, resolve the conflicts.  
+## Subagents
+Multiple subagents may work in parallel as long as they don't step on each other's toes. If they do, resolve the conflicts.
+
+Astra is the model that will be used to architect the changes.
+
+Use Terra as the default model for plan review, analysis, and execution.
+
+Use Luna for narrowly scoped work that has:
+
+- a clearly defined input
+- a short expected output
+- little ambiguity
+- low need for independent judgment
+
+Examples include:
+
+- extracting values from logs
+- summarizing a single file
+- checking whether a known value exists
+- validating a small configuration change
+
+Use Astra only when Terra has failed to make progress after two well-scoped attempts or when the task clearly requires deeper reasoning than Terra can provide.
+
+Turn Fast off. Flag heavy or sustained work in advance. Keep delegated tasks bounded.
+
+When spawning a subagent, record:
+
+- role
+- bounded task
+- selected available model
+- one-sentence justification
 
 Keep notes that would be helpful when handing this off to another agent.
 

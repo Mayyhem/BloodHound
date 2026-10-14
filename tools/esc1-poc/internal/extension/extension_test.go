@@ -67,6 +67,10 @@ func writeExtension(t *testing.T, schema extension.Schema, queries map[string]st
 		t.Fatal(err)
 	}
 	for name, query := range queries {
+		query = "// namespace: PoC\n// version: v1.0.0\n" + query
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(directory, name)), 0700); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(filepath.Join(directory, name), []byte(query), 0600); err != nil {
 			t.Fatal(err)
 		}
@@ -76,30 +80,30 @@ func writeExtension(t *testing.T, schema extension.Schema, queries map[string]st
 
 func TestLoadOrdersSharedPrerequisitesOnce(t *testing.T) {
 	var queries = map[string]string{
-		"shared.cypher": "// depends-on: node:Domain\nRETURN 1",
-		"left.cypher":   "// depends-on: query:shared.cypher\nRETURN $shared",
-		"right.cypher":  "// depends-on: query:shared.cypher\nRETURN $shared",
-		"result.cypher": "// Read both sides.\n// depends-on: relationship:Enroll,\n// node:User, query:left.cypher\n// depends-on: query:right.cypher\n// Note: both sides use the shared rows.\nRETURN $left, $right, '$literal' // $example\n",
+		"PoC/shared.cypher": "// depends-on: node:Domain\nRETURN 1",
+		"PoC/left.cypher":   "// depends-on: query:shared\nRETURN $shared",
+		"PoC/right.cypher":  "// depends-on: query:shared\nRETURN $shared",
+		"PoC/result.cypher": "// Read both sides.\n// depends-on: relationship:Enroll,\n// node:User\n// depends-on: query:left\n// depends-on: query:right\n// Note: both sides use the shared rows.\nRETURN $left, $right, '$literal' // $example\n",
 	}
-	plan, err := extension.Load(writeExtension(t, schemaFor("result.cypher"), queries))
+	plan, err := extension.Load(writeExtension(t, schemaFor("PoC/result.cypher"), queries))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var actual []string
 	for _, query := range plan.Queries {
 		actual = append(actual, query.Name)
-		if query.Parameter != strings.TrimSuffix(query.Name, ".cypher") {
+		if query.Parameter != strings.TrimSuffix(filepath.Base(query.Name), ".cypher") {
 			t.Fatalf("unexpected parameter %q", query.Parameter)
 		}
 	}
-	expected := []string{"shared.cypher", "left.cypher", "right.cypher", "result.cypher"}
+	expected := []string{"PoC/shared.cypher", "PoC/left.cypher", "PoC/right.cypher", "PoC/result.cypher"}
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("order %v; expected %v", actual, expected)
 	}
 }
 
 func TestFilenameDoesNotAssignPublishedKind(t *testing.T) {
-	plan, err := extension.Load(writeExtension(t, schemaFor("renamed_output.cypher"), map[string]string{"renamed_output.cypher": "// depends-on: none\nRETURN 1"}))
+	plan, err := extension.Load(writeExtension(t, schemaFor("PoC/renamed_output.cypher"), map[string]string{"PoC/renamed_output.cypher": "// depends-on: none\nRETURN 1"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,15 +120,15 @@ func TestLoadRejectsInvalidExtensions(t *testing.T) {
 		{"malformed continuation", "// depends-on: node:Domain\n// query missing.cypher\nRETURN 1", "malformed"},
 		{"unknown dependency", "// depends-on: property:Name\nRETURN 1", "unknown"},
 		{"invalid native label", "// depends-on: node:Bad-Label\nRETURN 1", "invalid"},
-		{"invalid prerequisite filename", "// depends-on: query:BadFile.cypher\nRETURN 1", "invalid"},
-		{"missing prerequisite", "// depends-on: query:missing.cypher\nRETURN 1", "missing prerequisite"},
+		{"invalid prerequisite filename", "// depends-on: query:BadFile\nRETURN 1", "invalid"},
+		{"missing prerequisite", "// depends-on: query:missing\nRETURN 1", "missing prerequisite"},
 		{"duplicate prerequisite", "// depends-on: node:Domain, node:Domain\nRETURN 1", "duplicate"},
 		{"none with dependencies", "// depends-on: none\n// depends-on: node:Domain\nRETURN 1", "cannot be combined"},
-		{"undeclared parameter", "// depends-on: node:Domain\nRETURN $missing", "add query:missing.cypher"},
+		{"undeclared parameter", "// depends-on: node:Domain\nRETURN $missing", "add query:missing"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			_, err := extension.Load(writeExtension(t, schemaFor("result.cypher"), map[string]string{"result.cypher": testCase.query}))
+			_, err := extension.Load(writeExtension(t, schemaFor("PoC/result.cypher"), map[string]string{"PoC/result.cypher": testCase.query}))
 			if err == nil || !strings.Contains(err.Error(), testCase.want) {
 				t.Fatalf("error %v; expected %q", err, testCase.want)
 			}
@@ -138,12 +142,12 @@ func TestLoadRejectsCycleAndUnusedQueries(t *testing.T) {
 		queries map[string]string
 		want    string
 	}{
-		{"cycle", map[string]string{"result.cypher": "// depends-on: query:intermediate.cypher\nRETURN 1", "intermediate.cypher": "// depends-on: query:result.cypher\nRETURN 1"}, "cycle"},
-		{"unused", map[string]string{"result.cypher": "// depends-on: none\nRETURN 1", "unused.cypher": "// depends-on: none\nRETURN 1"}, "unused query"},
+		{"cycle", map[string]string{"PoC/result.cypher": "// depends-on: query:intermediate\nRETURN 1", "PoC/intermediate.cypher": "// depends-on: query:result\nRETURN 1"}, "cycle"},
+		{"unused", map[string]string{"PoC/result.cypher": "// depends-on: none\nRETURN 1", "PoC/unused.cypher": "// depends-on: none\nRETURN 1"}, "unused query"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			_, err := extension.Load(writeExtension(t, schemaFor("result.cypher"), testCase.queries))
+			_, err := extension.Load(writeExtension(t, schemaFor("PoC/result.cypher"), testCase.queries))
 			if err == nil || !strings.Contains(err.Error(), testCase.want) {
 				t.Fatalf("error %v; expected %q", err, testCase.want)
 			}
@@ -160,23 +164,23 @@ func TestLoadRejectsInvalidSchema(t *testing.T) {
 		{"reference", func(schema *extension.Schema) { schema.ReferenceCommit = "main" }, "40 hexadecimal"},
 		{"published kind", func(schema *extension.Schema) { schema.Relationships[0].Kind = "ESC1" }, "namespace"},
 		{"endpoint", func(schema *extension.Schema) { schema.Relationships[0].Endpoints[0].TargetKind = "Bad-Label" }, "invalid"},
-		{"missing binding", func(schema *extension.Schema) { schema.Relationships[0].Query = "missing.cypher" }, "missing query"},
+		{"missing binding", func(schema *extension.Schema) { schema.Relationships[0].Query = "PoC/missing.cypher" }, "missing query"},
 		{"duplicate kind", func(schema *extension.Schema) {
 			schema.Relationships = append(schema.Relationships, schema.Relationships[0])
 		}, "duplicate"},
 		{"both output roles", func(schema *extension.Schema) {
-			schema.Nodes = []extension.NodeBinding{{Kind: "PoC_Helper", Query: "result.cypher", IDPrefix: "PoC_Helper_"}}
+			schema.Nodes = []extension.NodeBinding{{Kind: "PoC_Helper", Query: "PoC/result.cypher", IDPrefix: "PoC_Helper_"}}
 		}, "multiple output"},
 		{"helper prefix", func(schema *extension.Schema) {
 			schema.Relationships = nil
-			schema.Nodes = []extension.NodeBinding{{Kind: "PoC_Helper", Query: "result.cypher", IDPrefix: "native_"}}
+			schema.Nodes = []extension.NodeBinding{{Kind: "PoC_Helper", Query: "PoC/result.cypher", IDPrefix: "native_"}}
 		}, "ID prefix"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			var schema = schemaFor("result.cypher")
+			var schema = schemaFor("PoC/result.cypher")
 			testCase.change(&schema)
-			_, err := extension.Load(writeExtension(t, schema, map[string]string{"result.cypher": "// depends-on: none\nRETURN 1"}))
+			_, err := extension.Load(writeExtension(t, schema, map[string]string{"PoC/result.cypher": "// depends-on: none\nRETURN 1"}))
 			if err == nil || !strings.Contains(err.Error(), testCase.want) {
 				t.Fatalf("error %v; expected %q", err, testCase.want)
 			}
@@ -188,7 +192,7 @@ func TestLoadRejectsUnknownJSONFieldsAndTrailingJSON(t *testing.T) {
 	for _, suffix := range []string{`, "typo": true}`, `} {}`} {
 		t.Run(suffix, func(t *testing.T) {
 			var (
-				directory     = writeExtension(t, schemaFor("result.cypher"), map[string]string{"result.cypher": "// depends-on: none\nRETURN 1"})
+				directory     = writeExtension(t, schemaFor("PoC/result.cypher"), map[string]string{"PoC/result.cypher": "// depends-on: none\nRETURN 1"})
 				filename      = filepath.Join(directory, "schema.json")
 				contents, err = os.ReadFile(filename)
 			)
@@ -207,15 +211,15 @@ func TestLoadRejectsUnknownJSONFieldsAndTrailingJSON(t *testing.T) {
 
 func TestAffectedEvidenceAndPrerequisites(t *testing.T) {
 	var (
-		schema  = schemaFor("result.cypher")
+		schema  = schemaFor("PoC/result.cypher")
 		queries = map[string]string{
-			"constant.cypher":  "// depends-on: none\nRETURN 1",
-			"evidence.cypher":  "// depends-on: relationship:Enroll, query:constant.cypher\nRETURN $constant",
-			"result.cypher":    "// depends-on: query:evidence.cypher\nRETURN $evidence",
-			"unrelated.cypher": "// depends-on: node:Computer\nRETURN 1",
+			"PoC/constant.cypher":  "// depends-on: none\nRETURN 1",
+			"PoC/evidence.cypher":  "// depends-on: relationship:Enroll\n// depends-on: query:constant\nRETURN $constant",
+			"PoC/result.cypher":    "// depends-on: query:evidence\nRETURN $evidence",
+			"PoC/unrelated.cypher": "// depends-on: node:Computer\nRETURN 1",
 		}
 	)
-	schema.Nodes = []extension.NodeBinding{{Kind: "PoC_Unrelated", Query: "unrelated.cypher", IDPrefix: "PoC_Unrelated_"}}
+	schema.Nodes = []extension.NodeBinding{{Kind: "PoC_Unrelated", Query: "PoC/unrelated.cypher", IDPrefix: "PoC_Unrelated_"}}
 	plan, err := extension.Load(writeExtension(t, schema, queries))
 	if err != nil {
 		t.Fatal(err)
@@ -226,10 +230,10 @@ func TestAffectedEvidenceAndPrerequisites(t *testing.T) {
 		known                bool
 		expected             []string
 	}{
-		{"unknown coverage", nil, nil, false, []string{"constant.cypher", "evidence.cypher", "result.cypher", "unrelated.cypher"}},
-		{"relationship only including removal", nil, []string{"Enroll"}, true, []string{"constant.cypher", "evidence.cypher", "result.cypher"}},
-		{"endpoint property change", []string{"Domain"}, nil, true, []string{"constant.cypher", "evidence.cypher", "result.cypher"}},
-		{"helper change", []string{"PoC_Unrelated"}, nil, true, []string{"unrelated.cypher"}},
+		{"unknown coverage", nil, nil, false, []string{"PoC/constant.cypher", "PoC/evidence.cypher", "PoC/result.cypher", "PoC/unrelated.cypher"}},
+		{"relationship only including removal", nil, []string{"Enroll"}, true, []string{"PoC/constant.cypher", "PoC/evidence.cypher", "PoC/result.cypher"}},
+		{"endpoint property change", []string{"Domain"}, nil, true, []string{"PoC/constant.cypher", "PoC/evidence.cypher", "PoC/result.cypher"}},
+		{"helper change", []string{"PoC_Unrelated"}, nil, true, []string{"PoC/unrelated.cypher"}},
 		{"unrelated evidence", []string{"Unknown"}, []string{"Unknown"}, true, nil},
 		{"known no changes", nil, nil, true, nil},
 	}

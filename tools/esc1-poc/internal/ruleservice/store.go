@@ -19,6 +19,8 @@ SPDX-License-Identifier: Apache-2.0
 package ruleservice
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -68,6 +70,7 @@ const MaxRecentRuns = 20
 const maxStoredStatusBytes = MaxRecentRuns*MaxStatusBytes + MaxStatusBytes
 
 type Store struct {
+	schemas   SchemaSnapshot
 	mutex     sync.Mutex
 	directory string
 	active    Bundle
@@ -100,6 +103,11 @@ func Open(directory string) (*Store, error) {
 	if err == nil {
 		if err := decodeJSON(contents, &store.active); err != nil {
 			return nil, fmt.Errorf("read active rules: %w", err)
+		}
+		// Old experimental bundles mixed schemas and queries under filenames.
+		// Do not guess which extension owns those files or rewrite saved evidence.
+		if len(store.active.Files) > 0 && store.active.Schemas == nil {
+			return nil, fmt.Errorf("stored rules need explicit extension associations; follow 'Convert an older experimental rules directory' in tools/esc1-poc/USAGE.md using a new state directory")
 		}
 		store.plan, err = validateBundle(directory, store.active)
 		if err != nil {
@@ -146,7 +154,13 @@ func (s *Store) Active() (Bundle, error) {
 }
 
 func cloneBundle(bundle Bundle) Bundle {
-	copied := Bundle{Revision: bundle.Revision, Files: make(map[string]string, len(bundle.Files)), RetiredRelationships: append([]string(nil), bundle.RetiredRelationships...), RetiredEndpoints: copyEndpoints(bundle.RetiredEndpoints), Disabled: append([]string(nil), bundle.Disabled...), AddedAt: map[string]time.Time{}}
+	copied := Bundle{RetiredSchemas: map[string]SchemaAssociation{}, Schemas: cloneSchemas(bundle.Schemas), SchemaRevision: bundle.SchemaRevision, Suspended: map[string]string{}, Revision: bundle.Revision, Files: make(map[string]string, len(bundle.Files)), RetiredRelationships: append([]string(nil), bundle.RetiredRelationships...), RetiredEndpoints: copyEndpoints(bundle.RetiredEndpoints), Disabled: append([]string(nil), bundle.Disabled...), AddedAt: map[string]time.Time{}}
+	for kind, owner := range bundle.RetiredSchemas {
+		copied.RetiredSchemas[kind] = owner
+	}
+	for name, reason := range bundle.Suspended {
+		copied.Suspended[name] = reason
+	}
 	for name, added := range bundle.AddedAt {
 		copied.AddedAt[name] = added
 	}
@@ -161,10 +175,40 @@ func cloneBundle(bundle Bundle) Bundle {
 func (s *Store) Update(files map[string]string) (Bundle, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	var change = Change{BaseRevision: s.active.Revision, Files: files}
-	for name := range files {
+	var (
+		change  = Change{BaseRevision: s.active.Revision, Files: map[string]string{}}
+		schemas = map[string]InstalledSchema{}
+	)
+	// This explicit offline setup helper is used by tests and the standalone
+	// lab. HTTP callers cannot supply schemas: they use Preview/Apply instead.
+	for _, schema := range s.schemas.Definitions {
+		schemas[schema.Namespace] = schema
+	}
+	for name, contents := range files {
+		if extension.IsSchemaFile(name) {
+			if err := uniqueJSON([]byte(contents)); err != nil {
+				return Bundle{}, err
+			}
+			definition, err := extension.ParseDefinition([]byte(contents))
+			if err != nil {
+				return Bundle{}, err
+			}
+			digest := sha256.Sum256([]byte(definition.Schema.Namespace))
+			id := int32(binary.BigEndian.Uint32(digest[:4]) & 0x7fffffff)
+			schemas[definition.Schema.Namespace] = InstalledSchema{ID: id, Name: definition.Schema.Name, Namespace: definition.Schema.Namespace, Version: definition.Schema.Version, Definition: json.RawMessage(contents)}
+			continue
+		}
+		change.Files[name] = contents
 		change.Overwrite = append(change.Overwrite, name)
 	}
+	var snapshot = SchemaSnapshot{Definitions: []InstalledSchema{}}
+	for _, schema := range schemas {
+		snapshot.Definitions = append(snapshot.Definitions, schema)
+	}
+	if err := snapshot.validate(); err != nil {
+		return Bundle{}, err
+	}
+	s.schemas = snapshot
 	candidate, plan, _, err := s.candidate(change)
 	if err != nil {
 		return Bundle{}, err
@@ -174,6 +218,7 @@ func (s *Store) Update(files map[string]string) (Bundle, error) {
 
 func (s *Store) activate(candidate Bundle, plan extension.Plan) (Bundle, error) {
 	if candidate.Revision == s.active.Revision {
+		s.plan = plan
 		return cloneBundle(s.active), nil
 	}
 	// Keep the first recorded date through edits and disabling. Older saved
@@ -211,6 +256,12 @@ func (s *Store) LatestStatus() Status {
 	defer s.mutex.Unlock()
 	var result = cloneStatus(s.status)
 	result.ResultsStale = result.SavedRevision == "" || result.SavedRevision != s.active.Revision || result.ResultsUncertain || result.State == "failed" || result.State == "running" || result.State == "unavailable" || result.State == "uncertain"
+	if result.Execution != nil {
+		result.ResultsStale = result.ResultsStale || result.Execution.CleanupPending || (s.plan.SchemaRevision != "" && result.Execution.SchemaRevision != s.plan.SchemaRevision)
+		for _, query := range result.Execution.Queries {
+			result.ResultsStale = result.ResultsStale || query.State == "disabled"
+		}
+	}
 	// A lost final report must not leave a permanent success-looking spinner.
 	// This is a reporting deadline, not evidence that the graph rolled back.
 	if result.State == "running" && time.Since(result.UpdatedAt) > runner.DefaultLimits().RunTimeout+time.Minute {
@@ -251,6 +302,30 @@ func (s *Store) Report(status Status) error {
 	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	// The worker may notice a schema deletion before anybody opens the rules
+	// page. Save its pause only for the exact revision it ran. A late report
+	// must never disable a replacement the user has already reviewed.
+	if status.Execution != nil && status.Revision == s.active.Revision {
+		candidate := cloneBundle(s.active)
+		for _, query := range status.Execution.Queries {
+			if query.SchemaPaused {
+				if _, exists := candidate.Files[query.Name]; !exists {
+					return fmt.Errorf("pause names an unknown analysis")
+				}
+				candidate.Suspended[query.Name] = "The installed schema changed. Review before enabling this analysis."
+			}
+		}
+		candidate.Revision = bundleRevision(candidate)
+		if candidate.Revision != s.active.Revision {
+			plan, err := ValidateBundle(candidate)
+			if err != nil {
+				return err
+			}
+			if _, err := s.activate(candidate, plan); err != nil {
+				return err
+			}
+		}
+	}
 	status.SavedRevision, status.ResultsUncertain = s.status.SavedRevision, s.status.ResultsUncertain
 	if status.Execution != nil {
 		if status.Execution.Save == "succeeded" || status.Execution.Save == "unchanged" {

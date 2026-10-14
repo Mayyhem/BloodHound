@@ -18,10 +18,15 @@ package ruleservice
 
 import (
 	"fmt"
-	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
+	"regexp"
 	"slices"
 	"unicode/utf8"
+
+	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
+	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
 )
+
+var reportDigest = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 func validateExecution(execution *runner.Execution) error {
 	if execution == nil {
@@ -32,6 +37,9 @@ func validateExecution(execution *runner.Execution) error {
 	}
 	if len(execution.Queries) > MaxFiles || len(execution.Phase) > 64 || execution.Elapsed < 0 {
 		return fmt.Errorf("invalid execution report")
+	}
+	if execution.SchemaRevision != "" && !reportDigest.MatchString(execution.SchemaRevision) {
+		return fmt.Errorf("invalid schema revision")
 	}
 	if execution.Save != "succeeded" && execution.Saved != nil {
 		return fmt.Errorf("saved counts require a confirmed save")
@@ -46,6 +54,19 @@ func validateExecution(execution *runner.Execution) error {
 	for _, query := range execution.Queries {
 		if !queryName.MatchString(query.Name) || names[query.Name] || query.Stage < 1 || query.Stage > MaxFiles || len(query.Reason) > 2048 || !utf8.ValidString(query.Reason) || query.Elapsed < 0 {
 			return fmt.Errorf("invalid query report")
+		}
+		for _, version := range []string{query.Version, query.SchemaVersion} {
+			if version != "" {
+				if len(version) > 128 {
+					return fmt.Errorf("version exceeds its limit")
+				}
+				if _, err := extension.SchemaVersionMatches(version, ""); err != nil {
+					return fmt.Errorf("invalid reported version")
+				}
+			}
+		}
+		if query.SchemaPaused && query.State != "disabled" {
+			return fmt.Errorf("a schema pause must be reported as disabled")
 		}
 		names[query.Name] = true
 		if !slices.Contains([]string{"waiting", "running", "succeeded", "failed", "skipped", "disabled", "canceled"}, query.State) {

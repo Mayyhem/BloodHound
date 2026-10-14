@@ -86,6 +86,8 @@ Save this as **`getting_started_memberships.cypher`**:
 
 <!-- tested-example: 1 getting_started_memberships.cypher -->
 ```cypher
+// namespace: PoC_Start
+// version: v1.0.0
 // depends-on: node:User, node:Group, relationship:MemberOf
 // existing-edge-policy: keep-existing
 
@@ -106,14 +108,14 @@ If you have the local Go tooling and dependencies from the setup guide, you can 
 ./scripts/go.sh run . plan -extension /path/to/developer-start
 ```
 
-Expect one planned query, `getting_started_memberships.cypher`, with role `relationship` and kind `PoC_Start_DirectMemberOf`.
+Expect one planned query, `PoC_Start/getting_started_memberships.cypher`, with role `relationship` and kind `PoC_Start_DirectMemberOf`.
 
 This checks the schema, filenames, declarations, output columns, and the complete query using the same language reader used during execution. The result separates `validation` from the planned `queries`; database execution is explicitly **not run**. Mistakes include the filename and line where available. Named graph kinds and answer parameters must appear in `depends-on`; missing entries include a suggested correction. Passing these checks does not prove that database translation, actual data, or returned values will be valid. The script uses locally cached dependencies and does not download missing packages. If your dependencies are in another cache, set `POC_MODULE_CACHE` to that directory as described in the setup guide.
 
-### 3. Activate the two files
+### 3. Upload the schema and activate the analysis
 
-1. Open the lab's rule page at `http://127.0.0.1:18081/`.
-2. Select the two files, then click **Save upload and review**.
+1. Upload `getting_started.schema.json` through BloodHound’s **OpenGraph Management** page.
+2. Open the rule page at `http://127.0.0.1:18081/`, select `getting_started_memberships.cypher`, and click **Save upload and review**.
 3. Check the proposed rule and output kind. If replacing files, explicitly choose which files to overwrite.
 4. Click **Activate reviewed revision**.
 
@@ -166,7 +168,7 @@ Collector uploads facts
 | --- | --- |
 | Collector | Upload the facts: objects, properties, and observed relationships. |
 | Extension author | Describe the model and write the calculation queries. |
-| Rule service | Store schema/query files, review changes, and show the latest report plus up to 20 recent runs. It does not run graph queries. |
+| Rule service | Store analysis files and declaration snapshots, review changes, and show the latest report plus up to 20 recent runs. It does not run graph queries. |
 | BloodHound | Run native analysis, execute extension queries, and save validated results. |
 | DAWGS | Provide BloodHound's graph access and supported Cypher parsing/translation. |
 
@@ -179,7 +181,7 @@ You can update a rule without rebuilding BloodHound. Adding a missing DAWGS lang
 | You decide | BloodHound handles |
 | --- | --- |
 | The collected facts, their stable IDs, and the properties that connect different sources. | Importing those facts. Omission from a later upload does not automatically mean deletion. |
-| Your schema's names, kinds, allowed endpoint pairs, presentation, and whether a connection is traversable. | Registering the display schema and checking calculated endpoints. |
+| Your schema's names, kinds, allowed endpoint pairs, presentation, and whether a connection is traversable. | Reading the installed schema and checking calculated endpoints. |
 | The complete answer your query should return, including its literal output kind and any properties. | Checking rows, combining identical answers, and saving combined results together. |
 | All graph kinds read by the query and every prerequisite query it consumes. | Choosing affected queries, ordering their work, and sharing each prerequisite's answer within the run. |
 | An optional `existing-edge-policy` comment on a relationship query. | Applying that policy and removing in-scope relationships no producer still returns. |
@@ -196,39 +198,69 @@ If the account arrives before the directory user, a later run can connect them w
 
 ## Files and schema
 
-Use a distinct named schema, such as `my_extension.schema.json`, and descriptive `snake_case.cypher` filenames. `schema.json` is also accepted. The upload is a flat collection of files, not a directory tree.
+Upload the schema through **OpenGraph Management** and the `snake_case.cypher` files through the current **rules page**. Keep the schema beside the queries for offline `plan` checks. Its filename does not identify the installed extension; `schema.name` does.
 
-**Query filenames are shared across all installed extensions.** Prefix them when necessary, for example `vault_account_users.cypher`. Each query must produce a declared output or be needed by another query; unused files are rejected.
+**Different extensions may use the same query filename.** `PoC_AD/users` and `PoC_Vault/users` are separate analyses. Each query declares its own namespace and version, even if it only supplies shared answers. Each file must produce an output or be needed by another query; unused files are rejected.
 
 | Field or rule | What you need to know |
 | --- | --- |
-| `schema.name` | Stable extension identity, unique in the bundle. |
+| `schema.name` | Stable installed extension identity; matching names update that extension. |
 | `schema.display_name` | Human-readable name shown to authors. |
-| `schema.version` | A semantic version such as `v1.0.0`; this experiment requires the `v` prefix. |
+| `schema.version` | The installed schema version. Existing BloodHound spellings such as `1.0.0` remain accepted; comparison treats it as `v1.0.0`. |
 | `schema.namespace` | Prefix for this schema's declared kinds. With `PoC_Start`, kinds must begin `PoC_Start_`. Namespaces must be unique. |
 | `node_kinds` / `relationship_kinds` | Arrays describing your own kinds. Current BloodHound registration requires at least one local node kind; relationships may be `[]`. Do not redeclare another extension's kinds. |
-| Relationship `compatible_kinds` | Exact allowed source/target kind pairs. Allowing `User → Domain` and `Group → Computer` does not allow `User → Computer`. |
+| Relationship `compatible_kinds` | Exact allowed source/target kind pairs for calculated relationships; optional for collected-only types. Allowing `User → Domain` and `Group → Computer` does not allow `User → Computer`. |
 | `is_traversable` | Whether pathfinding may follow the relationship. Use `false` for factual associations that do not establish an attack step. |
 
 Current experiment restriction: **calculated kinds and helper ID prefixes must start with `PoC_`**. They must also follow their schema namespace rules. This separates experimental output from native output.
 
-A declared kind with no producing query is descriptive or collected data; declaring it alone does not schedule graph changes. If its last producing rule was deleted, previously managed results are cleared on the next successful run. The runner registers the display schema separately from calculating results. The custom `compatible_kinds` field is interpreted by this architecture, not by an ordinary OpenGraph schema upload.
+A declared kind with no producing query is descriptive or collected data; declaring it alone does not schedule graph changes. If its last producing rule was deleted, previously managed results are cleared on the next successful run. The modified schema upload preserves `compatible_kinds`; our parser interprets it when checking analyses. The worker never installs or restores schemas.
 
 Reference native BloodHound kinds directly. For a kind defined by another extension, use its defining schema; do not repeat its declaration in your own file.
 
-All schemas are read before references are checked, so they can refer to one another in either file order. Missing definitions keep an uploaded draft inactive; upload the remaining schemas and queries, review the complete result, then activate it. Mutual type references are allowed. Calculations that each require the other's new answer still have no valid execution order and cannot activate.
+All schemas are read before references are checked, so they can refer to one another in either file order. Missing definitions keep an uploaded draft inactive; install the missing schemas in OpenGraph Management, add missing queries on the rules page, then review and activate. Mutual type references are allowed. Calculations that each require the other's new answer still have no valid execution order and cannot activate.
 
 **Do not add `post_processing` blocks.** Output declarations live in Cypher. The platform supplies the reference build and the shipped ESC1 experiment’s native-agreement check. Declare each relationship kind once in a schema; several query files may return it.
 
-Keep an activated schema's filename and name stable when updating it. You can add producers and change their queries through reviewed uploads. See [USAGE.md — Change the active rules](USAGE.md#change-the-active-rules) for removal and reassignment.
+Keep `schema.name` stable when updating an installed extension. You can add producers and change their queries through reviewed uploads. See [USAGE.md — Change the active rules](USAGE.md#change-the-active-rules) for removal and reassignment.
+
+## File association and compatible versions
+
+Put these declarations in the leading comments, after an optional license block:
+
+```cypher
+// namespace: PoC_CyberArk
+// version: v1.0.0
+// extension-versions: >=v1.0.0,<v2.0.0
+// depends-on: query:PoC_AD/users>=v1.0.3,<v2.0.0 as directory_users
+// depends-on: node:PoC_CyberArk_Account, node:User
+```
+
+`namespace` and `version` are required exactly once. The namespace assigns the file to its installed extension, regardless of who uses its answer or where its output kind is defined. The file’s version is independent of `schema.version`. Optional `extension-versions` limits which installed schema versions it supports; omission adds no version restriction.
+
+A local dependency such as `query:users` stays in the consumer’s namespace. Use `query:PoC_AD/users` across extensions. Omit `.cypher` in declarations; keep it on actual files. Add `as directory_users` to supply `$directory_users`. Two prerequisites with the same basename need distinct aliases. Put one query requirement on each `depends-on` line; keep graph inputs on their own lines.
+
+Version conditions follow requirements.txt notation: `==`, `!=`, `>`, `>=`, `<`, `<=`, `~=`, and `==v1.*` / `!=v1.2.*`. Commas mean every condition must hold. `~=v1.0.3` means `>=v1.0.3,<v1.1.0`; `~=v1.0` means `>=v1.0.0,<v2.0.0`. Other concrete comparison versions need all three components. Analysis versions and condition versions use `v`. Ordering is numeric: `v1.10.0` follows `v1.9.0`. Build suffixes do not change ordering or equality. With a condition, a prerelease is accepted only when at least one comparison explicitly names a prerelease. Without a condition, an explicitly reviewed and activated prerelease is also eligible.
+
+No condition means the one latest **activated local version**, including a major update. A new draft has no effect. There is no download, historical-version search, or separate version per consumer. An exact requirement `==v1.0.0` rejects a proposed `v1.0.1` replacement until its consumer is updated or deliberately disabled. A compatible schema update needs no file edit. An incompatible or missing installed schema pauses affected files and their consumers, keeping previous graph results. A retained schema pause needs a reviewed **Enable** after the cause is fixed.
+
+### Shared columns and meanings
+
+Use descriptive producer columns, such as `RETURN person.objectid AS user_id`. In the consumer, `UNWIND $directory_users AS directory_user` names each row, and `WITH directory_user.user_id AS matched_user_id` names a value. These names do not cast values or select a type. There is no required `row`, `node`, or `relationship` alias and no additional type-comment format.
+
+Review checks explicit `RETURN` column names against direct `UNWIND $parameter AS row` uses such as `row.user_id`. Renaming that column can therefore reject a replacement even if its declared version is compatible. It does not infer every expression: a `WITH`, a renamed value, indexing, or an advanced calculation may need execution to verify. Each returned row is also checked against known columns during execution. Plain nulls and nested lists/maps are allowed in shared answers; final relationship/helper outputs retain their stricter checks. Raw database node, relationship, and path values remain unsupported.
+
+Document what columns mean next to the query. For example: **`user_id` is a native User’s text `objectid`; each eligible user appears once; no matches returns an empty list.** A membership producer might document **`user_id` and `group_id` are text object IDs; each row is one direct membership pair.** Types and meaning are author claims, not inferred guarantees. A type error stops the run and preserves the previous answer; a valid comparison that finds no matches can produce a successful empty answer and remove old calculated connections. Test those cases before widening a compatibility range.
 
 ## Dependencies and shared queries
 
 Every query starts with a `depends-on` comment. Declare the node and relationship kinds it reads, plus any earlier query answers it consumes. Declared graph inputs must be native kinds or have a defining schema in the complete set; a missing custom schema keeps the draft inactive:
 
 ```cypher
-// depends-on: node:User, node:Group, relationship:MemberOf,
-// query:getting_started_enabled_users.cypher
+// namespace: PoC_Start
+// version: v1.0.0
+// depends-on: node:User, node:Group, relationship:MemberOf
+// depends-on: query:getting_started_enabled_users
 ```
 
 These declarations do two jobs: order queries and decide which rules need to run after data changes. Include kinds used in filters and traversals, not just those in the final output. If a query has no inputs, write `// depends-on: none`.
@@ -243,6 +275,8 @@ Continue from the quick start. Add **`getting_started_enabled_users.cypher`** be
 
 <!-- tested-example: 2 getting_started_enabled_users.cypher -->
 ```cypher
+// namespace: PoC_Start
+// version: v1.0.0
 // depends-on: node:User
 MATCH (person:User)
 WHERE person.enabled = true
@@ -253,8 +287,10 @@ Replace **`getting_started_memberships.cypher`** with the following query. Keep 
 
 <!-- tested-example: 2 getting_started_memberships.cypher -->
 ```cypher
-// depends-on: query:getting_started_enabled_users.cypher,
-// node:User, node:Group, relationship:MemberOf
+// namespace: PoC_Start
+// version: v1.0.0
+// depends-on: query:getting_started_enabled_users
+// depends-on: node:User, node:Group, relationship:MemberOf
 // existing-edge-policy: keep-existing
 
 UNWIND $getting_started_enabled_users AS eligible
@@ -264,7 +300,7 @@ RETURN DISTINCT person.objectid AS source, group.objectid AS target,
        'PoC_Start_DirectMemberOf' AS kind
 ```
 
-The filename without `.cypher` becomes the parameter: `$getting_started_enabled_users` is a list of rows, each with `user_id`. Query parameters currently come from declared query prerequisites; there is no separate arbitrary parameter/configuration file for authors.
+The filename without `.cypher` is the default parameter name: `$getting_started_enabled_users` is a list of rows, each with `user_id`. Query parameters currently come from declared query prerequisites; there is no separate arbitrary parameter/configuration file for authors.
 
 Both files must be in the loaded bundle. The final query names its declared edge kind in `RETURN`; the prerequisite has no output declaration. Query dependencies can cross extension boundaries, and a shared prerequisite runs once for its consumers in that run. Answers are not cached between runs. Circular dependencies are rejected.
 
@@ -300,8 +336,10 @@ To add properties after the [shared-answer example](#pass-rows-from-one-query-to
 
 <!-- tested-example: 4 getting_started_memberships.cypher -->
 ```cypher
-// depends-on: query:getting_started_enabled_users.cypher,
-// node:User, node:Group, relationship:MemberOf
+// namespace: PoC_Start
+// version: v1.0.0
+// depends-on: query:getting_started_enabled_users
+// depends-on: node:User, node:Group, relationship:MemberOf
 // existing-edge-policy: merge-properties
 
 UNWIND $getting_started_enabled_users AS eligible
@@ -338,6 +376,8 @@ The quick-start schema already declares `PoC_Start_Note`. To create one note per
 
 <!-- tested-example: 3 getting_started_notes.cypher -->
 ```cypher
+// namespace: PoC_Start
+// version: v1.0.0
 // depends-on: node:User
 MATCH (person:User)
 RETURN 'PoC_Start_Note_' + person.objectid AS id,
@@ -463,7 +503,7 @@ Only relationship producers can request it, and they cannot also request `reacha
 ### `batch-on`: run independent input chunks
 
 ```cypher
-// batch-on: trusted_cas.cypher
+// batch-on: trusted_cas
 ```
 
 This permits the runner to split one declared prerequisite into smaller lists. It executes the query once per chunk and combines the answers before publication. Other prerequisites remain available for every chunk.
@@ -526,7 +566,7 @@ The local `plan` command is a useful first check. Use the rule page and a dedica
 | --- | --- |
 | File upload rejected | Filenames, size limits, valid schema fields, missing prerequisite files, unused queries, and literal output kinds with matching policies for shared relationship producers. |
 | Output declaration rejected | Use a literal `kind`, declare that kind once in the schema, and give all its producers the same update policy. |
-| Query parameter rejected | Declare `query:filename.cypher`; use `$filename` without the extension. |
+| Query parameter rejected | Declare `query:filename`; use `$filename` without the extension. |
 | Rule never runs after activation | Activation alone does not execute it. Trigger a later successful native analysis with a collection upload; check disabled prerequisites and report revision. |
 | Rule does not rerun after relevant data changes | Check all node/relationship dependencies, including kinds used only in filters. |
 | No output, but the report succeeded | Check the query's actual rows and current graph evidence. Empty successful results are allowed. |

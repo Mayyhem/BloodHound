@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
@@ -112,7 +111,7 @@ func calculateQueries(ctx context.Context, database Database, transaction Transa
 				graphInputs[dependency.Name] = true
 			}
 			if dependency.Type == "query" {
-				remaining[strings.TrimSuffix(dependency.Name, ".cypher")]++
+				remaining[dependency.Name]++
 			}
 		}
 	}
@@ -176,8 +175,8 @@ func calculateQueries(ctx context.Context, database Database, transaction Transa
 			inputs := map[string]*answerFile{}
 			for _, dependency := range query.Dependencies {
 				if dependency.Type == "query" {
-					parameter := strings.TrimSuffix(dependency.Name, ".cypher")
-					inputs[parameter] = answers[parameter]
+					parameter := dependency.AnswerParameter()
+					inputs[parameter] = answers[dependency.Name]
 				}
 			}
 			report.Execution.query(query.Name).State = "running"
@@ -210,7 +209,7 @@ func calculateQueries(ctx context.Context, database Database, transaction Transa
 		query, file := answer.query, answer.file
 		*currentQuery = query.Name
 		report.Execution.Phase = "check-answers"
-		answers[query.Parameter] = file
+		answers[query.Name] = file
 		report.Queries = append(report.Queries, query.Name)
 		report.QueryRows[query.Name] = int(file.rows)
 		if space.observeAnswer != nil {
@@ -275,7 +274,7 @@ func calculateQueries(ctx context.Context, database Database, transaction Transa
 		report.Execution.Phase = "calculation"
 		for _, dependency := range query.Dependencies {
 			if dependency.Type == "query" {
-				remaining[strings.TrimSuffix(dependency.Name, ".cypher")]--
+				remaining[dependency.Name]--
 			}
 		}
 		for parameter, file := range answers {
@@ -402,7 +401,7 @@ func calculateQuery(ctx context.Context, transaction Transaction, query extensio
 		if dependency.Type != "query" {
 			continue
 		}
-		parameter := strings.TrimSuffix(dependency.Name, ".cypher")
+		parameter := dependency.AnswerParameter()
 		parameterBytes += encodedSize(parameter) + 1 // The name, colon, and comma.
 		if parameterBytes > space.limits.ParameterBytes {
 			return nil, fmt.Errorf("prerequisite names exceed the parameter budget")
@@ -411,7 +410,7 @@ func calculateQuery(ctx context.Context, transaction Transaction, query extensio
 		if file == nil {
 			return nil, fmt.Errorf("missing completed prerequisite %s", dependency.Name)
 		}
-		if dependency.Name == query.BatchDependency {
+		if dependency.AnswerParameter() == query.BatchDependency {
 			partition = file
 			continue
 		}
@@ -442,6 +441,16 @@ func calculateQuery(ctx context.Context, transaction Transaction, query extensio
 	}
 	execute := func() error {
 		return stream(ctx, transaction, query.Text, parameters, func(row map[string]any) error {
+			if query.ColumnsKnown {
+				if len(row) != len(query.Columns) {
+					return fmt.Errorf("returned columns do not match the final RETURN")
+				}
+				for _, column := range query.Columns {
+					if _, exists := row[column]; !exists {
+						return fmt.Errorf("returned columns do not match the final RETURN")
+					}
+				}
+			}
 			if query.OutputKind != "" {
 				// Relationships return kind; helpers return a one-item kinds
 				// list. Their full row shapes are checked before saving either.
@@ -472,7 +481,7 @@ func calculateQuery(ctx context.Context, transaction Transaction, query extensio
 		// The author explicitly promises that each input row is an independent
 		// calculation. We combine complete answers; publication still waits for
 		// every input batch. Ordinary queries are never split by guessing.
-		parameter := strings.TrimSuffix(query.BatchDependency, ".cypher")
+		parameter := query.BatchDependency
 		var batch = Rows{}
 		var bytes int64 = 2 // The batched list also needs brackets.
 		flush := func() error {

@@ -88,7 +88,7 @@ func TestRenamingESC1QueryPreservesNativeComparison(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !plan.Schema.CompareNativeESC1 || plan.Schema.Relationships[0].Query != "renamed_result.cypher" || plan.Schema.Relationships[0].Kind != "PoC_ADCSESC1" {
+	if !plan.Schema.CompareNativeESC1 || plan.Schema.Relationships[0].Query != "PoC/renamed_result.cypher" || plan.Schema.Relationships[0].Kind != "PoC_ADCSESC1" {
 		t.Fatalf("renamed output changed native comparison configuration: %+v", plan.Schema)
 	}
 }

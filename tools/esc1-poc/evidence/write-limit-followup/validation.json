@@ -1,0 +1,178 @@
+{
+  "date": "2026-10-13",
+  "starting_commits": {
+    "bloodhound": "ed94c2c96855599dfe66d0e83f9a976a0969dff7",
+    "dawgs": "5f16c574e48045472d15a447c2fa9707d394a4bd"
+  },
+  "starting_dawgs_was_dirty": true,
+  "source_hash_algorithm": "sha256",
+  "tested_dawgs_source_digest": "4380e87f9ae29d015feee7218619e366990700f27d0213ec37228e827a5538bb",
+  "tested_dawgs_source_digest_method": "SHA-256 of the sorted compact JSON map of source paths to hashes, excluding Markdown. Includes tracked and nonignored untracked files.",
+  "changed_dawgs_files": {
+    "README.md": {
+      "before": "13a396c597227325add60c23f82fcd25d7ac8ca6a255fa3e61849ffdd26fc09b",
+      "after": "a5bd6c33a02bd3f4ad310efc4c5bf0f0f1af8cfae00ce9d38b74748e0518195b"
+    },
+    "cypher/models/pgsql/test/translation_cases/write_selection.sql": {
+      "before": null,
+      "after": "7c9a97432400354fec7420c79330051ac32394575c2bde511f0855a8dc29d379"
+    },
+    "cypher/models/pgsql/translate/query.go": {
+      "before": "6c5047c583776e11640f7ea0764cc1981a81915d9766e4ac413979649f3092c2",
+      "after": "a37f881fc0b974dca557dca6a393d449bc17fc961dadf7cef962fce985589460"
+    },
+    "cypher/models/pgsql/translate/translator.go": {
+      "before": "6ef9efd30a2ede6d43811f3c6487c2ecd5c93bba7d92528a68265baaae096e94",
+      "after": "f087de7155c1f0cce24782beb264e01a0bcd54478c66bab063a32468acb24775"
+    },
+    "cypher/models/pgsql/translate/with.go": {
+      "before": "a5f1b7ef4a0fe7826735f7a33cca02dbf95b6d8fee65d842657e88c252be00d5",
+      "after": "7ef8d301893c3d32987b405aa6c8817d1a2dbab11f2631dc373b277f62c812eb"
+    },
+    "cypher/models/pgsql/translate/with_selection_test.go": {
+      "before": null,
+      "after": "21cbea98b8611cacfde9928d3388e209c2f2b6eaf15bd2e3629fbdddac70cbce"
+    },
+    "cypher/test/cases/mutation_tests.json": {
+      "before": "90f7556d857de71523f20d67bbb1c77e09525eaf23d342993ca20974e1c61311",
+      "after": "9c5f6ba8aeb760307c1213a2ede8e2de58b363cfc307b3122c915fb48b12e33b"
+    },
+    "integration/cypher_template_test.go": {
+      "before": "61599b72526bbdf9650f7e6552b31184609e846180bc1763e4bc1cabfb3c0398",
+      "after": "1727474d8405ffc1a64bec115f98a57320dfb89386cc186d2b9eba23852c7dc4"
+    },
+    "integration/pgsql_path_input_integration_test.go": {
+      "before": "f83d27c3a4d60d3b7056fbf7ef74d604a25b18a48589c8f4d713acb9d3bb309f",
+      "after": "a41a4dd2a252423752feba1d00f755515b29ecacd448e8e5fa3739614908e3f0"
+    },
+    "integration/testdata/templates/write_selection.json": {
+      "before": null,
+      "after": "1398976d506e2de603c47a141655c89019c0fcce67b52534cbbec8483ac3cf16"
+    },
+    "integration/write_selection_integration_test.go": {
+      "before": null,
+      "after": "43ce12dcaa9f8b1d4f3c5e19da1a9f53c8235ebe3a24b552b432ea3172805f8e"
+    }
+  },
+  "checks": [
+    {
+      "name": "full-dawgs-pg",
+      "command": [
+        "make",
+        "-C",
+        "tools/DAWGS",
+        "test_all",
+        "GO_CMD=tools/esc1-poc/scripts/go.sh -C ../DAWGS",
+        "METRICS_DIR=tools/esc1-poc/work/write-limits/coverage-pg"
+      ],
+      "exit_code": 0,
+      "seconds": 381.02798138900835,
+      "private_log": "tools/esc1-poc/work/write-limits/full-dawgs-pg.log",
+      "log_sha256": "a4110276b6307ee8f5b389ed5b57a25d91f98118939979accacde170a4dfac5e"
+    },
+    {
+      "name": "full-dawgs-neo4j",
+      "command": [
+        "make",
+        "-C",
+        "tools/DAWGS",
+        "test_all",
+        "GO_CMD=tools/esc1-poc/scripts/go.sh -C ../DAWGS",
+        "METRICS_DIR=tools/esc1-poc/work/write-limits/coverage-neo4j"
+      ],
+      "exit_code": 0,
+      "seconds": 202.6358271240024,
+      "private_log": "tools/esc1-poc/work/write-limits/full-dawgs-neo4j.log",
+      "log_sha256": "2cef92044ebd6b04972a85b07aa81a6cea5abbd823635002352c468a592cf31c"
+    },
+    {
+      "name": "dawgs-vet",
+      "command": [
+        "tools/esc1-poc/scripts/go.sh",
+        "-C",
+        "../DAWGS",
+        "vet",
+        "./cypher/models/pgsql/...",
+        "./integration"
+      ],
+      "exit_code": 0,
+      "seconds": 1.382007316002273,
+      "private_log": "tools/esc1-poc/work/write-limits/dawgs-vet.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "pilot-unit",
+      "command": [
+        "tools/esc1-poc/scripts/go.sh",
+        "test",
+        "-race",
+        "-count=1",
+        "./internal/runner",
+        "./internal/graphdb"
+      ],
+      "exit_code": 0,
+      "seconds": 10.160016045992961,
+      "private_log": "tools/esc1-poc/work/write-limits/pilot-unit.log",
+      "log_sha256": "9f1a02e886cce93f4f64dd3e2900b35ea9231ba6b452b2842bff91ba2cc2b7c9"
+    }
+  ],
+  "coverage": {
+    "method": "Same make test command before and after; merge repeated blocks with any hit counted as covered. Generated parser excluded by the existing Makefile.",
+    "before": {
+      "covered_statements": 21263,
+      "total_statements": 34257,
+      "percent": 62.069066176255944
+    },
+    "after": {
+      "covered_statements": 21710,
+      "total_statements": 34322,
+      "percent": 63.253889633471246
+    }
+  },
+  "shared_write_selection_cases": 38,
+  "postgresql_optimizations_disabled_cases": 38,
+  "failure_preservation_cases_per_backend": 4,
+  "initial_reproduction": {
+    "cases": 26,
+    "neo4j_passed": 26,
+    "postgresql_passed": 3,
+    "postgresql_failed": 23
+  },
+  "sql_cases": {
+    "existing_retained": 408,
+    "added": 36,
+    "final_total": 444
+  },
+  "database_state": [
+    {
+      "container": "esc1-write-limits-test-pg-graph-1",
+      "status": "exited",
+      "running": false,
+      "image": "docker.io/library/postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+      "storage_preserved": true
+    },
+    {
+      "container": "esc1-write-limits-test-graph-1",
+      "status": "exited",
+      "running": false,
+      "image": "docker.io/library/neo4j:4.4.42@sha256:73b5a47eb9952f47fcc42fcc80bdd6bd0d6b71eea9a1a345c216675498c790e4",
+      "storage_preserved": true
+    }
+  ],
+  "unsuccessful_attempts": [
+    "Sandbox-only baseline could not open its local test HTTP listener; authorized rerun passed.",
+    "A first reproduction used an unsupported connection scheme; corrected before recording the 26-case baseline.",
+    "First full run found an expected formatting string missing explicit ASC; corrected.",
+    "Second full run found a computed-alias filter after creation; moved bounded filters before writes and added graph checks.",
+    "A broader filter-placement attempt affected existing grouped queries; retained original placement for unbounded filters.",
+    "The existing SQL updater silently dropped cases after errors; restored starting fixtures and verified all 408 original cases plus 36 additions."
+  ],
+  "historical_evidence_modified": false,
+  "public_api_or_author_requirements_changed": false,
+  "application_deployed": false,
+  "staged_or_committed": false,
+  "root_just_test_run": false,
+  "root_just_test_reason": "Only the separate DAWGS runtime and BloodHound documentation changed; full DAWGS checks and affected pilot unit checks were used.",
+  "prepare_for_codereview_run": false,
+  "prepare_for_codereview_note": "Required before the user commits. It performs dependency/generation/analysis tasks and does not substitute for the database suites."
+}

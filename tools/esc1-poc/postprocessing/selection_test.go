@@ -133,9 +133,10 @@ func TestServiceSettlesSafeSkipAndExcludesSchemaPreparation(t *testing.T) {
 	)
 	service.changes.Reset()
 	service.changes.add(ctx, true, graph.StringKind("Unrelated"))
-	service.configuration.RegisterSchema = func(ctx context.Context, _ []byte) error {
+	original := service.configuration.ReadSchemas
+	service.configuration.ReadSchemas = func(ctx context.Context) ([]byte, error) {
 		service.changes.Unknown(ctx)
-		return nil
+		return original(ctx)
 	}
 	service.execute = func(_ context.Context, _ extension.Plan, options runner.Options) (runner.Report, error) {
 		if !options.Changes.CoverageKnown || !reflect.DeepEqual(options.Changes.Nodes, []string{"Unrelated"}) {

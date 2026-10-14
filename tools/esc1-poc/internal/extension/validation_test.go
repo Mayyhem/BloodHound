@@ -28,12 +28,12 @@ import (
 
 func TestCompleteQueryValidation(t *testing.T) {
 	for _, testCase := range []struct{ name, source, problem string }{
-		{"misspelled match", "// depends-on: node:User\nMACH (person:User) RETURN person.objectid AS source", "line 2"},
-		{"missing graph input", "// depends-on: node:User, node:Group\nMATCH (person:User)-[:MemberOf]->(group:Group) RETURN person.objectid AS source", "line 2: missing dependency; add relationship:MemberOf"},
-		{"missing answer", "// depends-on: none\nUNWIND $people AS person RETURN person.id AS source", "line 2: missing dependency; add query:people.cypher"},
-		{"unsupported subquery", "// depends-on: none\nCALL { RETURN 1 AS value } RETURN value", "file syntax: line 2"},
+		{"misspelled match", "// depends-on: node:User\nMACH (person:User) RETURN person.objectid AS source", "line 4"},
+		{"missing graph input", "// depends-on: node:User, node:Group\nMATCH (person:User)-[:MemberOf]->(group:Group) RETURN person.objectid AS source", "line 4: missing dependency; add relationship:MemberOf"},
+		{"missing answer", "// depends-on: none\nUNWIND $people AS person RETURN person.id AS source", "line 4: missing dependency; add query:people"},
+		{"unsupported subquery", "// depends-on: none\nCALL { RETURN 1 AS value } RETURN value", "file syntax: line 4"},
 		{"unsupported expression", "// depends-on: none\nRETURN [n IN [1] | n] AS answer", "language support"},
-		{"bad columns", "// depends-on: none\nRETURN 'x' AS source, 'PoC_ESC1' AS kind", "line 2: output: relationship output requires"},
+		{"bad columns", "// depends-on: none\nRETURN 'x' AS source, 'PoC_ESC1' AS kind", "line 4: output: relationship output requires"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			_, err := extension.Load(writeExtension(t, schemaFor("result.cypher"), map[string]string{"result.cypher": testCase.source}))

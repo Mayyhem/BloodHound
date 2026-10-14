@@ -29,19 +29,30 @@ import (
 // on a disabled rule can resume automatically once all its inputs are available.
 func applyRuleSettings(bundle Bundle, plan *extension.Plan) error {
 	var (
-		known   = map[string]bool{}
-		reasons = map[string]string{}
+		known        = map[string]bool{}
+		reasons      = map[string]string{}
+		seenDisabled = map[string]bool{}
 	)
 	for _, query := range plan.Queries {
 		known[query.Name] = true
+		if query.DisabledReason != "" {
+			reasons[query.Name] = query.DisabledReason
+		}
+	}
+	for name, reason := range bundle.Suspended {
+		if !known[name] || reason == "" {
+			return fmt.Errorf("invalid retained pause")
+		}
+		reasons[name] = reason
 	}
 	if len(bundle.Disabled) > MaxFiles || !sort.StringsAreSorted(bundle.Disabled) {
 		return fmt.Errorf("disabled rules must be a sorted, bounded list")
 	}
 	for _, name := range bundle.Disabled {
-		if !known[name] || reasons[name] != "" {
+		if !known[name] || seenDisabled[name] {
 			return fmt.Errorf("unknown or repeated disabled rule %q", name)
 		}
+		seenDisabled[name] = true
 		reasons[name] = "Disabled by you. Existing connections are kept."
 	}
 	for name, added := range bundle.AddedAt {
@@ -116,6 +127,7 @@ func changeEnabledRules(candidate *Bundle, change Change) error {
 			}
 		}
 		delete(disabled, name)
+		delete(candidate.Suspended, name)
 	}
 	candidate.Disabled = nil
 	for name := range disabled {
@@ -128,14 +140,25 @@ func changeEnabledRules(candidate *Bundle, change Change) error {
 // Remember which connection types no longer have any producing rules. The
 // saved endpoint scope lets the runner clear old results even if a later schema
 // changes the type's name. A shared type is refreshed by its remaining producers.
-func retainRetirements(previous extension.Plan, next extension.Plan, candidate *Bundle) error {
-	var retired = map[string]bool{}
-	// Schema files also hold display information. Keep their identity stable
-	// even when their last rule is deleted.
-	for name, filename := range previous.SchemaFiles {
-		if next.SchemaFiles[name] != filename {
-			return fmt.Errorf("keep the schema name and filename for %s", name)
+func retainRetirements(previous extension.Plan, next extension.Plan, previousSchemas []InstalledSchema, candidate *Bundle) error {
+	var (
+		retired = map[string]bool{}
+		owners  = map[string]SchemaAssociation{}
+	)
+	for _, schema := range previousSchemas {
+		if len(schema.Definition) == 0 || string(schema.Definition) == "null" {
+			continue
 		}
+		definition, err := extension.ParseDefinition(schema.Definition)
+		if err != nil {
+			return err
+		}
+		for _, kind := range definition.RelationshipKinds {
+			owners[kind.Name] = SchemaAssociation{ID: schema.ID, Name: schema.Name, Namespace: schema.Namespace}
+		}
+	}
+	if candidate.RetiredSchemas == nil {
+		candidate.RetiredSchemas = map[string]SchemaAssociation{}
 	}
 	for _, kind := range candidate.RetiredRelationships {
 		retired[kind] = true
@@ -144,12 +167,18 @@ func retainRetirements(previous extension.Plan, next extension.Plan, candidate *
 		candidate.RetiredEndpoints = map[string][]extension.Endpoint{}
 	}
 	for _, binding := range previous.Schema.Relationships {
+		owner, exists := owners[binding.Kind]
+		if !exists {
+			return fmt.Errorf("cannot retain cleanup without the output's extension association")
+		}
+		candidate.RetiredSchemas[binding.Kind] = owner
 		retired[binding.Kind] = true
 		candidate.RetiredEndpoints[binding.Kind] = append([]extension.Endpoint(nil), binding.Endpoints...)
 	}
 	for _, binding := range next.Schema.Relationships {
 		delete(retired, binding.Kind)
 		delete(candidate.RetiredEndpoints, binding.Kind)
+		delete(candidate.RetiredSchemas, binding.Kind)
 	}
 	candidate.RetiredRelationships = nil
 	for kind := range retired {

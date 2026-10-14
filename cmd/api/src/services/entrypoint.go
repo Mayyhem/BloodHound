@@ -197,23 +197,24 @@ func Entrypoint(ctx context.Context, cfg config.Configuration, connections boots
 			extensions, err := postprocessing.New(postprocessing.Configuration{
 				URL: cfg.PostProcessing.URL, Token: cfg.PostProcessing.Token,
 				Directory: filepath.Join(cfg.WorkDir, "postprocessing"), Backend: driverName,
-				RegisterSchema: func(schemaContext context.Context, contents []byte) error {
-					var payload model.GraphExtensionPayload
-					if err := json.Unmarshal(contents, &payload); err != nil {
-						return err
+				ReadSchemas: func(schemaContext context.Context) ([]byte, error) {
+					// A previous upload may have saved metadata but failed its
+					// graph-kind refresh. Retry that step before any calculation.
+					if err := connections.Graph.RefreshKinds(schemaContext); err != nil {
+						return nil, err
 					}
-					definition, err := payload.ToGraphExtensionInput()
+					extensions, err := openGraphSchemaService.ListExtensions(schemaContext)
 					if err != nil {
-						return err
+						return nil, err
 					}
-					_, err = openGraphSchemaService.UpsertOpenGraphExtension(schemaContext, definition)
-					return err
+					return json.Marshal(extensions.DefinitionsResponse())
 				},
 			}, connections.Graph)
 			if err != nil {
 				return nil, fmt.Errorf("configure extension processing: %w", err)
 			}
 			pipeline.ExtensionAnalysis = extensions
+			openGraphSchemaService.SetAnalysisCoordinator(extensions.WithSchemaChange)
 		}
 		registration.RegisterFossRoutes(&routerInst, cfg, connections.RDMS, connections.Graph, graphQuery, apiCache, collectorManifests, authenticator, authorizer, ingestSchema, dependencies.FileServiceResolver, dogtagsService, openGraphSchemaService, alertPublisher)
 

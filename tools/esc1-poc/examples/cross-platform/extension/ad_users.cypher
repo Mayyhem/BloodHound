@@ -1,3 +1,5 @@
+// namespace: PoC_AD
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0

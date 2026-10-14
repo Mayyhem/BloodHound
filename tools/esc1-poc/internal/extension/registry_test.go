@@ -31,16 +31,16 @@ import (
 func registryDefinitions() []extension.Definition {
 	return []extension.Definition{
 		{
-			Schema:            extension.Metadata{Name: "active_directory", DisplayName: "Active Directory", Namespace: "PoC_AD", Version: "v1"},
+			Schema:            extension.Metadata{Name: "active_directory", DisplayName: "Active Directory", Namespace: "PoC_AD", Version: "v1.0.0"},
 			PostProcessing:    &extension.ProcessingSettings{ReferenceCommit: strings.Repeat("a", 40)},
-			NodeKinds:         []extension.NodeKind{{Name: "PoC_AD_User", PostProcessing: &extension.NodeProcessing{Query: "ad_users.cypher", IDPrefix: "PoC_AD_User_"}}},
+			NodeKinds:         []extension.NodeKind{{Name: "PoC_AD_User", PostProcessing: &extension.NodeProcessing{Query: "PoC_AD/ad_users.cypher", IDPrefix: "PoC_AD_User_"}}},
 			RelationshipKinds: []extension.RelationshipKind{},
 		},
 		{
-			Schema:            extension.Metadata{Name: "cyberark", DisplayName: "CyberArk", Namespace: "PoC_CA", Version: "v1"},
+			Schema:            extension.Metadata{Name: "cyberark", DisplayName: "CyberArk", Namespace: "PoC_CA", Version: "v1.0.0"},
 			PostProcessing:    &extension.ProcessingSettings{ReferenceCommit: strings.Repeat("b", 40)},
 			NodeKinds:         []extension.NodeKind{{Name: "PoC_CA_Account"}},
-			RelationshipKinds: []extension.RelationshipKind{{Name: "PoC_CA_Admin", CompatibleKinds: []extension.Endpoint{{SourceKind: "PoC_AD_User", TargetKind: "PoC_CA_Account"}}, PostProcessing: &extension.RelationshipProcessing{Query: "ca_admin.cypher"}}},
+			RelationshipKinds: []extension.RelationshipKind{{Name: "PoC_CA_Admin", CompatibleKinds: []extension.Endpoint{{SourceKind: "PoC_AD_User", TargetKind: "PoC_CA_Account"}}, PostProcessing: &extension.RelationshipProcessing{Query: "PoC_CA/ca_admin.cypher"}}},
 		},
 	}
 }
@@ -61,6 +61,14 @@ func writeRegistry(t *testing.T, definitions []extension.Definition, queries map
 		}
 	}
 	for filename, query := range queries {
+		namespace := definitions[0].Schema.Namespace
+		if strings.HasPrefix(filename, "PoC_CA/") {
+			namespace = definitions[1].Schema.Namespace
+		}
+		query = "// namespace: " + namespace + "\n// version: v1.0.0\n" + query
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(directory, filename)), 0700); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(filepath.Join(directory, filename), []byte(query), 0600); err != nil {
 			t.Fatal(err)
 		}
@@ -70,10 +78,10 @@ func writeRegistry(t *testing.T, definitions []extension.Definition, queries map
 
 func registryQueries() map[string]string {
 	return map[string]string{
-		"shared.cypher":      "// depends-on: node:User\nRETURN 1 AS value",
-		"ad_users.cypher":    "// depends-on: query:shared.cypher\nRETURN $shared",
-		"ca_accounts.cypher": "// depends-on: node:PoC_CA_Account\nRETURN 1 AS value",
-		"ca_admin.cypher":    "// depends-on: query:ad_users.cypher, query:ca_accounts.cypher\nRETURN $ad_users, $ca_accounts",
+		"PoC_AD/shared.cypher":      "// depends-on: node:User\nRETURN 1 AS value",
+		"PoC_AD/ad_users.cypher":    "// depends-on: query:shared\nRETURN $shared",
+		"PoC_CA/ca_accounts.cypher": "// depends-on: node:PoC_CA_Account\nRETURN 1 AS value",
+		"PoC_CA/ca_admin.cypher":    "// depends-on: query:PoC_AD/ad_users\n// depends-on: query:ca_accounts\nRETURN $ad_users, $ca_accounts",
 	}
 }
 
@@ -91,13 +99,13 @@ func TestLoadRegistryOrdersCrossSchemaQueries(t *testing.T) {
 		names = append(names, query.Name)
 		attributions[query.Name] = query.Extension
 	}
-	if expected := []string{"shared.cypher", "ad_users.cypher", "ca_accounts.cypher", "ca_admin.cypher"}; !reflect.DeepEqual(names, expected) {
+	if expected := []string{"PoC_AD/shared.cypher", "PoC_AD/ad_users.cypher", "PoC_CA/ca_accounts.cypher", "PoC_CA/ca_admin.cypher"}; !reflect.DeepEqual(names, expected) {
 		t.Fatalf("order %v; expected %v", names, expected)
 	}
-	if expected := map[string]string{"shared.cypher": "shared", "ad_users.cypher": "active_directory", "ca_accounts.cypher": "cyberark", "ca_admin.cypher": "cyberark"}; !reflect.DeepEqual(attributions, expected) {
+	if expected := map[string]string{"PoC_AD/shared.cypher": "active_directory", "PoC_AD/ad_users.cypher": "active_directory", "PoC_CA/ca_accounts.cypher": "cyberark", "PoC_CA/ca_admin.cypher": "cyberark"}; !reflect.DeepEqual(attributions, expected) {
 		t.Fatalf("attributions %v; expected %v", attributions, expected)
 	}
-	if plan.Queries[0].ExtensionName != "Shared calculations" || plan.Queries[1].ExtensionName != "Active Directory" {
+	if plan.Queries[0].ExtensionName != "Active Directory" || plan.Queries[1].ExtensionName != "Active Directory" {
 		t.Fatalf("incorrect display names: %+v", plan.Queries)
 	}
 	if plan.Schema.Name != "registered_extensions" || plan.Schema.ReferenceCommit != definitions[0].PostProcessing.ReferenceCommit {
@@ -131,17 +139,17 @@ func TestLoadRegistryRejectsGlobalConflictsAndInvalidDependencies(t *testing.T) 
 			definitions[1].NodeKinds = []extension.NodeKind{{Name: "PoC_AD_User"}, {Name: "PoC_CA_Account"}}
 		}, "duplicate declared kind"},
 		{"duplicate output", func(definitions []extension.Definition, _ map[string]string) {
-			definitions[1].RelationshipKinds[0].PostProcessing.Query = "ad_users.cypher"
+			definitions[1].RelationshipKinds[0].PostProcessing.Query = "PoC_AD/ad_users.cypher"
 		}, "multiple output bindings"},
 		{"duplicate prefix", func(definitions []extension.Definition, queries map[string]string) {
-			definitions[1].NodeKinds[0].PostProcessing = &extension.NodeProcessing{Query: "ca_accounts.cypher", IDPrefix: definitions[0].NodeKinds[0].PostProcessing.IDPrefix}
-			queries["ca_admin.cypher"] = "// depends-on: query:ad_users.cypher, query:ca_accounts.cypher\nRETURN 1"
+			definitions[1].NodeKinds[0].PostProcessing = &extension.NodeProcessing{Query: "PoC_CA/ca_accounts.cypher", IDPrefix: definitions[0].NodeKinds[0].PostProcessing.IDPrefix}
+			queries["PoC_CA/ca_admin.cypher"] = "// depends-on: query:PoC_AD/ad_users\n// depends-on: query:ca_accounts\nRETURN 1"
 		}, "duplicate helper ID prefix"},
 		{"missing cross-schema prerequisite", func(_ []extension.Definition, queries map[string]string) {
-			queries["ca_admin.cypher"] = "// depends-on: query:missing_ad.cypher\nRETURN 1"
+			queries["PoC_CA/ca_admin.cypher"] = "// depends-on: query:missing_ad\nRETURN 1"
 		}, "missing prerequisite"},
 		{"cross-schema cycle", func(_ []extension.Definition, queries map[string]string) {
-			queries["ad_users.cypher"] = "// depends-on: query:ca_admin.cypher, query:shared.cypher\nRETURN 1"
+			queries["PoC_AD/ad_users.cypher"] = "// depends-on: query:PoC_CA/ca_admin\n// depends-on: query:shared\nRETURN 1"
 		}, "dependency cycle"},
 		{"invalid secondary settings", func(definitions []extension.Definition, _ map[string]string) {
 			definitions[1].PostProcessing.ReferenceCommit = "invalid"
@@ -187,8 +195,15 @@ func TestRegistryCombinesNativeComparisonSettings(t *testing.T) {
 	)
 	definitions[0].Schema.Namespace = "PoC"
 	definitions[0].PostProcessing.CompareNativeESC1 = true
-	definitions[0].RelationshipKinds = []extension.RelationshipKind{{Name: "PoC_ADCSESC1", CompatibleKinds: []extension.Endpoint{{SourceKind: "PoC_AD_User", TargetKind: "PoC_AD_User"}}, PostProcessing: &extension.RelationshipProcessing{Query: "ad_esc1.cypher"}}}
-	queries["ad_esc1.cypher"] = "// depends-on: query:ad_users.cypher\nRETURN $ad_users"
+	definitions[0].RelationshipKinds = []extension.RelationshipKind{{Name: "PoC_ADCSESC1", CompatibleKinds: []extension.Endpoint{{SourceKind: "PoC_AD_User", TargetKind: "PoC_AD_User"}}, PostProcessing: &extension.RelationshipProcessing{Query: "PoC_AD/ad_esc1.cypher"}}}
+	queries["PoC_AD/ad_esc1.cypher"] = "// depends-on: query:PoC_AD/ad_users\nRETURN $ad_users"
+	for name, text := range queries {
+		delete(queries, name)
+		queries[strings.Replace(name, "PoC_AD/", "PoC/", 1)] = strings.ReplaceAll(text, "query:PoC_AD/", "query:PoC/")
+	}
+	definitions[0].NodeKinds[0].PostProcessing.Query = "PoC/ad_users.cypher"
+	definitions[0].RelationshipKinds[0].PostProcessing.Query = "PoC/ad_esc1.cypher"
+
 	plan, err := extension.Load(writeRegistry(t, definitions, queries))
 	if err != nil {
 		t.Fatal(err)

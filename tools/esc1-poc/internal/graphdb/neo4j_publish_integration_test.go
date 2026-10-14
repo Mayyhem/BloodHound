@@ -19,8 +19,9 @@
 package graphdb_test
 
 import (
-	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
 	"testing"
+
+	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
 )
 
 func TestNeo4jIndexedBulkPublication(t *testing.T) {

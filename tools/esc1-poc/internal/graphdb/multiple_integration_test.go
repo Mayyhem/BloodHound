@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
@@ -50,7 +51,14 @@ func crossPlatformFiles(t *testing.T) map[string]string {
 		if err != nil {
 			t.Fatal(err)
 		}
-		files[entry.Name()] = string(contents)
+		name := entry.Name()
+		if strings.HasSuffix(name, ".cypher") {
+			name, err = extension.QueryFileKey(name, string(contents))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		files[name] = string(contents)
 	}
 	return files
 }
@@ -92,7 +100,7 @@ func TestMultipleSchemasDisableAndRemovalOnBothDatabases(t *testing.T) {
 			// Remove only these examples' known helper objects and run records.
 			t.Cleanup(func() {
 				if err := backend.native.WriteTransaction(context.Background(), func(transaction graph.Transaction) error {
-					return transaction.Nodes().Filter(query.Kind(query.Node(), graph.StringKind("PoC_AD_User"), graph.StringKind("PoC_CyberArk_AccountSummary"), graph.StringKind("PoC_Run"))).Delete()
+					return transaction.Nodes().Filter(query.Or(query.StringStartsWith(query.NodeProperty("objectid"), "PoC_AD_User_"), query.StringStartsWith(query.NodeProperty("objectid"), "PoC_CyberArk_AccountSummary_"), query.StringStartsWith(query.NodeProperty("objectid"), "PoC_Run_"))).Delete()
 				}); err != nil {
 					t.Error(err)
 				}
@@ -101,7 +109,7 @@ func TestMultipleSchemasDisableAndRemovalOnBothDatabases(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			active, err := store.Update(map[string]string{"active_directory.schema.json": files["active_directory.schema.json"], "ad_users.cypher": files["ad_users.cypher"]})
+			active, err := store.Update(map[string]string{"active_directory.schema.json": files["active_directory.schema.json"], "PoC_AD/ad_users.cypher": files["PoC_AD/ad_users.cypher"]})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -148,7 +156,11 @@ func TestMultipleSchemasDisableAndRemovalOnBothDatabases(t *testing.T) {
 			}); err != nil {
 				t.Fatal(err)
 			}
-			plan = change(ruleservice.Change{Files: files})
+			active, err = store.Update(files)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan = load()
 			report, err := runner.Run(t.Context(), backend.database, plan, options())
 			if err != nil || !report.Committed || report.Added != 1 || len(report.Queries) != 3 {
 				t.Fatalf("combined AD/CyberArk: %+v %v", report, err)
@@ -161,10 +173,10 @@ func TestMultipleSchemasDisableAndRemovalOnBothDatabases(t *testing.T) {
 			if !reflect.DeepEqual(connections, runner.Rows{{"source": "PoC_Test_CyberArkAccount", "target": "PoC_Test_User"}}) {
 				t.Fatalf("cross-platform connection has wrong endpoints: %v", connections)
 			}
-			plan = change(ruleservice.Change{Disable: []string{"ad_users.cypher"}})
+			plan = change(ruleservice.Change{Disable: []string{"PoC_AD/ad_users.cypher"}})
 			setAccountUser(t, backend.native, "missing-user")
 			report, err = runner.Run(t.Context(), backend.database, plan, options())
-			if err != nil || !report.Committed || !reflect.DeepEqual(report.Queries, []string{"cyberark_accounts.cypher"}) || report.Removed != 0 {
+			if err != nil || !report.Committed || !reflect.DeepEqual(report.Queries, []string{"PoC_CyberArk/cyberark_accounts.cypher"}) || report.Removed != 0 {
 				t.Fatalf("disabled AD with changed evidence: %+v %v", report, err)
 			}
 			after := crossPlatformSnapshot(t, backend.database)
@@ -172,12 +184,12 @@ func TestMultipleSchemasDisableAndRemovalOnBothDatabases(t *testing.T) {
 				t.Fatal("disabled results changed, or the independent CyberArk rule did not run")
 			}
 			// No runnable query must not mean 'replace saved answers with none'.
-			plan = change(ruleservice.Change{Disable: []string{"cyberark_accounts.cypher"}})
+			plan = change(ruleservice.Change{Disable: []string{"PoC_CyberArk/cyberark_accounts.cypher"}})
 			report, err = runner.Run(t.Context(), backend.database, plan, options())
 			if err != nil || !report.Committed || len(report.Queries) != 0 || report.Removed != 0 || report.HelpersChanged != 0 {
 				t.Fatalf("all rules paused: %+v %v", report, err)
 			}
-			plan = change(ruleservice.Change{Enable: []string{"ad_users.cypher", "cyberark_accounts.cypher"}})
+			plan = change(ruleservice.Change{Enable: []string{"PoC_AD/ad_users.cypher", "PoC_CyberArk/cyberark_accounts.cypher"}})
 			before = crossPlatformSnapshot(t, backend.database)
 			report, err = runner.Run(t.Context(), &selectionRecordFailureDatabase{Database: backend.database}, plan, options())
 			if err == nil || report.Committed || report.Removed != 1 {
@@ -194,9 +206,9 @@ func TestMultipleSchemasDisableAndRemovalOnBothDatabases(t *testing.T) {
 			if report, err := runner.Run(t.Context(), backend.database, plan, options()); err != nil || report.Added != 1 {
 				t.Fatalf("restored evidence: %+v %v", report, err)
 			}
-			plan = change(ruleservice.Change{Disable: []string{"ad_users.cypher"}})
+			plan = change(ruleservice.Change{Disable: []string{"PoC_AD/ad_users.cypher"}})
 			before = crossPlatformSnapshot(t, backend.database)
-			plan = change(ruleservice.Change{Remove: []string{"ad_users.cypher"}})
+			plan = change(ruleservice.Change{Remove: []string{"PoC_AD/ad_users.cypher"}})
 			if len(plan.RetiredRelationships) != 1 || plan.RetiredRelationships[0] != "PoC_CyberArk_AccountFor" {
 				t.Fatalf("removed output was not scheduled for cleanup: %v", plan.RetiredRelationships)
 			}
@@ -208,7 +220,7 @@ func TestMultipleSchemasDisableAndRemovalOnBothDatabases(t *testing.T) {
 				t.Fatal("failed deletion lost saved data")
 			}
 			report, err = runner.Run(t.Context(), backend.database, plan, options())
-			if err != nil || !report.Committed || report.Removed != 1 || !reflect.DeepEqual(report.Queries, []string{"cyberark_accounts.cypher"}) {
+			if err != nil || !report.Committed || report.Removed != 1 || !reflect.DeepEqual(report.Queries, []string{"PoC_CyberArk/cyberark_accounts.cypher"}) {
 				t.Fatalf("delete paused cross-platform rule: %+v %v", report, err)
 			}
 			after = crossPlatformSnapshot(t, backend.database)

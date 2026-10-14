@@ -19,6 +19,8 @@ SPDX-License-Identifier: Apache-2.0
 package ruleservice_test
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"os"
@@ -27,6 +29,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/ruleservice"
 )
 
@@ -43,7 +46,15 @@ func files(t *testing.T) map[string]string {
 			if err != nil {
 				t.Fatal(err)
 			}
-			result[entry.Name()] = string(contents)
+			name := entry.Name()
+			if strings.HasSuffix(name, ".cypher") {
+				var keyError error
+				name, keyError = extension.QueryFileKey(name, string(contents))
+				if keyError != nil {
+					t.Fatal(keyError)
+				}
+			}
+			result[name] = string(contents)
 		}
 	}
 	return result
@@ -73,7 +84,7 @@ func TestSnapshotsAndPersistence(t *testing.T) {
 	if _, err := ruleservice.ValidateBundle(initial); err != nil {
 		t.Fatal(err)
 	}
-	name := "account_users.cypher"
+	name := "PoC_Vault/account_users.cypher"
 	changed, err := store.Update(map[string]string{name: initial.Files[name] + "\n// replacement\n"})
 	if err != nil {
 		t.Fatal(err)
@@ -124,8 +135,8 @@ func TestRejectedUpdatesPreserveActive(t *testing.T) {
 	}
 	for name, update := range map[string]map[string]string{
 		"path traversal":   {"../query.cypher": "RETURN 1"},
-		"write":            {"account_users.cypher": "CREATE (item) RETURN item"},
-		"oversize":         {"account_users.cypher": strings.Repeat("x", ruleservice.MaxFileBytes+1)},
+		"write":            {"PoC_Vault/account_users.cypher": "CREATE (item) RETURN item"},
+		"oversize":         {"PoC_Vault/account_users.cypher": strings.Repeat("x", ruleservice.MaxFileBytes+1)},
 		"duplicate schema": {"schema.json": `{"schema":{},"schema":{}}`},
 		"renamed schema":   {"schema.json": strings.Replace(original["schema.json"], `"name": "vault_poc"`, `"name": "different"`, 1)},
 	} {
@@ -174,7 +185,7 @@ func TestFailedDiskReplacementAndConcurrentSnapshots(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(directory, "active.json"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Update(map[string]string{"account_users.cypher": initial.Files["account_users.cypher"] + "\n// changed"}); err == nil {
+	if _, err := store.Update(map[string]string{"PoC_Vault/account_users.cypher": initial.Files["PoC_Vault/account_users.cypher"] + "\n// changed"}); err == nil {
 		t.Fatal("expected disk failure")
 	}
 	snapshot, err := store.Active()
@@ -197,8 +208,8 @@ func TestQueryOutputAndPolicyMayChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	changed := strings.ReplaceAll(initialFiles["account_users.cypher"], "keep-existing", "merge-properties")
-	updated, err := store.Update(map[string]string{"account_users.cypher": changed})
+	changed := strings.ReplaceAll(initialFiles["PoC_Vault/account_users.cypher"], "keep-existing", "merge-properties")
+	updated, err := store.Update(map[string]string{"PoC_Vault/account_users.cypher": changed})
 	if err != nil || updated.Revision == initial.Revision {
 		t.Fatal("policy change rejected", err)
 	}
@@ -230,10 +241,10 @@ func TestCorruptPersistedStateFailsClosed(t *testing.T) {
 func TestInitialUploadRequiresCompleteBundle(t *testing.T) {
 	store := open(t)
 	initial := files(t)
-	if _, err := store.Update(map[string]string{"schema.json": initial["schema.json"], "account_users.cypher": initial["account_users.cypher"]}); err == nil {
+	if _, err := store.Update(map[string]string{"schema.json": initial["schema.json"], "PoC_Vault/account_users.cypher": initial["PoC_Vault/account_users.cypher"]}); err == nil {
 		t.Fatal("accepted missing queries")
 	}
-	if _, err := store.Update(map[string]string{"account_users.cypher": initial["account_users.cypher"]}); err == nil {
+	if _, err := store.Update(map[string]string{"PoC_Vault/account_users.cypher": initial["PoC_Vault/account_users.cypher"]}); err == nil {
 		t.Fatal("accepted missing schema")
 	}
 	if _, err := store.Active(); !errors.Is(err, ruleservice.ErrNoActive) {
@@ -258,12 +269,12 @@ func TestAddingProducerAndRemovingItButRejectingRename(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	added, err := store.Update(map[string]string{"schema.json": string(contents), "additional.cypher": "// depends-on: none\nRETURN 'source' AS source, 'target' AS target, 'PoC_Vault_Additional' AS kind"})
+	added, err := store.Update(map[string]string{"schema.json": string(contents), "PoC_Vault/additional.cypher": "// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: none\nRETURN 'source' AS source, 'target' AS target, 'PoC_Vault_Additional' AS kind"})
 	if err != nil {
 		t.Fatal("new producer rejected", err)
 	}
-	removed := applyChange(t, store, ruleservice.Change{BaseRevision: added.Revision, Remove: []string{"additional.cypher"}})
-	if _, exists := removed.Files["additional.cypher"]; exists {
+	removed := applyChange(t, store, ruleservice.Change{BaseRevision: added.Revision, Remove: []string{"PoC_Vault/additional.cypher"}})
+	if _, exists := removed.Files["PoC_Vault/additional.cypher"]; exists {
 		t.Fatal("unused producer remains")
 	}
 	if removed.Revision == added.Revision {
@@ -280,5 +291,61 @@ func TestAddingProducerAndRemovingItButRejectingRename(t *testing.T) {
 	active, err := store.Active()
 	if err != nil || active.Revision != removed.Revision {
 		t.Fatal("rejected update changed active", err)
+	}
+}
+
+// installSchemas represents separate successful OpenGraph Management uploads.
+// The returned map contains only files accepted by the analysis upload page.
+func installSchemas(t *testing.T, store *ruleservice.Store, files map[string]string) map[string]string {
+	t.Helper()
+	var (
+		byNamespace = map[string]ruleservice.InstalledSchema{}
+		queries     = map[string]string{}
+	)
+	if active, err := store.Active(); err == nil {
+		for _, schema := range active.Schemas {
+			byNamespace[schema.Namespace] = schema
+		}
+	}
+	for name, contents := range files {
+		if !extension.IsSchemaFile(name) {
+			queries[name] = contents
+			continue
+		}
+		definition, err := extension.ParseDefinition([]byte(contents))
+		if err != nil {
+			t.Fatal(err)
+		}
+		digest := sha256.Sum256([]byte(definition.Schema.Namespace))
+		byNamespace[definition.Schema.Namespace] = ruleservice.InstalledSchema{
+			ID: int32(binary.BigEndian.Uint32(digest[:4]) & 0x7fffffff), Name: definition.Schema.Name,
+			Namespace: definition.Schema.Namespace, Version: definition.Schema.Version, Definition: json.RawMessage(contents),
+		}
+	}
+	snapshot := ruleservice.SchemaSnapshot{Definitions: []ruleservice.InstalledSchema{}}
+	for _, schema := range byNamespace {
+		snapshot.Definitions = append(snapshot.Definitions, schema)
+	}
+	if err := store.RefreshSchemas(snapshot); err != nil {
+		t.Fatal(err)
+	}
+	return queries
+}
+
+func TestOldUnassociatedFilesRequireExplicitConversion(t *testing.T) {
+	var (
+		directory = t.TempDir()
+		path      = filepath.Join(directory, "active.json")
+		contents  = []byte(`{"revision":"old","files":{"users.cypher":"RETURN 1"}}`)
+	)
+	if err := os.WriteFile(path, contents, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ruleservice.Open(directory); err == nil || !strings.Contains(err.Error(), "explicit extension associations") {
+		t.Fatalf("expected conversion instructions, got %v", err)
+	}
+	saved, err := os.ReadFile(path)
+	if err != nil || string(saved) != string(contents) {
+		t.Fatal("opening old state must preserve its exact contents")
 	}
 }

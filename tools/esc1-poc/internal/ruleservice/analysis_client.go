@@ -127,11 +127,15 @@ func (s *analysisClient) request(ctx context.Context, method, path string, expec
 			return nil, fmt.Errorf("native analysis API returned an unexpected HTTP status (%d)", response.StatusCode)
 		}
 	}
-	contents, err := io.ReadAll(io.LimitReader(response.Body, 64*1024+1))
+	limit := int64(64 * 1024)
+	if path == "/api/v2/extensions/definitions" {
+		limit = MaxBundleBytes
+	}
+	contents, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil {
 		return nil, fmt.Errorf("cannot read the native analysis API response")
 	}
-	if len(contents) > 64*1024 {
+	if int64(len(contents)) > limit {
 		return nil, fmt.Errorf("native analysis API response exceeds its size limit")
 	}
 	return contents, nil
@@ -208,4 +212,20 @@ func (s *analysisClient) Run(ctx context.Context) error {
 	}
 	_, err = s.request(ctx, http.MethodPut, "/api/v2/analysis", http.StatusAccepted)
 	return err
+}
+
+// The rules page reads definitions using the existing server-side credentials.
+// Tokens and schema installation never pass through the analysis upload form.
+func (s *analysisClient) Schemas(ctx context.Context) (SchemaSnapshot, error) {
+	var response struct {
+		Data json.RawMessage `json:"data"`
+	}
+	contents, err := s.request(ctx, http.MethodGet, "/api/v2/extensions/definitions", http.StatusOK)
+	if err != nil {
+		return SchemaSnapshot{}, err
+	}
+	if json.Unmarshal(contents, &response) != nil {
+		return SchemaSnapshot{}, fmt.Errorf("invalid installed schema response")
+	}
+	return ParseSchemas(response.Data)
 }

@@ -241,3 +241,35 @@ func TestAnalysisClientRunRequiresAcceptedResponse(t *testing.T) {
 		})
 	}
 }
+
+func TestInstalledDefinitionReadUsesAuthenticationAndSafeErrors(t *testing.T) {
+	for _, status := range []int{http.StatusOK, http.StatusUnauthorized, http.StatusForbidden, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				checkAnalysisSignature(t, request)
+				if request.Method != http.MethodGet || request.URL.Path != "/api/v2/extensions/definitions" {
+					t.Error("unexpected schema request")
+				}
+				writer.WriteHeader(status)
+				if status == http.StatusOK {
+					_, _ = io.WriteString(writer, `{"data":{"definitions":[]}}`)
+				} else {
+					_, _ = io.WriteString(writer, "private-schema-service-error")
+				}
+			}))
+			defer server.Close()
+			client, err := NewAnalysisClient(server.URL, analysisTestID, analysisTestKey)
+			if err != nil {
+				t.Fatal(err)
+			}
+			schemas, err := client.(SchemaReader).Schemas(t.Context())
+			if status == http.StatusOK {
+				if err != nil || schemas.Definitions == nil {
+					t.Fatalf("schema read: %v", err)
+				}
+			} else if err == nil || strings.Contains(err.Error(), "private-schema-service-error") {
+				t.Fatalf("unsafe failure: %v", err)
+			}
+		})
+	}
+}

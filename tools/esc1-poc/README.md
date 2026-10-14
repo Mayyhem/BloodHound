@@ -10,7 +10,7 @@ You install two parts once: an extra container that stores the rules, and a modi
 
 ## What using it looks like
 
-1. Open the local rule page, inspect the rules table, then review and activate schema definitions and `.cypher` files. The supplied Compose setup needs no pasted browser token.
+1. Upload schemas through BloodHound’s OpenGraph Management page. On the local rule page, inspect, review, and activate their `.cypher` files. The supplied Compose setup needs no pasted browser token.
 2. Upload collection data to BloodHound as usual, or click **Run Analysis** to check data already stored. The button requires a one-time server connection setup. Both ordinary BloodHound and OpenGraph collections are supported.
 3. After BloodHound successfully finishes its own analysis, it runs the affected rules and saves their calculated connections.
 4. Explore those connections in BloodHound's normal interface.
@@ -32,10 +32,10 @@ Existing settings give BloodHound the rule container's address and access secret
 - The runner combines every producer’s complete answer before refreshing a relationship type within its declared endpoint scope. Existing edges in that scope participate regardless of their origin. A failed calculation before saving preserves the previous results.
 - File checks parse complete queries, suggest missing input declarations, and distinguish those checks from actual database execution.
 - Execution reports show query failures, counts, timings, save outcomes, the last confirmed saved revision, and up to 20 recent attempts.
-- Uploads are saved as inactive drafts. Missing schemas can be added later; the complete set must validate and be reviewed before activation.
+- Uploads are saved as inactive drafts. Missing schemas can be installed through OpenGraph Management later; the complete set must validate and be reviewed before activation.
 - Each producing query names its edge with a literal `kind` column. Schemas describe types and directed `compatible_kinds` pairs; they need no `post_processing` blocks.
 - Each query can choose whether a matching connection is replaced, has its supplied details updated, or is kept unchanged. Replacement is the default.
-- Each extension has its own schema. Several queries can produce the same relationship type; their policies must agree. All uploaded schemas share one dependency order, and queries can pass calculated rows across extension boundaries. These settings are **proposed additions to OpenGraph**, not an accepted part of its official definition.
+- Each file declares its extension namespace and its own version. Query dependencies support compatible version conditions and local aliases; different extensions can use identical filenames. Each extension has its own schema. Several queries can produce the same relationship type; their policies must agree. All uploaded schemas share one dependency order, and queries can pass calculated rows across extension boundaries. These settings are **proposed additions to OpenGraph**, not an accepted part of its official definition.
 - Both Neo4j and PostgreSQL have laboratory test evidence. This coordinates one modified Community Edition application; other applications or direct database writers are outside its protection.
 - Up to five ready queries can run together. A ready query can start without waiting for an unrelated slow query. Queries run one at a time after supporting objects are created, so they can see those new objects before saving.
 - First runs, changed rules, restarts, and incomplete change tracking run all enabled rules. Tracking is bounded, so large uploads can also require a full run of enabled rules.

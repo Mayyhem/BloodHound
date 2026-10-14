@@ -237,3 +237,56 @@ func TestRemovedTypeUsesSavedEndpointScope(t *testing.T) {
 		t.Fatalf("changed retired type was not cleared: %+v %v", report, err)
 	}
 }
+
+func TestSameFilenameAnswersStaySeparateAndSharedProviderRunsOnce(t *testing.T) {
+	var (
+		database  = fixtureDatabase()
+		plan      = fixturePlan()
+		directory = extension.Query{Name: "PoC_AD/users.cypher", Parameter: "users", Text: "directory answer", QueryMetadata: extension.QueryMetadata{Namespace: "PoC_AD", Version: "v1.0.3"}, SchemaVersion: "v1.1.0"}
+		vault     = extension.Query{Name: "PoC_Vault/users.cypher", Parameter: "users", Text: "vault answer"}
+	)
+	plan.Schema.Nodes = nil
+	plan.Schema.Relationships[0].Query = "PoC_Vault/links.cypher"
+	plan.Schema.Relationships = append(plan.Schema.Relationships, plan.Schema.Relationships[0])
+	plan.Schema.Relationships[1].Query = "PoC_Vault/other.cypher"
+	plan.Queries = []extension.Query{directory, vault,
+		{Name: "PoC_Vault/links.cypher", Text: relationshipQuery, Dependencies: []extension.Dependency{{Type: "query", Name: directory.Name, Parameter: "directory_users"}, {Type: "query", Name: vault.Name, Parameter: "vault_users"}}},
+		{Name: "PoC_Vault/other.cypher", Text: "other answer", Dependencies: []extension.Dependency{{Type: "query", Name: directory.Name, Parameter: "people"}}},
+	}
+	database.answers[directory.Text] = runner.Rows{{"user_id": "directory", "memberships": []any{}, "optional": nil}}
+	database.answers[vault.Text] = runner.Rows{{"user_id": "vault"}}
+	database.answers["other answer"] = runner.Rows{}
+	report, err := runner.Run(t.Context(), database, plan, completeBatch())
+	if err != nil || !report.Committed {
+		t.Fatalf("run: %v", err)
+	}
+	reads := 0
+	for _, read := range database.reads {
+		if read.query == directory.Text {
+			reads++
+		}
+		if read.query == relationshipQuery {
+			if !reflect.DeepEqual(read.parameters["directory_users"], runner.Rows{map[string]any{"user_id": "directory", "memberships": []any{}, "optional": nil}}) || !reflect.DeepEqual(read.parameters["vault_users"], runner.Rows{map[string]any{"user_id": "vault"}}) {
+				t.Fatalf("answers collided: %+v", read.parameters)
+			}
+		}
+		if read.query == "other answer" && len(read.parameters) != 1 {
+			t.Fatal("consumer received another consumer's aliases")
+		}
+	}
+	if reads != 1 {
+		t.Fatalf("shared calculation ran %d times", reads)
+	}
+	if report.Execution.Queries[0].Version != "v1.0.3" || report.Execution.Queries[0].SchemaVersion != "v1.1.0" {
+		t.Fatal("exact versions were not reported")
+	}
+}
+
+func TestChangedReturnedColumnsRollBackBeforePublication(t *testing.T) {
+	var database = fixtureDatabase()
+	plan := fixturePlan()
+	plan.Queries[0].ColumnsKnown = true
+	plan.Queries[0].Columns = []string{"different"}
+	before := cloneGraph(*database.graph)
+	assertRollback(t, database, before, plan, completeBatch(), "column")
+}

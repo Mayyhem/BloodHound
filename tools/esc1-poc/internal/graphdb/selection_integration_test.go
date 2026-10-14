@@ -184,12 +184,12 @@ func selectionServiceFiles(t *testing.T, plan extension.Plan) map[string]string 
 		var declarations []string
 		var prerequisite string
 		for _, dependency := range analysisQuery.Dependencies {
-			declarations = append(declarations, dependency.Type+":"+dependency.Name)
+			declarations = append(declarations, dependency.Type+":"+strings.TrimSuffix(dependency.Name, ".cypher"))
 			if dependency.Type == "query" {
 				prerequisite = "WITH $" + strings.TrimSuffix(dependency.Name, ".cypher") + " AS prerequisite_rows\n"
 			}
 		}
-		files[analysisQuery.Name] = "// depends-on: " + strings.Join(declarations, ", ") + "\n" + prerequisite + analysisQuery.Text
+		files[analysisQuery.Name] = "// namespace: PoC\n// version: v1.0.0\n// depends-on: " + strings.Join(declarations, "\n// depends-on: ") + "\n" + prerequisite + analysisQuery.Text
 	}
 	return files
 }

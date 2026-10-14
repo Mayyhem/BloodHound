@@ -1,3 +1,5 @@
+// namespace: PoC
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,8 +16,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: query:ca_root_reach.cypher, query:ca_auth_reach.cypher,
-// node:EnterpriseCA, node:Domain, relationship:TrustedForNTAuth, relationship:NTAuthStoreFor
+// depends-on: query:ca_root_reach
+// depends-on: query:ca_auth_reach
+// depends-on: node:EnterpriseCA, node:Domain, relationship:TrustedForNTAuth, relationship:NTAuthStoreFor
 
 // Native certificate reach permits all three root-chain kinds at every depth.
 // Reach lists contain distinct objects, so repeated routes cannot multiply rows.

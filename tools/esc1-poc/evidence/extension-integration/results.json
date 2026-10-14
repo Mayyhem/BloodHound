@@ -1,0 +1,79 @@
+{
+  "recorded_at": "2026-10-14",
+  "bloodhound_commit": "ed94c2c96855599dfe66d0e83f9a976a0969dff7",
+  "dawgs_commit": "6d92ee1ed0605f6a08d614c4564a548b29d192b7",
+  "source_state": "Uncommitted working tree; source-files.json pins changed code and generated files. No DAWGS changes.",
+  "databases": {
+    "project": "esc1-extension-integration",
+    "postgres": "Fresh PostgreSQL 18 at localhost:25432; test database only, first failed attempt dump retained before reset. Final tests used this isolated database.",
+    "neo4j": "Fresh Neo4j 4.4.42 at localhost:27687; synthetic test graph only.",
+    "migration": "Dedicated pgtestdb database in the isolated checkout, from an empty database; actual migration and failed-save rollback tested."
+  },
+  "checks": [
+    {
+      "check": "All esc1-poc packages: go test ./...",
+      "result": "passed",
+      "log": "unit-tests-final.log"
+    },
+    {
+      "check": "BloodHound: go test ./cmd/api/src/... ./server/...",
+      "result": "passed",
+      "log": "bloodhound-go-tests.log"
+    },
+    {
+      "check": "Focused graph integration, both PostgreSQL and Neo4j",
+      "result": "passed",
+      "seconds": 23.291,
+      "log": "graph-tests-final.log"
+    },
+    {
+      "check": "Installed definition migration/save/rollback integration",
+      "result": "passed",
+      "log": "migration-test.log"
+    },
+    {
+      "check": "Schema association browser checks",
+      "result": "passed",
+      "log": "browser-2/results.json",
+      "scope": "Real rules server and page, synthetic authenticated schema reader; native persistence tested separately."
+    },
+    {
+      "check": "Draft/restart browser checks, both upload orders",
+      "result": "passed",
+      "log": "browser-drafts/checks.json"
+    },
+    {
+      "check": "Rules table browser behavior",
+      "result": "passed",
+      "log": "browser-table.log"
+    },
+    {
+      "check": "CI=true just test",
+      "result": "failed",
+      "log": "just-test-ci.log",
+      "detail": "Existing UI files: EdgeFilteringDialog hook timeout and unhandled errors in other UI tests. No claim that this full check passed or that baseline failures were reproduced."
+    },
+    {
+      "check": "just prepare-for-codereview",
+      "result": "incomplete",
+      "log": "prepare-local-2.log",
+      "detail": "Dependencies and code generation completed; stopped recursive goimports while it walked ignored lab directories. Unrelated generation/formatting changes restored. Later stages were not completed."
+    },
+    {
+      "check": "OpenAPI bundled JSON and local references",
+      "result": "passed",
+      "detail": "Affected bundled entries updated from source YAML locally; JSON and references validated. Offline just gen-spec failed with ENOTCACHED for the Redocly CLI; rerun in the normal development environment.",
+      "generator_log": "gen-spec.log"
+    },
+    {
+      "check": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "limits": [
+    "No deployment or conversion of the running rules service.",
+    "Existing one-process schema/write coordination only; external database writers are not coordinated.",
+    "No future deletion checkbox or TODO 3 workspace changes.",
+    "Updated persistent-service demonstration script was syntax-checked; its full lab run was not repeated."
+  ]
+}

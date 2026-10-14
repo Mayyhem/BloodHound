@@ -1,3 +1,5 @@
+// namespace: PoC
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,10 +16,12 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: query:trusted_cas.cypher, query:eligible_templates.cypher,
-// query:membership.cypher, node:Base, node:CertTemplate, node:EnterpriseCA,
-// relationship:PublishedTo, relationship:Enroll, relationship:GenericAll,
-// relationship:AllExtendedRights
+// depends-on: query:trusted_cas
+// depends-on: query:eligible_templates
+// depends-on: query:membership
+// depends-on: node:Base, node:CertTemplate, node:EnterpriseCA
+// depends-on: relationship:PublishedTo, relationship:Enroll, relationship:GenericAll
+// depends-on: relationship:AllExtendedRights
 
 // 1. Keep the template's permissions (left) separate from the authority's
 // permissions (right). Each template/authority/domain combination is one decision.

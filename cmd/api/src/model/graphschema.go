@@ -205,6 +205,9 @@ type GraphSchemaExtension struct {
 	Version     string
 	IsBuiltin   bool
 	Namespace   string
+	// Keep the accepted declaration for analysis readers. Normal extension
+	// listing responses remain unchanged, and this is not an analysis upload.
+	Definition json.RawMessage `json:"-" gorm:"type:jsonb"`
 }
 
 func (GraphSchemaExtension) TableName() string {
@@ -501,6 +504,7 @@ type SavedQueryInput struct {
 }
 
 type GraphExtensionInput struct {
+	Definition                json.RawMessage
 	ExtensionInput            ExtensionInput
 	RelationshipKindsInput    RelationshipsInput
 	NodeKindsInput            NodesInput
@@ -845,10 +849,18 @@ type GraphSchemaExtensionPayload struct {
 }
 
 type GraphSchemaRelationshipKindsPayload struct {
-	Name          string                     `json:"name"`
-	Description   string                     `json:"description"`
-	IsTraversable bool                       `json:"is_traversable"` // indicates whether the edge-kind is a traversable path
-	Info          map[string]KindInfoPayload `json:"info"`
+	CompatibleKinds []GraphSchemaEndpoint      `json:"compatible_kinds,omitempty"`
+	Name            string                     `json:"name"`
+	Description     string                     `json:"description"`
+	IsTraversable   bool                       `json:"is_traversable"` // indicates whether the edge-kind is a traversable path
+	Info            map[string]KindInfoPayload `json:"info"`
+}
+
+// Analysis uses explicit source/target pairs to limit which connections it may
+// maintain. Ordinary OpenGraph schemas do not have to include these pairs.
+type GraphSchemaEndpoint struct {
+	SourceKind string `json:"source_kind"`
+	TargetKind string `json:"target_kind"`
 }
 
 type GraphSchemaNodeKindsPayload struct {
@@ -965,6 +977,11 @@ func (s GraphExtensionPayload) ToGraphExtensionInput() (GraphExtensionInput, err
 		selectorSeeds []SelectorSeedInput
 		err           error
 	)
+	// Preserve supported schema fields, including optional analysis endpoint
+	// pairs, rather than losing them when converting display metadata to rows.
+	if graphExtension.Definition, err = json.Marshal(s); err != nil {
+		return GraphExtensionInput{}, fmt.Errorf("cannot preserve extension definition: %w", err)
+	}
 
 	for _, nodeKindPayload := range s.GraphSchemaNodeKinds {
 		if infoInputs, err = parseInfoPayload(nodeKindPayload.Info); err != nil {

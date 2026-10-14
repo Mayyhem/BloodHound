@@ -36,7 +36,7 @@ func prepareOverlap(t *testing.T, rows Rows) *groupOverlap {
 	t.Helper()
 	var (
 		parameters  = map[string]any{"membership": rows, "other": Rows{{"value": "kept"}}}
-		result, err = newGroupOverlap(t.Context(), extension.Query{Overlap: &extension.GroupOverlap{Memberships: "membership.cypher"}}, parameters, DefaultLimits())
+		result, err = newGroupOverlap(t.Context(), extension.Query{Overlap: &extension.GroupOverlap{Memberships: "membership"}}, parameters, DefaultLimits())
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -132,11 +132,11 @@ func TestGroupOverlapFailsClosed(t *testing.T) {
 	}
 	var limits = DefaultLimits()
 	limits.ParameterBytes = 1
-	if _, err := newGroupOverlap(t.Context(), extension.Query{Overlap: &extension.GroupOverlap{Memberships: "membership.cypher"}}, map[string]any{"membership": rows}, limits); err == nil {
+	if _, err := newGroupOverlap(t.Context(), extension.Query{Overlap: &extension.GroupOverlap{Memberships: "membership"}}, map[string]any{"membership": rows}, limits); err == nil {
 		t.Fatal("oversized cache accepted")
 	}
 	rows = Rows{overlapRow("U", 1, false, false, false, "missing")}
-	if _, err := newGroupOverlap(t.Context(), extension.Query{Overlap: &extension.GroupOverlap{Memberships: "membership.cypher"}}, map[string]any{"membership": rows}, DefaultLimits()); err == nil {
+	if _, err := newGroupOverlap(t.Context(), extension.Query{Overlap: &extension.GroupOverlap{Memberships: "membership"}}, map[string]any{"membership": rows}, DefaultLimits()); err == nil {
 		t.Fatal("incomplete reach table accepted")
 	}
 }
@@ -159,7 +159,7 @@ func (s *overlapSetupContext) Err() error {
 
 func TestGroupOverlapSetupCancellation(t *testing.T) {
 	var (
-		query                       = extension.Query{Overlap: &extension.GroupOverlap{Memberships: "membership.cypher"}}
+		query                       = extension.Query{Overlap: &extension.GroupOverlap{Memberships: "membership"}}
 		rows                        = Rows{}
 		contextBefore, cancelBefore = context.WithCancel(t.Context())
 	)

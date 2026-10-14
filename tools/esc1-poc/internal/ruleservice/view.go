@@ -20,7 +20,6 @@ package ruleservice
 
 import (
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
@@ -29,15 +28,17 @@ import (
 // PlanView describes declared dependencies and the runner's existing execution
 // order. Threads are conservative connected groups, not running goroutines.
 type PlanView struct {
-	Validation ValidationView  `json:"validation"`
-	Revision   string          `json:"revision"`
-	Name       string          `json:"name"`
-	Threads    []ThreadView    `json:"threads"`
-	Queries    []QueryView     `json:"queries"`
-	Extensions []ExtensionView `json:"extensions"`
+	SchemaRevision string          `json:"schema_revision,omitempty"`
+	Validation     ValidationView  `json:"validation"`
+	Revision       string          `json:"revision"`
+	Name           string          `json:"name"`
+	Threads        []ThreadView    `json:"threads"`
+	Queries        []QueryView     `json:"queries"`
+	Extensions     []ExtensionView `json:"extensions"`
 }
 
 type ExtensionView struct {
+	Namespace   string `json:"namespace"`
 	Name        string `json:"name"`
 	DisplayName string `json:"display_name"`
 }
@@ -54,8 +55,9 @@ type InputView struct {
 }
 
 type PrerequisiteView struct {
-	Name      string `json:"name"`
-	Parameter string `json:"parameter"`
+	Conditions string `json:"conditions,omitempty"`
+	Name       string `json:"name"`
+	Parameter  string `json:"parameter"`
 }
 
 type OutputView struct {
@@ -74,22 +76,26 @@ type ProcessingView struct {
 }
 
 type QueryView struct {
-	InputWarning   string             `json:"input_warning,omitempty"`
-	Name           string             `json:"name"`
-	Extension      string             `json:"extension"`
-	ExtensionName  string             `json:"extension_name"`
-	AddedAt        string             `json:"added_at"`
-	DisabledReason string             `json:"disabled_reason"`
-	Enabled        bool               `json:"enabled"`
-	Order          int                `json:"order"`
-	Stage          int                `json:"stage"`
-	Parameter      string             `json:"parameter"`
-	Text           string             `json:"text"`
-	Inputs         []InputView        `json:"inputs"`
-	Prerequisites  []PrerequisiteView `json:"prerequisites"`
-	Dependents     []string           `json:"dependents"`
-	Outputs        []OutputView       `json:"outputs"`
-	Processing     ProcessingView     `json:"processing"`
+	Namespace         string             `json:"namespace"`
+	Version           string             `json:"version"`
+	SchemaVersion     string             `json:"schema_version"`
+	ExtensionVersions string             `json:"extension_versions,omitempty"`
+	InputWarning      string             `json:"input_warning,omitempty"`
+	Name              string             `json:"name"`
+	Extension         string             `json:"extension"`
+	ExtensionName     string             `json:"extension_name"`
+	AddedAt           string             `json:"added_at"`
+	DisabledReason    string             `json:"disabled_reason"`
+	Enabled           bool               `json:"enabled"`
+	Order             int                `json:"order"`
+	Stage             int                `json:"stage"`
+	Parameter         string             `json:"parameter"`
+	Text              string             `json:"text"`
+	Inputs            []InputView        `json:"inputs"`
+	Prerequisites     []PrerequisiteView `json:"prerequisites"`
+	Dependents        []string           `json:"dependents"`
+	Outputs           []OutputView       `json:"outputs"`
+	Processing        ProcessingView     `json:"processing"`
 }
 
 // ValidationView describes checks already performed, not an execution preview.
@@ -103,7 +109,7 @@ type ValidationView struct {
 // and managed producers join groups without inventing scheduling edges.
 func BuildView(bundle Bundle, plan extension.Plan) PlanView {
 	var (
-		view          = PlanView{Revision: bundle.Revision, Name: plan.Schema.Name, Threads: []ThreadView{}, Queries: []QueryView{}, Extensions: []ExtensionView{}}
+		view          = PlanView{SchemaRevision: plan.SchemaRevision, Revision: bundle.Revision, Name: plan.Schema.Name, Threads: []ThreadView{}, Queries: []QueryView{}, Extensions: []ExtensionView{}}
 		queries       = make([]QueryView, len(plan.Queries))
 		indexes       = make(map[string]int)
 		parents       = make([]int, len(plan.Queries))
@@ -118,7 +124,7 @@ func BuildView(bundle Bundle, plan extension.Plan) PlanView {
 		view.Validation.Files, view.Validation.Language = "not checked", "not checked"
 	}
 	for _, definition := range plan.Definitions {
-		view.Extensions = append(view.Extensions, ExtensionView{Name: definition.Schema.Name, DisplayName: definition.Schema.DisplayName})
+		view.Extensions = append(view.Extensions, ExtensionView{Namespace: definition.Schema.Namespace, Name: definition.Schema.Name, DisplayName: definition.Schema.DisplayName})
 	}
 	sort.Slice(view.Extensions, func(first, second int) bool { return view.Extensions[first].Name < view.Extensions[second].Name })
 	for _, binding := range plan.Schema.Nodes {
@@ -146,7 +152,7 @@ func BuildView(bundle Bundle, plan extension.Plan) PlanView {
 		)
 		parents[index] = index
 		indexes[query.Name] = index
-		queries[index] = QueryView{Name: query.Name, Extension: query.Extension, ExtensionName: query.ExtensionName, DisabledReason: query.DisabledReason, Enabled: query.DisabledReason == "", Order: index + 1, Stage: 1, Parameter: query.Parameter, Text: query.Text, Inputs: []InputView{}, Prerequisites: []PrerequisiteView{}, Dependents: []string{}, Outputs: outputs[query.Name], Processing: ProcessingView{Reachability: query.Reach, GroupOverlap: query.Overlap, BatchDependency: query.BatchDependency}}
+		queries[index] = QueryView{Namespace: query.Namespace, Version: query.Version, SchemaVersion: query.SchemaVersion, ExtensionVersions: query.ExtensionVersions, Name: query.Name, Extension: query.Extension, ExtensionName: query.ExtensionName, DisabledReason: query.DisabledReason, Enabled: query.DisabledReason == "", Order: index + 1, Stage: 1, Parameter: query.Parameter, Text: query.Text, Inputs: []InputView{}, Prerequisites: []PrerequisiteView{}, Dependents: []string{}, Outputs: outputs[query.Name], Processing: ProcessingView{Reachability: query.Reach, GroupOverlap: query.Overlap, BatchDependency: query.BatchDependency}}
 		if query.BroadRead {
 			queries[index].InputWarning = "This query has graph reads without explicit kinds. It is recalculated conservatively because its declarations may not describe every input."
 		}
@@ -165,7 +171,7 @@ func BuildView(bundle Bundle, plan extension.Plan) PlanView {
 		}
 		for _, dependency := range query.Dependencies {
 			if dependency.Type == "query" {
-				queries[index].Prerequisites = append(queries[index].Prerequisites, PrerequisiteView{Name: dependency.Name, Parameter: strings.TrimSuffix(dependency.Name, ".cypher")})
+				queries[index].Prerequisites = append(queries[index].Prerequisites, PrerequisiteView{Conditions: dependency.Conditions, Name: dependency.Name, Parameter: dependency.AnswerParameter()})
 			} else {
 				input := InputView{Type: dependency.Type, Name: dependency.Name}
 				queries[index].Inputs = append(queries[index].Inputs, input)

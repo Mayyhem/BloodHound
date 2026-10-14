@@ -1,3 +1,5 @@
+// namespace: PoC
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,8 +16,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: query:enabled_cas.cypher, node:Domain,
-// relationship:SameForestTrust
+// depends-on: query:enabled_cas
+// depends-on: node:Domain
+// depends-on: relationship:SameForestTrust
 
 // A certificate authority's own domain counts, as do domains that can reach
 // it through forest trust. Every object along the route must be a Domain.

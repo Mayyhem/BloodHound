@@ -110,20 +110,20 @@ func TestLoadBindsCypherOutputsWithoutSchemaProcessing(t *testing.T) {
 		t.Fatal(err)
 	}
 	binding := plan.Schema.Relationships[0]
-	if binding.Query != "renamed.cypher" || binding.Kind != "PoC_ESC1" || binding.ExistingEdgePolicy != extension.KeepExisting || plan.Queries[0].OutputKind != "PoC_ESC1" {
+	if binding.Query != "PoC/renamed.cypher" || binding.Kind != "PoC_ESC1" || binding.ExistingEdgePolicy != extension.KeepExisting || plan.Queries[0].OutputKind != "PoC_ESC1" {
 		t.Fatalf("wrong inferred output: %+v", plan)
 	}
 	if plan.Schema.ReferenceCommit != extension.BuildReferenceCommit {
 		t.Fatalf("missing platform defaults: %+v", plan.Schema)
 	}
-	if err := os.WriteFile(filepath.Join(directory, "second.cypher"), []byte(query), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(directory, "second.cypher"), []byte("// namespace: PoC\n// version: v1.0.0\n"+query), 0600); err != nil {
 		t.Fatal(err)
 	}
 	plan, err = extension.Load(directory)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Schema.Relationships) != 2 || plan.Schema.Relationships[1].Query != "second.cypher" {
+	if len(plan.Schema.Relationships) != 2 || plan.Schema.Relationships[1].Query != "PoC/second.cypher" {
 		t.Fatalf("missing shared producer: %+v", plan.Schema.Relationships)
 	}
 }

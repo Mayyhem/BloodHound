@@ -176,54 +176,12 @@ func loadDefinitions(directory string, entries []os.DirEntry) ([]Definition, map
 	return definitions, files, nil
 }
 
-// Output bindings identify their extension. Intermediate calculations inherit
-// all extensions that consume them, so shared work can be displayed together.
-func attributeQueries(queries []Query, definitions []Definition) []Query {
-	var (
-		outputExtensions = make(map[string]string)
-		displayNames     = make(map[string]string)
-		consumers        = make(map[string]map[string]bool)
-	)
-	for _, definition := range definitions {
-		displayNames[definition.Schema.Name] = definition.Schema.DisplayName
-		for _, kind := range definition.NodeKinds {
-			if kind.PostProcessing != nil {
-				outputExtensions[kind.PostProcessing.Query] = definition.Schema.Name
-			}
-		}
-		for _, kind := range definition.RelationshipKinds {
-			for _, query := range kind.producingQueries() {
-				outputExtensions[query] = definition.Schema.Name
-			}
+// Native kinds remain available independently of custom schema installation.
+func IsNativeRelationshipKind(name string) bool {
+	for _, kind := range graphschema.CombinedGraphSchema("").Edges {
+		if kind.String() == name {
+			return true
 		}
 	}
-	for _, query := range queries {
-		consumers[query.Name] = make(map[string]bool)
-		if extension := outputExtensions[query.Name]; extension != "" {
-			consumers[query.Name][extension] = true
-		}
-	}
-	for index := len(queries) - 1; index >= 0; index-- {
-		query := queries[index]
-		for _, dependency := range query.Dependencies {
-			if dependency.Type == "query" {
-				for extension := range consumers[query.Name] {
-					consumers[dependency.Name][extension] = true
-				}
-			}
-		}
-	}
-	for index := range queries {
-		query := &queries[index]
-		if extension := outputExtensions[query.Name]; extension != "" {
-			query.Extension, query.ExtensionName = extension, displayNames[extension]
-		} else if len(consumers[query.Name]) == 1 {
-			for extension := range consumers[query.Name] {
-				query.Extension, query.ExtensionName = extension, displayNames[extension]
-			}
-		} else {
-			query.Extension, query.ExtensionName = "shared", "Shared calculations"
-		}
-	}
-	return queries
+	return false
 }

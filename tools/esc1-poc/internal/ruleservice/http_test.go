@@ -73,7 +73,7 @@ func TestHTTPAuthenticationAndStrictUploads(t *testing.T) {
 			}
 		}
 	}
-	contents := confirmedHTTPChange(t, handler, ruleservice.Change{Files: files(t)})
+	contents := confirmedHTTPChange(t, handler, ruleservice.Change{Files: installSchemas(t, store, files(t))})
 	var response *httptest.ResponseRecorder
 
 	response = exchange(handler, "PUT", "/v1/rules", "private-token-012345678901234567890123456789", contents)

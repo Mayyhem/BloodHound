@@ -1,0 +1,8 @@
+{
+  "checks": [
+    "An analysis uploaded before its schema stays a draft and activates only after review",
+    "Three independently associated files share the same original filename",
+    "Compatible schema upgrades require no file edits; deletion/reinstall retains a reviewed pause"
+  ],
+  "browser_errors": []
+}

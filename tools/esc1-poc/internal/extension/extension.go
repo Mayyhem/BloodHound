@@ -20,6 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 package extension
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -67,8 +68,18 @@ func (s RelationshipBinding) EffectiveExistingEdgePolicy() ExistingEdgePolicy {
 type Dependency struct {
 	Type string
 	Name string
+	// Query names include their namespace. Parameter is the local name used
+	// by this consumer; Conditions constrain the producer's own version.
+	Parameter  string
+	Conditions string
 }
 type Query struct {
+	QueryMetadata
+	Columns       []string
+	ColumnsKnown  bool
+	SharedFields  []querycheck.SharedField
+	SchemaPaused  bool
+	SchemaVersion string
 	// BroadRead prevents unsafe skipping when graph inputs cannot be narrowed to named kinds.
 	BroadRead bool
 
@@ -86,6 +97,8 @@ type Query struct {
 	Dependencies    []Dependency
 }
 type Plan struct {
+	CleanupPending bool `json:"cleanup_pending,omitempty"`
+	SchemaRevision string
 	// Removed rules still need their old connections cleared on the next
 	// successful run. This list comes from the saved rule history, not Cypher.
 	RetiredRelationships []string              `json:"retired_relationships,omitempty"`
@@ -105,22 +118,86 @@ var (
 	queryParameter      = regexp.MustCompile(`\$([A-Za-z_][A-Za-z0-9_]*)`)
 )
 
+// Load is the offline entry point. Schema files here are local test inputs;
+// the rules page uses LoadFiles with definitions read from BloodHound.
 func Load(directory string) (Plan, error) {
-	var (
-		plan    Plan
-		err     error
-		schemas []Schema
-		queries = make(map[string]Query)
-		entries []os.DirEntry
-		ordered []Query
-	)
-	entries, err = os.ReadDir(directory)
+	var files = map[string]string{}
+	entries, err := os.ReadDir(directory)
 	if err != nil {
 		return Plan{}, err
 	}
-	plan.Definitions, plan.SchemaFiles, err = loadDefinitions(directory, entries)
+	definitions, schemaFiles, err := loadDefinitions(directory, entries)
 	if err != nil {
 		return Plan{}, err
+	}
+	err = filepath.WalkDir(directory, func(filename string, entry os.DirEntry, walkError error) error {
+		if walkError != nil {
+			return walkError
+		}
+		if entry.IsDir() || filepath.Ext(filename) != ".cypher" {
+			return nil
+		}
+		name, err := filepath.Rel(directory, filename)
+		if err != nil {
+			return err
+		}
+		contents, err := os.ReadFile(filename)
+		if err != nil {
+			return err
+		}
+		files[filepath.ToSlash(name)] = string(contents)
+		return nil
+	})
+	if err != nil {
+		return Plan{}, err
+	}
+	plan, err := LoadFiles(definitions, files)
+	plan.SchemaFiles = schemaFiles
+	return plan, err
+}
+
+// LoadFiles keeps installed definitions separate from uploaded analyses. Work
+// on a private copy because discovering outputs adds temporary run settings.
+func LoadFiles(definitions []Definition, files map[string]string) (Plan, error) {
+	return LoadFilesWithDisabled(definitions, files, nil)
+}
+
+// Disabled consumers can stay installed while a reviewed provider update no
+// longer satisfies their version condition. They cannot execute until fixed.
+func LoadFilesWithDisabled(definitions []Definition, files map[string]string, disabled []string) (Plan, error) {
+	var (
+		plan      Plan
+		schemas   []Schema
+		queries   = map[string]Query{}
+		filenames []string
+	)
+	if err := ValidateDefinitions(definitions); err != nil {
+		return Plan{}, err
+	}
+	contents, err := json.Marshal(definitions)
+	if err != nil {
+		return Plan{}, err
+	}
+	if err := json.Unmarshal(contents, &plan.Definitions); err != nil {
+		return Plan{}, err
+	}
+	plan.SchemaFiles = map[string]string{}
+	for index := range plan.Definitions {
+		definition := &plan.Definitions[index]
+		definition.LegacyProcessing = definitions[index].LegacyProcessing
+		plan.SchemaFiles[definition.Schema.Name] = definition.Schema.Name
+		// Legacy offline fixtures name their bindings locally. Resolve them
+		// once so even those tests exercise the same full query identities.
+		for index := range definition.NodeKinds {
+			if binding := definition.NodeKinds[index].PostProcessing; binding != nil && !strings.Contains(binding.Query, "/") {
+				binding.Query = definition.Schema.Namespace + "/" + binding.Query
+			}
+		}
+		for index := range definition.RelationshipKinds {
+			if binding := definition.RelationshipKinds[index].PostProcessing; binding != nil && !strings.Contains(binding.Query, "/") {
+				binding.Query = definition.Schema.Namespace + "/" + binding.Query
+			}
+		}
 	}
 	for index := range plan.Definitions {
 		definition := &plan.Definitions[index]
@@ -128,37 +205,63 @@ func Load(directory string) (Plan, error) {
 			definition.PostProcessing = &ProcessingSettings{ReferenceCommit: BuildReferenceCommit}
 		}
 	}
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".cypher" {
-			continue
-		}
-		if !queryFilename.MatchString(entry.Name()) {
-			return Plan{}, fmt.Errorf("invalid query filename %q: use snake_case.cypher", entry.Name())
-		}
-		contents, err := os.ReadFile(filepath.Join(directory, entry.Name()))
+	for filename := range files {
+		filenames = append(filenames, filename)
+	}
+	sort.Strings(filenames)
+	for _, filename := range filenames {
+		contents := files[filename]
+		name, err := QueryFileKey(filename, contents)
 		if err != nil {
-			return Plan{}, err
+			return Plan{}, fmt.Errorf("%s: %w", filename, err)
+		}
+		if _, exists := queries[name]; exists {
+			return Plan{}, fmt.Errorf("duplicate query %s", name)
+		}
+		metadata, err := ReadQueryMetadata(contents)
+		if err != nil {
+			return Plan{}, fmt.Errorf("%s: %w", name, err)
+		}
+		var owner *Definition
+		for index := range plan.Definitions {
+			if plan.Definitions[index].Schema.Namespace == metadata.Namespace {
+				owner = &plan.Definitions[index]
+			}
+		}
+		if owner == nil {
+			return Plan{}, fmt.Errorf("%s: install the schema for namespace %s in OpenGraph Management", name, metadata.Namespace)
+		}
+		paused := false
+		for _, disabledName := range disabled {
+			paused = paused || disabledName == name
+		}
+		compatible, err := SchemaVersionMatches(owner.Schema.Version, metadata.ExtensionVersions)
+		if !paused && (err != nil || !compatible) {
+			return Plan{}, fmt.Errorf("%s: installed schema version %s does not satisfy extension-versions %s", name, owner.Schema.Version, metadata.ExtensionVersions)
 		}
 		dependencies, err := parseDependencies(string(contents))
 		if err != nil {
-			return Plan{}, fmt.Errorf("%s: %w", entry.Name(), err)
+			return Plan{}, fmt.Errorf("%s: %w", filename, err)
 		}
 		reach, err := parseReachability(string(contents), dependencies)
 		if err != nil {
-			return Plan{}, fmt.Errorf("%s: %w", entry.Name(), err)
+			return Plan{}, fmt.Errorf("%s: %w", filename, err)
 		}
 		overlap, err := parseGroupOverlap(string(contents), dependencies)
 		if err != nil {
-			return Plan{}, fmt.Errorf("%s: %w", entry.Name(), err)
+			return Plan{}, fmt.Errorf("%s: %w", filename, err)
 		}
 		if overlap != nil && reach != nil {
-			return Plan{}, fmt.Errorf("%s: group-overlap cannot also request reachability", entry.Name())
+			return Plan{}, fmt.Errorf("%s: group-overlap cannot also request reachability", filename)
 		}
 		batchDependency, err := parseBatchDependency(string(contents), dependencies)
 		if err != nil {
-			return Plan{}, fmt.Errorf("%s: %w", entry.Name(), err)
+			return Plan{}, fmt.Errorf("%s: %w", filename, err)
 		}
-		query := Query{Name: entry.Name(), Parameter: strings.TrimSuffix(entry.Name(), ".cypher"), Text: string(contents), Dependencies: dependencies, Reach: reach, BatchDependency: batchDependency, Overlap: overlap}
+		query := Query{QueryMetadata: metadata, SchemaVersion: owner.Schema.Version, Extension: owner.Schema.Name, ExtensionName: owner.Schema.DisplayName, Name: name, Parameter: strings.TrimSuffix(filepath.Base(filename), ".cypher"), Text: string(contents), Dependencies: dependencies, Reach: reach, BatchDependency: batchDependency, Overlap: overlap}
+		if paused {
+			query.DisabledReason = "Disabled by you. Existing connections are kept."
+		}
 		if err := checkReadOnlyText(query.Text); err != nil {
 			return Plan{}, fmt.Errorf("%s: %w", query.Name, err)
 		}
@@ -167,17 +270,23 @@ func Load(directory string) (Plan, error) {
 			return Plan{}, fmt.Errorf("%s: %w", query.Name, err)
 		}
 		query.BroadRead = checked.BroadRead
+		query.Columns, query.ColumnsKnown, query.SharedFields = checked.Columns, checked.ColumnsKnown, checked.SharedFields
+		if query.Reach != nil || query.Overlap != nil {
+			// Advanced calculations transform the rows after the Cypher read.
+			// Their dedicated checks describe the resulting answer instead.
+			query.ColumnsKnown = false
+		}
 		var missing []error
 		for _, input := range checked.Inputs {
 			declared := false
 			for _, dependency := range dependencies {
-				if dependency.Type == input.Type && dependency.Name == input.Name {
+				if dependency.Type == input.Type && (dependency.Name == input.Name || input.Type == "query" && dependency.AnswerParameter()+".cypher" == input.Name) {
 					declared = true
 					break
 				}
 			}
 			if !declared {
-				missing = append(missing, fmt.Errorf("%s: line %d: missing dependency; add %s:%s to // depends-on", query.Name, input.Line, input.Type, input.Name))
+				missing = append(missing, fmt.Errorf("%s: line %d: missing dependency; add %s:%s to // depends-on", query.Name, input.Line, input.Type, strings.TrimSuffix(input.Name, ".cypher")))
 			}
 		}
 		if len(missing) > 0 {
@@ -190,7 +299,7 @@ func Load(directory string) (Plan, error) {
 		if err := bindQueryOutput(plan.Definitions, &query, output); err != nil {
 			return Plan{}, fmt.Errorf("%s: line %d: %w", query.Name, finalReturnLine(query.Text), err)
 		}
-		queries[entry.Name()] = query
+		queries[query.Name] = query
 	}
 	plan.Definition = plan.Definitions[0]
 	for _, definition := range plan.Definitions {
@@ -242,14 +351,14 @@ func Load(directory string) (Plan, error) {
 	if err := validateSchema(plan.Schema, queries); err != nil {
 		return Plan{}, err
 	}
-	ordered, err = orderQueries(queries, plan.Schema)
+	ordered, err := orderQueries(queries, plan.Schema)
 	if err != nil {
 		return Plan{}, err
 	}
 	if err := validateInputKinds(ordered, plan.Definitions); err != nil {
 		return Plan{}, err
 	}
-	plan.Queries = attributeQueries(ordered, plan.Definitions)
+	plan.Queries = ordered
 	return plan, nil
 }
 
@@ -257,82 +366,6 @@ func Load(directory string) (Plan, error) {
 // the query. The rules page uses the same reader when removing dependent rules.
 func QueryDependencies(contents string) ([]Dependency, error) {
 	return parseDependencies(contents)
-}
-
-func parseDependencies(contents string) ([]Dependency, error) {
-	var (
-		dependencies []Dependency
-		seen         = make(map[string]bool)
-		declared     bool
-		continuation bool
-		none         bool
-	)
-	for lineNumber, line := range strings.Split(contents, "\n") {
-		problem := func(format string, arguments ...any) error {
-			return fmt.Errorf("line %d: %s", lineNumber+1, fmt.Sprintf(format, arguments...))
-		}
-		comment := strings.TrimSpace(line)
-		if !strings.HasPrefix(comment, "//") {
-			continuation = false
-			continue
-		}
-		comment = strings.TrimSpace(strings.TrimPrefix(comment, "//"))
-		if strings.HasPrefix(comment, "depends-on:") {
-			declared = true
-			continuation = true
-			comment = strings.TrimSpace(strings.TrimPrefix(comment, "depends-on:"))
-		} else if !continuation || !dependencyContinuation(comment) {
-			continuation = false
-			continue
-		}
-		// Empty declaration lines allow the list to start on the next comment line.
-		if comment == "" {
-			continue
-		}
-		if comment == "none" {
-			none = true
-			continue
-		}
-		for _, item := range strings.Split(comment, ",") {
-			item = strings.TrimSpace(item)
-			if item == "" {
-				continue
-			} // A trailing comma can continue onto the next line.
-			parts := strings.Split(item, ":")
-			if len(parts) != 2 {
-				return nil, problem("malformed dependency %q", item)
-			}
-			dependency := Dependency{Type: strings.TrimSpace(parts[0]), Name: strings.TrimSpace(parts[1])}
-			switch dependency.Type {
-			case "node", "relationship":
-				if !identifier.MatchString(dependency.Name) {
-					return nil, problem("invalid dependency kind %q", dependency.Name)
-				}
-			case "query":
-				if !queryFilename.MatchString(dependency.Name) {
-					return nil, problem("invalid prerequisite filename %q", dependency.Name)
-				}
-			default:
-				return nil, problem("unknown dependency type %q", dependency.Type)
-			}
-			key := dependency.Type + ":" + dependency.Name
-			if seen[key] {
-				return nil, problem("duplicate dependency %q", key)
-			}
-			seen[key] = true
-			dependencies = append(dependencies, dependency)
-		}
-	}
-	if !declared {
-		return nil, fmt.Errorf("line 1: missing // depends-on declaration")
-	}
-	if none && len(dependencies) != 0 {
-		return nil, fmt.Errorf("depends-on: none cannot be combined with dependencies")
-	}
-	if !none && len(dependencies) == 0 {
-		return nil, fmt.Errorf("empty dependency declaration; use none for constants")
-	}
-	return dependencies, nil
 }
 
 // Ordinary explanatory comments can appear between dependency declarations.
@@ -436,7 +469,26 @@ func orderQueries(queries map[string]Query, schema Schema) ([]Query, error) {
 				return nil, fmt.Errorf("%s: line %d: missing prerequisite %s; upload that file with this draft", name, textLine(query.Text, dependency.Name), dependency.Name)
 			}
 			used[dependency.Name] = true
-			declaredParameters[strings.TrimSuffix(dependency.Name, ".cypher")] = true
+			compatible, err := VersionMatches(queries[dependency.Name].Version, dependency.Conditions)
+			if query.DisabledReason == "" && (err != nil || !compatible) {
+				return nil, fmt.Errorf("%s: prerequisite %s at %s does not satisfy %s", name, dependency.Name, queries[dependency.Name].Version, dependency.Conditions)
+			}
+			declaredParameters[dependency.AnswerParameter()] = true
+			producer := queries[dependency.Name]
+			if producer.ColumnsKnown && query.DisabledReason == "" {
+				for _, field := range query.SharedFields {
+					if field.Parameter != dependency.AnswerParameter() {
+						continue
+					}
+					found := false
+					for _, column := range producer.Columns {
+						found = found || column == field.Column
+					}
+					if !found {
+						return nil, fmt.Errorf("%s: line %d: prerequisite %s does not return column %s", name, field.Line, dependency.Name, field.Column)
+					}
+				}
+			}
 		}
 		for _, prerequisite := range plan.Prerequisites(query) {
 			used[prerequisite] = true

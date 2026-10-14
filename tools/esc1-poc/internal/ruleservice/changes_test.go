@@ -74,7 +74,7 @@ func TestPreviewLeavesActiveAndDiskUntouched(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	change := ruleservice.Change{Files: files(t)}
+	change := ruleservice.Change{Files: installSchemas(t, store, files(t))}
 	preview, err := store.Preview(change)
 	if err != nil || preview.Revision == "" {
 		t.Fatal(err, preview)
@@ -91,7 +91,7 @@ func TestPreviewLeavesActiveAndDiskUntouched(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	change = ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"vault_helpers.cypher"}}
+	change = ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"PoC_Vault/vault_helpers.cypher"}}
 	if _, err := store.Preview(change); err != nil {
 		t.Fatal(err)
 	}
@@ -111,11 +111,11 @@ func TestApplyRequiresExactReviewedCandidateAndCurrentBase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	change := ruleservice.Change{BaseRevision: initial.Revision, Files: map[string]string{"account_users.cypher": initial.Files["account_users.cypher"] + "\n// reviewed"}}
+	change := ruleservice.Change{BaseRevision: initial.Revision, Files: map[string]string{"PoC_Vault/account_users.cypher": initial.Files["PoC_Vault/account_users.cypher"] + "\n// reviewed"}}
 	if _, err := store.Preview(change); !errors.Is(err, ruleservice.ErrConflict) {
 		t.Fatal("replacement lacked explicit choice", err)
 	}
-	change.Overwrite = []string{"account_users.cypher"}
+	change.Overwrite = []string{"PoC_Vault/account_users.cypher"}
 	preview, err := store.Preview(change)
 	if err != nil || !reflect.DeepEqual(preview.Overwritten, change.Overwrite) {
 		t.Fatal(err, preview)
@@ -124,12 +124,12 @@ func TestApplyRequiresExactReviewedCandidateAndCurrentBase(t *testing.T) {
 		t.Fatal("applied unconfirmed change", err)
 	}
 	change.ConfirmRevision = preview.Revision
-	change.Files["account_users.cypher"] += "\n// edited after review"
+	change.Files["PoC_Vault/account_users.cypher"] += "\n// edited after review"
 	if _, err := store.Apply(change); !errors.Is(err, ruleservice.ErrConflict) {
 		t.Fatal("applied edited candidate", err)
 	}
-	change.Files["account_users.cypher"] = initial.Files["account_users.cypher"] + "\n// reviewed"
-	newer, err := store.Update(map[string]string{"vault_helpers.cypher": initial.Files["vault_helpers.cypher"] + "\n// another editor"})
+	change.Files["PoC_Vault/account_users.cypher"] = initial.Files["PoC_Vault/account_users.cypher"] + "\n// reviewed"
+	newer, err := store.Update(map[string]string{"PoC_Vault/vault_helpers.cypher": initial.Files["PoC_Vault/vault_helpers.cypher"] + "\n// another editor"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,8 +148,8 @@ func TestReplacementRebuildsDeclaredDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	query := "// depends-on: node:PoC_Vault_Container, node:User\nMATCH (vault:PoC_Vault_Container), (directory_user:User) RETURN vault.objectid AS source, directory_user.objectid AS target, 'PoC_Vault_HasAccountFor' AS kind"
-	change := ruleservice.Change{BaseRevision: initial.Revision, Files: map[string]string{"account_users.cypher": query}, Overwrite: []string{"account_users.cypher"}}
+	query := "// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: node:PoC_Vault_Container, node:User\nMATCH (vault:PoC_Vault_Container), (directory_user:User) RETURN vault.objectid AS source, directory_user.objectid AS target, 'PoC_Vault_HasAccountFor' AS kind"
+	change := ruleservice.Change{BaseRevision: initial.Revision, Files: map[string]string{"PoC_Vault/account_users.cypher": query}, Overwrite: []string{"PoC_Vault/account_users.cypher"}}
 	preview, err := store.Preview(change)
 	if err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func TestReplacementRebuildsDeclaredDependencies(t *testing.T) {
 	var found bool
 	for _, thread := range preview.Plan.Threads {
 		for _, rule := range thread.Queries {
-			if rule.Name == "account_users.cypher" {
+			if rule.Name == "PoC_Vault/account_users.cypher" {
 				found = true
 				if len(rule.Prerequisites) != 0 || rule.Text != query || rule.Stage != 1 {
 					t.Fatal("old prerequisite survived", rule)
@@ -180,12 +180,12 @@ func TestRemovingPrerequisiteCascadesAndKeepsSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	change := ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"vault_helpers.cypher"}}
+	change := ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"PoC_Vault/vault_helpers.cypher"}}
 	preview, err := store.Preview(change)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(preview.Removed, []string{"account_users.cypher", "vault_helpers.cypher"}) || len(preview.Plan.Threads) != 0 {
+	if !reflect.DeepEqual(preview.Removed, []string{"PoC_Vault/account_users.cypher", "PoC_Vault/vault_helpers.cypher"}) || len(preview.Plan.Threads) != 0 {
 		t.Fatal("incomplete cascade", preview)
 	}
 	active, err := store.Active()
@@ -193,7 +193,7 @@ func TestRemovingPrerequisiteCascadesAndKeepsSchema(t *testing.T) {
 		t.Fatal("cascade preview partially activated", err)
 	}
 	updated := applyChange(t, store, change)
-	if len(updated.Files) != 1 || updated.Files["schema.json"] == "" {
+	if len(updated.Files) != 0 || !reflect.DeepEqual(updated.Schemas, initial.Schemas) {
 		t.Fatal("schema lost or queries retained", updated.Files)
 	}
 	if !reflect.DeepEqual(updated.RetiredRelationships, []string{"PoC_Vault_HasAccountFor"}) {
@@ -213,16 +213,15 @@ func TestQueryRenameKeepsOutputWithoutChangingSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	change := ruleservice.Change{BaseRevision: initial.Revision, Files: map[string]string{
-		"schema.json":          strings.ReplaceAll(original["schema.json"], "vault_helpers.cypher", "replacement.cypher"),
-		"account_users.cypher": strings.ReplaceAll(original["account_users.cypher"], "vault_helpers", "replacement"),
-		"replacement.cypher":   original["vault_helpers.cypher"],
-	}, Overwrite: []string{"schema.json", "account_users.cypher"}, Remove: []string{"vault_helpers.cypher"}}
+		"PoC_Vault/account_users.cypher": strings.ReplaceAll(original["PoC_Vault/account_users.cypher"], "vault_helpers", "replacement"),
+		"PoC_Vault/replacement.cypher":   original["PoC_Vault/vault_helpers.cypher"],
+	}, Overwrite: []string{"PoC_Vault/account_users.cypher"}, Remove: []string{"PoC_Vault/vault_helpers.cypher"}}
 	preview, err := store.Preview(change)
-	if err != nil || !reflect.DeepEqual(preview.Removed, []string{"vault_helpers.cypher"}) {
+	if err != nil || !reflect.DeepEqual(preview.Removed, []string{"PoC_Vault/vault_helpers.cypher"}) {
 		t.Fatal("old query not pruned", err, preview)
 	}
 	updated := applyChange(t, store, change)
-	if _, exists := updated.Files["vault_helpers.cypher"]; exists {
+	if _, exists := updated.Files["PoC_Vault/vault_helpers.cypher"]; exists {
 		t.Fatal("old query retained")
 	}
 	if len(updated.RetiredRelationships) != 0 {
@@ -241,7 +240,7 @@ func TestRetirementHistorySurvivesRestartAndReintroduction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	removed := applyChange(t, store, ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"account_users.cypher"}})
+	removed := applyChange(t, store, ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"PoC_Vault/account_users.cypher"}})
 	if len(removed.RetiredRelationships) != 1 {
 		t.Fatal(removed)
 	}
@@ -258,7 +257,10 @@ func TestRetirementHistorySurvivesRestartAndReintroduction(t *testing.T) {
 	if endpoints := active.RetiredEndpoints["PoC_Vault_HasAccountFor"]; len(endpoints) != 1 || endpoints[0].SourceKind != "PoC_Vault_Container" || endpoints[0].TargetKind != "User" {
 		t.Fatal("saved cleanup endpoints were lost or changed by a caller", endpoints)
 	}
-	changed, err := restored.Update(map[string]string{"vault_helpers.cypher": active.Files["vault_helpers.cypher"] + "\n// update"})
+	if err := restored.RefreshSchemas(ruleservice.SchemaSnapshot{Definitions: active.Schemas}); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := restored.Update(map[string]string{"PoC_Vault/vault_helpers.cypher": active.Files["PoC_Vault/vault_helpers.cypher"] + "\n// update"})
 	if err != nil || !reflect.DeepEqual(changed.RetiredRelationships, active.RetiredRelationships) {
 		t.Fatal("update forgot retirement", err, changed)
 	}
@@ -284,7 +286,7 @@ func TestHTTPRequiresPreviewAndReplacementChoice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	contents, err := json.Marshal(ruleservice.Change{Files: files(t)})
+	contents, err := json.Marshal(ruleservice.Change{Files: installSchemas(t, store, files(t))})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +294,7 @@ func TestHTTPRequiresPreviewAndReplacementChoice(t *testing.T) {
 	if response.Code != http.StatusConflict {
 		t.Fatal("unreviewed upload activated", response.Code, response.Body.String())
 	}
-	response = exchange(handler, "PUT", "/v1/rules", "private-token-012345678901234567890123456789", confirmedHTTPChange(t, handler, ruleservice.Change{Files: files(t)}))
+	response = exchange(handler, "PUT", "/v1/rules", "private-token-012345678901234567890123456789", confirmedHTTPChange(t, handler, ruleservice.Change{Files: installSchemas(t, store, files(t))}))
 	if response.Code != http.StatusOK {
 		t.Fatal(response.Code, response.Body.String())
 	}
@@ -300,7 +302,7 @@ func TestHTTPRequiresPreviewAndReplacementChoice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	change := ruleservice.Change{BaseRevision: initial.Revision, Files: map[string]string{"account_users.cypher": initial.Files["account_users.cypher"] + "\n// replaced"}}
+	change := ruleservice.Change{BaseRevision: initial.Revision, Files: map[string]string{"PoC_Vault/account_users.cypher": initial.Files["PoC_Vault/account_users.cypher"] + "\n// replaced"}}
 	contents, err = json.Marshal(change)
 	if err != nil {
 		t.Fatal(err)
@@ -309,7 +311,7 @@ func TestHTTPRequiresPreviewAndReplacementChoice(t *testing.T) {
 	if response.Code != http.StatusConflict {
 		t.Fatal("silent filename replacement", response.Code)
 	}
-	change.Overwrite = []string{"account_users.cypher"}
+	change.Overwrite = []string{"PoC_Vault/account_users.cypher"}
 	response = exchange(handler, "PUT", "/v1/rules", "private-token-012345678901234567890123456789", confirmedHTTPChange(t, handler, change))
 	if response.Code != http.StatusOK {
 		t.Fatal(response.Code, response.Body.String())
@@ -327,9 +329,9 @@ func TestRemovalKeepsGraphReadersAndEndpointConsumers(t *testing.T) {
 	}
 	relationships := schema["relationship_kinds"].([]any)
 	relationships = append(relationships,
-		map[string]any{"name": "PoC_Vault_HelperEdge", "compatible_kinds": []any{map[string]any{"source_kind": "PoC_Vault_Helper", "target_kind": "User"}}, "post_processing": map[string]any{"query": "endpoint.cypher"}},
-		map[string]any{"name": "PoC_Vault_ReadHelper", "compatible_kinds": []any{map[string]any{"source_kind": "PoC_Vault_Container", "target_kind": "User"}}, "post_processing": map[string]any{"query": "node_reader.cypher"}},
-		map[string]any{"name": "PoC_Vault_ReadEdge", "compatible_kinds": []any{map[string]any{"source_kind": "PoC_Vault_Container", "target_kind": "User"}}, "post_processing": map[string]any{"query": "edge_reader.cypher"}},
+		map[string]any{"name": "PoC_Vault_HelperEdge", "compatible_kinds": []any{map[string]any{"source_kind": "PoC_Vault_Helper", "target_kind": "User"}}, "post_processing": map[string]any{"query": "PoC_Vault/endpoint.cypher"}},
+		map[string]any{"name": "PoC_Vault_ReadHelper", "compatible_kinds": []any{map[string]any{"source_kind": "PoC_Vault_Container", "target_kind": "User"}}, "post_processing": map[string]any{"query": "PoC_Vault/node_reader.cypher"}},
+		map[string]any{"name": "PoC_Vault_ReadEdge", "compatible_kinds": []any{map[string]any{"source_kind": "PoC_Vault_Container", "target_kind": "User"}}, "post_processing": map[string]any{"query": "PoC_Vault/edge_reader.cypher"}},
 	)
 	schema["relationship_kinds"] = relationships
 	contents, err := json.Marshal(schema)
@@ -337,18 +339,18 @@ func TestRemovalKeepsGraphReadersAndEndpointConsumers(t *testing.T) {
 		t.Fatal(err)
 	}
 	original["schema.json"] = string(contents)
-	original["endpoint.cypher"] = "// depends-on: none\nRETURN 'helper' AS source, 'user' AS target"
-	original["node_reader.cypher"] = "// depends-on: node:PoC_Vault_Helper\nMATCH (helper:PoC_Vault_Helper) RETURN helper.objectid AS source, 'user' AS target"
-	original["edge_reader.cypher"] = "// depends-on: relationship:PoC_Vault_HasAccountFor\nMATCH ()-[edge:PoC_Vault_HasAccountFor]->() RETURN 'vault' AS source, 'user' AS target"
+	original["PoC_Vault/endpoint.cypher"] = "// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: none\nRETURN 'helper' AS source, 'user' AS target"
+	original["PoC_Vault/node_reader.cypher"] = "// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: node:PoC_Vault_Helper\nMATCH (helper:PoC_Vault_Helper) RETURN helper.objectid AS source, 'user' AS target"
+	original["PoC_Vault/edge_reader.cypher"] = "// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: relationship:PoC_Vault_HasAccountFor\nMATCH ()-[edge:PoC_Vault_HasAccountFor]->() RETURN 'vault' AS source, 'user' AS target"
 	initial, err := store.Update(original)
 	if err != nil {
 		t.Fatal(err)
 	}
-	preview, err := store.Preview(ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"vault_helpers.cypher"}})
+	preview, err := store.Preview(ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"PoC_Vault/vault_helpers.cypher"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := []string{"account_users.cypher", "vault_helpers.cypher"}
+	expected := []string{"PoC_Vault/account_users.cypher", "PoC_Vault/vault_helpers.cypher"}
 	if !reflect.DeepEqual(preview.Removed, expected) {
 		t.Fatal("deletion should cascade only through required query rows", preview.Removed)
 	}
@@ -363,12 +365,12 @@ func TestRemovingLastProducerAllowsRemainingReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	updated := applyChange(t, store, ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"account_users.cypher"}})
-	if updated.Files["schema.json"] != initial.Files["schema.json"] {
+	updated := applyChange(t, store, ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"PoC_Vault/account_users.cypher"}})
+	if !reflect.DeepEqual(updated.Schemas, initial.Schemas) {
 		t.Fatal("removal rewrote the display schema")
 	}
-	reader := "// depends-on: relationship:PoC_Vault_HasAccountFor\nMATCH ()-[edge:PoC_Vault_HasAccountFor]->() RETURN 'PoC_Vault_Helper_1' AS id, ['PoC_Vault_Helper'] AS kinds, {} AS properties"
-	withReader, err := store.Update(map[string]string{"vault_helpers.cypher": reader})
+	reader := "// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: relationship:PoC_Vault_HasAccountFor\nMATCH ()-[edge:PoC_Vault_HasAccountFor]->() RETURN 'PoC_Vault_Helper_1' AS id, ['PoC_Vault_Helper'] AS kinds, {} AS properties"
+	withReader, err := store.Update(map[string]string{"PoC_Vault/vault_helpers.cypher": reader})
 	if err != nil {
 		t.Fatal("reader should remain valid after the last producer is removed", err)
 	}
@@ -382,20 +384,20 @@ func TestRemovalPrunesUnusedScratchPrerequisites(t *testing.T) {
 		store    = open(t)
 		original = files(t)
 	)
-	original["scratch.cypher"] = "// depends-on: none\nRETURN 1 AS value"
-	original["account_users.cypher"] = strings.Replace(original["account_users.cypher"], "query:vault_helpers.cypher,", "query:vault_helpers.cypher, query:scratch.cypher,", 1)
+	original["PoC_Vault/scratch.cypher"] = "// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: none\nRETURN 1 AS value"
+	original["PoC_Vault/account_users.cypher"] = strings.Replace(original["PoC_Vault/account_users.cypher"], "query:vault_helpers", "query:vault_helpers\n// depends-on: query:scratch", 1)
 	initial, err := store.Update(original)
 	if err != nil {
 		t.Fatal(err)
 	}
-	preview, err := store.Preview(ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"account_users.cypher"}})
+	preview, err := store.Preview(ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"PoC_Vault/account_users.cypher"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(preview.Removed, []string{"account_users.cypher", "scratch.cypher"}) {
+	if !reflect.DeepEqual(preview.Removed, []string{"PoC_Vault/account_users.cypher", "PoC_Vault/scratch.cypher"}) {
 		t.Fatal("unused prerequisite survived", preview.Removed)
 	}
-	if len(preview.Plan.Threads) != 1 || len(preview.Plan.Threads[0].Queries) != 1 || preview.Plan.Threads[0].Queries[0].Name != "vault_helpers.cypher" {
+	if len(preview.Plan.Threads) != 1 || len(preview.Plan.Threads[0].Queries) != 1 || preview.Plan.Threads[0].Queries[0].Name != "PoC_Vault/vault_helpers.cypher" {
 		t.Fatal("helper producer not preserved", preview.Plan)
 	}
 }

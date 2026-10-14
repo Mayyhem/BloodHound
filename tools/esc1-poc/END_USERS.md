@@ -6,15 +6,15 @@ Use this guide for extensions someone else has written. It assumes an administra
 
 | File | What it provides | Where to upload it |
 | --- | --- | --- |
-| Schema (`schema.json` or `name.schema.json`) | Object and connection types, and how they appear. | The rule page supplied by your administrator. |
-| Ruleset (`.cypher` files) | Instructions for finding connections in collected data. | The rule page, with its schema. |
+| Schema (`schema.json` or `name.schema.json`) | Object and connection types, and how they appear. | BloodHound’s OpenGraph Management page. |
+| Ruleset (`.cypher` files) | Instructions for finding connections in collected data. | The current rule page. |
 | Collection payload (supported JSON or ZIP) | Facts gathered from your environment. | BloodHound's normal data upload page. |
 
 The lab's rule page is at <http://127.0.0.1:18081/>. You do not need to understand the files' code.
 
 ## How do I start using an extension?
 
-1. Select its schema and all supplied rule files. Click **Save upload and review**.
+1. Upload its schema through **OpenGraph Management**. On the rule page, select its `.cypher` files and click **Save upload and review**.
 2. Check the proposed additions and replacements. Then click **Activate reviewed revision**. A revision identifies one saved version of the rules.
 3. Upload collection data to BloodHound, or click **Run Analysis** to use data already stored.
 4. Click **Refresh rules and status** and check **Latest analysis report** before exploring the connections in BloodHound.
@@ -25,7 +25,7 @@ The lab's rule page is at <http://127.0.0.1:18081/>. You do not need to understa
 
 Yes. Uploads add to the saved files. Activate each complete extension when ready. The engine combines all active rules into one plan, including connections between extensions.
 
-Filenames must be unique across extensions. If another extension already uses `schema.json`, name the new schema something like `vault.schema.json` before its first upload. Keep that name for updates. Ask the supplier to resolve conflicting rule filenames, since other rules may refer to them.
+Different extensions may supply the same filenames. Their declared namespaces keep them separate. Upload schemas on OpenGraph Management, then review each extension’s analyses on the rule page. A file uploaded before its schema remains an inactive draft.
 
 ## What if I only have some of the required files?
 
@@ -67,7 +67,7 @@ A queued request is still waiting. Check the report for completion. If the butto
 
 ## How do I update an extension?
 
-Upload just the changed or new files, keeping existing filenames. For a changed file, choose **Overwrite this file** or **Skip this file**, then review and activate. Overwrite replaces the whole file. Files omitted from the upload remain installed.
+Upload schema updates through OpenGraph Management. On the rule page, upload just the changed or new analysis files, keeping their filenames. For a changed file, choose **Overwrite this file** or **Skip this file**, then review and activate. Overwrite replaces the whole file. Files omitted from the upload remain installed.
 
 Review checks the files without running them against your data, so acceptance does not guarantee successful analysis. Updates need no application restart.
 
@@ -146,3 +146,11 @@ Yes. Previous extension results remain available until replacements are saved to
 No. Some connections describe associations without demonstrating an attack step. The schema decides which types pathfinding can follow. You can inspect other associations in the graph even when pathfinding does not use them.
 
 For administrator setup and detailed controls, see [USAGE.md](USAGE.md).
+
+## What happens when a schema is deleted or becomes incompatible?
+
+The analysis files remain available on the rule page. Affected calculations and other rules depending on them pause; previous calculated results are kept and shown as potentially stale. Other independent extensions can continue. The worker cannot reinstall the deleted schema.
+
+After correcting or reinstalling the schema, review **Enable** for the retained paused files. Changing the schema version does not require new Cypher files when the author’s compatibility conditions and the other checks still hold. Each report records the query and schema versions used.
+
+For now, deleting an extension does not delete its analysis files. A future deletion option will offer that choice. The later TODO 3 workspace will take over analysis management; schema uploads stay in OpenGraph Management.

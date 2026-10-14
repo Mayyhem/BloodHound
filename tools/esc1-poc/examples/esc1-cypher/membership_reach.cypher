@@ -1,3 +1,5 @@
+// namespace: PoC
+// version: v1.0.0
 // Copyright 2026 Specter Ops, Inc.
 //
 // Licensed under the Apache License, Version 2.0
@@ -14,8 +16,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// depends-on: query:enrollment_principals.cypher,
-// relationship:MemberOf, relationship:MemberOfLocalGroup
+// depends-on: query:enrollment_principals
+// depends-on: relationship:MemberOf, relationship:MemberOfLocalGroup
 
 // Include each direct enroller and every member beneath it. A zero-length
 // match includes the enroller itself. Keep groups as well as users.

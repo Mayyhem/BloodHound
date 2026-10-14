@@ -81,7 +81,7 @@ func newGroupOverlap(ctx context.Context, query extension.Query, parameters map[
 	if query.Overlap == nil {
 		return nil, fmt.Errorf("group overlap configuration is missing")
 	}
-	parameter := strings.TrimSuffix(query.Overlap.Memberships, ".cypher")
+	parameter := query.Overlap.Memberships
 	rows, valid := parameters[parameter].([]map[string]any)
 	if !valid {
 		return nil, fmt.Errorf("group overlap requires the %s membership table", parameter)

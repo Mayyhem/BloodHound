@@ -44,11 +44,11 @@ func TestBuildViewEmpty(t *testing.T) {
 func TestBuildViewOrdersBranchesAndSeparatesIndependentGroups(t *testing.T) {
 	var (
 		plan = extension.Plan{Queries: []extension.Query{
-			{Name: "seed.cypher", Parameter: "seed", Text: "RETURN 1"},
-			{Name: "first.cypher", Dependencies: []extension.Dependency{{Type: "query", Name: "seed.cypher"}}},
-			{Name: "second.cypher", Dependencies: []extension.Dependency{{Type: "query", Name: "seed.cypher"}}},
-			{Name: "final.cypher", Dependencies: []extension.Dependency{{Type: "query", Name: "first.cypher"}, {Type: "query", Name: "second.cypher"}}},
-			{Name: "independent.cypher"},
+			{Name: "PoC_Vault/seed.cypher", Parameter: "seed", Text: "RETURN 1"},
+			{Name: "PoC_Vault/first.cypher", Dependencies: []extension.Dependency{{Type: "query", Name: "PoC_Vault/seed.cypher"}}},
+			{Name: "PoC_Vault/second.cypher", Dependencies: []extension.Dependency{{Type: "query", Name: "PoC_Vault/seed.cypher"}}},
+			{Name: "PoC_Vault/final.cypher", Dependencies: []extension.Dependency{{Type: "query", Name: "PoC_Vault/first.cypher"}, {Type: "query", Name: "PoC_Vault/second.cypher"}}},
+			{Name: "PoC_Vault/independent.cypher"},
 		}}
 		view           = ruleservice.BuildView(ruleservice.Bundle{Revision: "example"}, plan)
 		expectedStages = []int{1, 2, 2, 3}
@@ -61,10 +61,10 @@ func TestBuildViewOrdersBranchesAndSeparatesIndependentGroups(t *testing.T) {
 			t.Fatalf("incorrect order or stage: %+v", query)
 		}
 	}
-	if !reflect.DeepEqual(view.Threads[0].Queries[0].Dependents, []string{"first.cypher", "second.cypher"}) {
+	if !reflect.DeepEqual(view.Threads[0].Queries[0].Dependents, []string{"PoC_Vault/first.cypher", "PoC_Vault/second.cypher"}) {
 		t.Fatalf("missing downstream queries: %+v", view.Threads[0].Queries[0])
 	}
-	if prerequisite := view.Threads[0].Queries[3].Prerequisites[0]; prerequisite.Name != "first.cypher" || prerequisite.Parameter != "first" {
+	if prerequisite := view.Threads[0].Queries[3].Prerequisites[0]; prerequisite.Name != "PoC_Vault/first.cypher" || prerequisite.Parameter != "first" {
 		t.Fatalf("incorrect prerequisite row parameter: %+v", prerequisite)
 	}
 	if query := view.Threads[1].Queries[0]; query.Order != 5 || query.Stage != 1 {
@@ -75,10 +75,10 @@ func TestBuildViewOrdersBranchesAndSeparatesIndependentGroups(t *testing.T) {
 func TestBuildViewGroupsSharedInputsTransitivelyWithoutInventingExecutionEdges(t *testing.T) {
 	var (
 		plan = extension.Plan{Queries: []extension.Query{
-			{Name: "first.cypher", Dependencies: []extension.Dependency{{Type: "node", Name: "User"}}},
-			{Name: "bridge.cypher", Dependencies: []extension.Dependency{{Type: "node", Name: "User"}, {Type: "relationship", Name: "MemberOf"}}},
-			{Name: "last.cypher", Dependencies: []extension.Dependency{{Type: "relationship", Name: "MemberOf"}}},
-			{Name: "separate.cypher", Dependencies: []extension.Dependency{{Type: "node", Name: "MemberOf"}}},
+			{Name: "PoC_Vault/first.cypher", Dependencies: []extension.Dependency{{Type: "node", Name: "User"}}},
+			{Name: "PoC_Vault/bridge.cypher", Dependencies: []extension.Dependency{{Type: "node", Name: "User"}, {Type: "relationship", Name: "MemberOf"}}},
+			{Name: "PoC_Vault/last.cypher", Dependencies: []extension.Dependency{{Type: "relationship", Name: "MemberOf"}}},
+			{Name: "PoC_Vault/separate.cypher", Dependencies: []extension.Dependency{{Type: "node", Name: "MemberOf"}}},
 		}}
 		view           = ruleservice.BuildView(ruleservice.Bundle{}, plan)
 		expectedInputs = []ruleservice.InputView{{Type: "node", Name: "User"}, {Type: "relationship", Name: "MemberOf"}}
@@ -98,15 +98,15 @@ func TestBuildViewGroupsSharedInputsTransitivelyWithoutInventingExecutionEdges(t
 
 func TestBuildViewJoinsManagedProducersAndPreservesPublicationDetails(t *testing.T) {
 	var (
-		text = "// depends-on: none\nRETURN '<script>alert(1)</script>' AS note\n"
+		text = "// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: none\nRETURN '<script>alert(1)</script>' AS note\n"
 		plan = extension.Plan{
-			Schema: extension.Schema{Name: "test", Nodes: []extension.NodeBinding{{Kind: "PoC_Helper", Query: "helper.cypher", IDPrefix: "PoC_Helper_"}}, Relationships: []extension.RelationshipBinding{
-				{Kind: "PoC_Default", Query: "consumer.cypher", Endpoints: []extension.Endpoint{{SourceKind: "PoC_Helper", TargetKind: "User"}}},
-				{Kind: "PoC_Preserved", Query: "consumer.cypher", ExistingEdgePolicy: extension.KeepExisting},
+			Schema: extension.Schema{Name: "test", Nodes: []extension.NodeBinding{{Kind: "PoC_Helper", Query: "PoC_Vault/helper.cypher", IDPrefix: "PoC_Helper_"}}, Relationships: []extension.RelationshipBinding{
+				{Kind: "PoC_Default", Query: "PoC_Vault/consumer.cypher", Endpoints: []extension.Endpoint{{SourceKind: "PoC_Helper", TargetKind: "User"}}},
+				{Kind: "PoC_Preserved", Query: "PoC_Vault/consumer.cypher", ExistingEdgePolicy: extension.KeepExisting},
 			}},
 			Queries: []extension.Query{
-				{Name: "consumer.cypher", Text: text, Dependencies: []extension.Dependency{{Type: "node", Name: "PoC_Helper"}}},
-				{Name: "helper.cypher", Parameter: "helper"},
+				{Name: "PoC_Vault/consumer.cypher", Text: text, Dependencies: []extension.Dependency{{Type: "node", Name: "PoC_Helper"}}},
+				{Name: "PoC_Vault/helper.cypher", Parameter: "helper"},
 			},
 		}
 		view = ruleservice.BuildView(ruleservice.Bundle{}, plan)
@@ -129,15 +129,15 @@ func TestBuildViewGroupsEndpointAndReachabilityKinds(t *testing.T) {
 	var (
 		plan = extension.Plan{
 			Schema: extension.Schema{
-				Nodes:         []extension.NodeBinding{{Kind: "PoC_Helper", Query: "helper.cypher"}},
-				Relationships: []extension.RelationshipBinding{{Kind: "PoC_Link", Query: "endpoint.cypher", Endpoints: []extension.Endpoint{{SourceKind: "PoC_Helper", TargetKind: "User"}}}},
+				Nodes:         []extension.NodeBinding{{Kind: "PoC_Helper", Query: "PoC_Vault/helper.cypher"}},
+				Relationships: []extension.RelationshipBinding{{Kind: "PoC_Link", Query: "PoC_Vault/endpoint.cypher", Endpoints: []extension.Endpoint{{SourceKind: "PoC_Helper", TargetKind: "User"}}}},
 			},
 			Queries: []extension.Query{
-				{Name: "helper.cypher"},
-				{Name: "endpoint.cypher", Dependencies: []extension.Dependency{{Type: "node", Name: "User"}}},
-				{Name: "reach.cypher", Reach: &extension.Reachability{NodeKinds: []string{"User"}, Relationships: []string{"MemberOf"}}},
-				{Name: "membership.cypher", Dependencies: []extension.Dependency{{Type: "relationship", Name: "MemberOf"}}},
-				{Name: "separate.cypher"},
+				{Name: "PoC_Vault/helper.cypher"},
+				{Name: "PoC_Vault/endpoint.cypher", Dependencies: []extension.Dependency{{Type: "node", Name: "User"}}},
+				{Name: "PoC_Vault/reach.cypher", Reach: &extension.Reachability{NodeKinds: []string{"User"}, Relationships: []string{"MemberOf"}}},
+				{Name: "PoC_Vault/membership.cypher", Dependencies: []extension.Dependency{{Type: "relationship", Name: "MemberOf"}}},
+				{Name: "PoC_Vault/separate.cypher"},
 			},
 		}
 		view = ruleservice.BuildView(ruleservice.Bundle{}, plan)
@@ -161,11 +161,11 @@ func TestBuildViewIncludesExtensionsAndPausedRules(t *testing.T) {
 		plan    = extension.Plan{
 			Definitions: []extension.Definition{{Schema: extension.Metadata{Name: "cyberark", DisplayName: "CyberArk"}}, {Schema: extension.Metadata{Name: "active_directory", DisplayName: "Active Directory"}}},
 			Queries: []extension.Query{
-				{Name: "seed.cypher", Extension: "active_directory", ExtensionName: "Active Directory", DisabledReason: "Disabled by you."},
-				{Name: "consumer.cypher", Extension: "cyberark", ExtensionName: "CyberArk", DisabledReason: "Waiting for seed.cypher to be enabled.", Dependencies: []extension.Dependency{{Type: "query", Name: "seed.cypher"}}},
+				{Name: "PoC_Vault/seed.cypher", Extension: "active_directory", ExtensionName: "Active Directory", DisabledReason: "Disabled by you."},
+				{Name: "PoC_Vault/consumer.cypher", Extension: "cyberark", ExtensionName: "CyberArk", DisabledReason: "Waiting for seed.cypher to be enabled.", Dependencies: []extension.Dependency{{Type: "query", Name: "PoC_Vault/seed.cypher"}}},
 			},
 		}
-		view = ruleservice.BuildView(ruleservice.Bundle{AddedAt: map[string]time.Time{"seed.cypher": addedAt}}, plan)
+		view = ruleservice.BuildView(ruleservice.Bundle{AddedAt: map[string]time.Time{"PoC_Vault/seed.cypher": addedAt}}, plan)
 	)
 	if len(view.Queries) != 2 || len(view.Extensions) != 2 || view.Extensions[0].DisplayName != "Active Directory" {
 		t.Fatalf("missing flattened rules or extensions: %+v", view)
@@ -182,17 +182,17 @@ func TestBuildViewShowsPropertyPrecedenceIndependentlyOfQueryOrder(t *testing.T)
 	var (
 		plan = extension.Plan{
 			Schema: extension.Schema{Relationships: []extension.RelationshipBinding{
-				{Kind: "PoC_Shared", Query: "z_first.cypher"},
-				{Kind: "PoC_Shared", Query: "a_later.cypher"},
+				{Kind: "PoC_Shared", Query: "PoC_Vault/z_first.cypher"},
+				{Kind: "PoC_Shared", Query: "PoC_Vault/a_later.cypher"},
 			}},
 			Queries: []extension.Query{
-				{Name: "z_first.cypher"},
-				{Name: "a_later.cypher", Dependencies: []extension.Dependency{{Type: "query", Name: "z_first.cypher"}}},
+				{Name: "PoC_Vault/z_first.cypher"},
+				{Name: "PoC_Vault/a_later.cypher", Dependencies: []extension.Dependency{{Type: "query", Name: "PoC_Vault/z_first.cypher"}}},
 			},
 		}
 		view = ruleservice.BuildView(ruleservice.Bundle{}, plan)
 	)
-	if !reflect.DeepEqual(view.Queries[0].Outputs[0].Producers, []string{"a_later.cypher", "z_first.cypher"}) {
+	if !reflect.DeepEqual(view.Queries[0].Outputs[0].Producers, []string{"PoC_Vault/a_later.cypher", "PoC_Vault/z_first.cypher"}) {
 		t.Fatal("property precedence must follow filenames, not execution order", view.Queries[0].Outputs)
 	}
 }

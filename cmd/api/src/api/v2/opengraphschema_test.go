@@ -167,6 +167,8 @@ func TestResources_OpenGraphSchemaIngest(t *testing.T) {
 	)
 	defer mockCtrl.Finish()
 	require.NoError(t, err)
+	serviceGraphExtension.Definition, err = json.Marshal(graphExtension)
+	require.NoError(t, err)
 
 	type fields struct {
 		setupOpenGraphServiceMock func(t *testing.T, repository *schemamocks.MockOpenGraphSchemaService)
@@ -400,6 +402,12 @@ func TestResources_OpenGraphSchemaIngest(t *testing.T) {
 							Value: "MATCH (n:TEST_GraphSchemaNodeKind_1) RETURN n",
 						}},
 					}}
+
+					payload := graphExtension
+					enabled := true
+					payload.PZRules = &model.PZRulesPayload{{RuleKey: "tier_zero_admins", Name: "Tier Zero Admins", Description: "Seeds for tier zero", Enabled: &enabled, AllowDisable: &enabled, Seeds: []model.SelectorSeedPayload{{Type: model.SelectorTypeCypher, Value: "MATCH (n:TEST_GraphSchemaNodeKind_1) RETURN n"}}}}
+					expectedGraphExtension.Definition, err = json.Marshal(payload)
+					require.NoError(t, err)
 
 					mock.EXPECT().UpsertOpenGraphExtension(gomock.Any(), expectedGraphExtension).Return(false, nil)
 				},
@@ -895,6 +903,45 @@ func TestResources_DeleteExtension(t *testing.T) {
 				assert.JSONEq(t, testCase.expected.responseBody, body)
 			} else {
 				assert.Equal(t, testCase.expected.responseBody, body)
+			}
+		})
+	}
+}
+
+func TestResources_ListExtensionDefinitions(t *testing.T) {
+	for _, fails := range []bool{false, true} {
+		t.Run(fmt.Sprint(fails), func(t *testing.T) {
+			var (
+				controller = gomock.NewController(t)
+				service    = schemamocks.NewMockOpenGraphSchemaService(controller)
+				response   = httptest.NewRecorder()
+				request    = httptest.NewRequest(http.MethodGet, "/api/v2/extensions/definitions", nil)
+				definition = json.RawMessage(`{"schema":{"name":"directory","namespace":"PoC_AD","version":"v1.0.0"},"node_kinds":[],"relationship_kinds":[{"name":"PoC_AD_Link","compatible_kinds":[{"source_kind":"User","target_kind":"Domain"}]}]}`)
+			)
+			request = request.WithContext(context.WithValue(request.Context(), bhctx.ValueKey, (&bhctx.Context{}).WithRequestID("definitions")))
+			if fails {
+				service.EXPECT().ListExtensions(gomock.Any()).Return(nil, errors.New("private database detail"))
+			} else {
+				service.EXPECT().ListExtensions(gomock.Any()).Return(model.GraphSchemaExtensions{
+					{Serial: model.Serial{ID: 1}, Name: "builtin", IsBuiltin: true},
+					{Serial: model.Serial{ID: 2}, Name: "directory", Namespace: "PoC_AD", Version: "v1.0.0", Definition: definition},
+					{Serial: model.Serial{ID: 3}, Name: "old", Namespace: "PoC_Old", Version: "1.0.0"},
+				}, nil)
+			}
+			resources := v2.Resources{OpenGraphSchemaService: service}
+			resources.ListExtensionDefinitions(response, request)
+			if fails {
+				require.Equal(t, http.StatusInternalServerError, response.Code)
+				require.NotContains(t, response.Body.String(), "private database detail")
+			} else {
+				require.Equal(t, http.StatusOK, response.Code)
+				var body struct {
+					Data model.GraphDefinitionsResponse `json:"data"`
+				}
+				require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+				require.Len(t, body.Data.Definitions, 2)
+				require.JSONEq(t, string(definition), string(body.Data.Definitions[0].Definition))
+				require.Equal(t, "null", string(body.Data.Definitions[1].Definition))
 			}
 		})
 	}

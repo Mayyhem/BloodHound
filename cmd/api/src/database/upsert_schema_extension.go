@@ -89,6 +89,8 @@ func (s *BloodhoundDB) UpsertOpenGraphExtension(ctx context.Context, graphExtens
 		return model.GraphExtensionUpsertResult{}, fmt.Errorf("failed to fetch existing asset group tag selectors: %w", err)
 	} else if reconciledPZRules, err := reconcile(ctx, graphExtensionInput.PZRulesInput, existingSelectors, bloodhoundDBTransaction.pzRulesReconcileConfig(extension.ID)); err != nil {
 		return model.GraphExtensionUpsertResult{}, fmt.Errorf("failed to reconcile PZ rules: %w", err)
+	} else if err := bloodhoundDBTransaction.saveGraphSchemaDefinition(ctx, extension.ID, graphExtensionInput.Definition); err != nil {
+		return model.GraphExtensionUpsertResult{}, fmt.Errorf("failed to preserve extension definition: %w", err)
 	} else if err = tx.Commit().Error; err != nil {
 		return model.GraphExtensionUpsertResult{}, err
 	} else {
@@ -104,6 +106,16 @@ func (s *BloodhoundDB) UpsertOpenGraphExtension(ctx context.Context, graphExtens
 			PZRulesResult:              reconciledPZRules,
 		}, nil
 	}
+}
+
+// Save with the same transaction as the extension's kinds. A failed upload
+// must never leave readers with a definition that describes unsaved changes.
+func (s *BloodhoundDB) saveGraphSchemaDefinition(ctx context.Context, extensionID int32, definition []byte) error {
+	var contents any
+	if len(definition) != 0 {
+		contents = string(definition)
+	}
+	return s.db.WithContext(ctx).Exec("UPDATE schema_extensions SET definition = ?::jsonb WHERE id = ?", contents, extensionID).Error
 }
 
 // findOrCreateExtension looks up an extension by name. If one exists, its mutable metadata is

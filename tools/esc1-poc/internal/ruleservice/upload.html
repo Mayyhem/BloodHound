@@ -282,10 +282,10 @@ SPDX-License-Identifier: Apache-2.0
     <p id="analysis-request-state" role="status" aria-live="polite">BloodHound analysis status has not loaded.</p>
     <section>
       <details id="upload-controls">
-        <summary>Upload rules and download schemas</summary>
-        <label for="files">Schema definitions and .cypher files</label>
-        <input id="files" type="file" multiple accept=".json,.cypher">
-        <p class="muted">Use schema.json or extension_name.schema.json, plus uniquely named snake_case.cypher files. Uploads are saved as inactive drafts. Add missing schemas or queries in later uploads, then review and activate the complete set. Each changed existing file requires its own overwrite choice. Maximum: 32 files, 1 MiB per file, 4 MiB in total.</p>
+        <summary>Upload analysis files</summary>
+        <label for="files">Analysis .cypher files</label>
+        <input id="files" type="file" multiple accept=".cypher">
+        <p class="muted">Upload schemas through OpenGraph Management. Upload snake_case.cypher analysis files here, each with namespace and version comments. Different extensions may use the same filename. Uploads are inactive drafts; add missing queries or install their schemas, then review and activate. Each changed existing file requires its own overwrite choice. Maximum: 32 files, 1 MiB per file, 4 MiB in total.</p>
         <div id="schema-downloads"></div>
         <button id="preview" class="primary">Save upload and review</button>
         <div id="draft-controls" hidden>
@@ -557,7 +557,7 @@ SPDX-License-Identifier: Apache-2.0
         const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
         const link = element('a');
         link.href = url;
-        link.download = name;
+        link.download = name.split('/').pop();
         document.body.append(link);
         link.click();
         link.remove();
@@ -566,11 +566,7 @@ SPDX-License-Identifier: Apache-2.0
 
       function renderSchemas() {
         byID('schema-downloads').replaceChildren();
-        for (const name of Object.keys(active.files).filter(name => name.endsWith('.json')).sort()) {
-          const button = element('button', 'Download ' + name);
-          button.onclick = () => download(name, active.files[name]);
-          byID('schema-downloads').append(button);
-        }
+        byID('schema-downloads').textContent = 'Schemas are installed and managed in BloodHound OpenGraph Management.';
         byID('active-revision').textContent = active.revision ? 'Active revision: ' + active.revision : 'No active rules. Upload files to start an inactive draft.';
       }
 
@@ -612,7 +608,10 @@ SPDX-License-Identifier: Apache-2.0
         const container = element('div'), facts = element('dl'), processing = query.processing || {};
         if (query.input_warning) entry(facts, 'Input check', query.input_warning);
         entry(facts, 'Graph inputs', describe((query.inputs || []).map(input => input.type + ': ' + input.name)));
-        entry(facts, 'Waits for rules', describe((query.prerequisites || []).map(input => input.name + ' → $' + input.parameter)));
+        entry(facts, 'Analysis version', query.version);
+        entry(facts, 'Installed schema version', query.schema_version || 'unavailable');
+        entry(facts, 'Supported schema versions', query.extension_versions || 'Latest installed version');
+        entry(facts, 'Waits for rules', describe((query.prerequisites || []).map(input => input.name.replace(/\.cypher$/, '') + (input.conditions || '') + ' → $' + input.parameter)));
         entry(facts, 'Used by rules', describe(query.dependents));
         entry(facts, 'Result rows', '$' + query.parameter);
         entry(facts, 'Helper objects created', describe(
@@ -687,7 +686,7 @@ SPDX-License-Identifier: Apache-2.0
           nameCell.append(expand);
           const stateCell = element('td', query.disabled_reason || (query.enabled === false ? 'Disabled' : 'Enabled'), 'rule-state');
           let date = query.added_at ? new Date(query.added_at).toLocaleString() : (pending && !Object.hasOwn(active.files, query.name) ? 'On activation' : 'Not recorded');
-          const actions = element('td'), explicitlyDisabled = (active.disabled || []).includes(query.name), toggle = element('button', explicitlyDisabled ? 'Enable' : 'Disable');
+          const actions = element('td'), explicitlyDisabled = (active.disabled || []).includes(query.name) || Object.hasOwn(active.suspended || {}, query.name), toggle = element('button', explicitlyDisabled ? 'Enable' : 'Disable');
           toggle.dataset.ruleAction = query.name;
           toggle.onclick = () => ruleAction(explicitlyDisabled ? 'enable' : 'disable', [query.name]);
           const trash = element('button', undefined, 'trash');
@@ -752,6 +751,7 @@ SPDX-License-Identifier: Apache-2.0
         const execution = record.execution;
         if (!execution) return;
         parent.append(element('p', 'Calculation: ' + execution.calculation.replaceAll('-', ' ') + '. Saving: ' + execution.save.replaceAll('-', ' ') + '. Database: ' + ({pg: 'PostgreSQL', neo4j: 'Neo4j'}[record.backend] || record.backend || 'not reported') + '.'));
+        if (execution.cleanup_pending) parent.append(element('p', 'Cleanup is waiting for its extension schema. Existing connections are kept.', 'notice'));
         if (execution.failure) {
           const failure = execution.failure;
           parent.append(element('p', (failure.query ? failure.query + ' (stage ' + failure.stage + '), ' : '') + failure.phase.replaceAll('-', ' ') + ': ' + failure.message, 'notice'));
@@ -760,23 +760,25 @@ SPDX-License-Identifier: Apache-2.0
  if (execution.save !== 'succeeded' && execution.save !== 'unchanged') parent.append(element('p', 'Counts from an unfinished or failed run may be incomplete. Proposed outputs are not proof of a save.', 'muted'));
         parent.append(element('p', 'Proposed changes: ' + (counts.relationships_added || 0) + ' connections added, ' + (counts.relationships_removed || 0) + ' removed, ' + (counts.relationships_updated || 0) + ' updated, ' + (counts.helpers_changed || 0) + ' helpers changed. ' + (execution.saved ? 'These changes were saved.' : 'These changes have no confirmed save.')));
         const table = element('table'), head = element('tr'), body = element('tbody');
-        for (const title of ['Query', 'Stage', 'State', 'Rows', 'Read time', 'Proposed outputs', 'Saved outputs', 'Reason']) head.append(element('th', title));
+        for (const title of ['Query', 'Analysis version', 'Schema version', 'Stage', 'State', 'Rows', 'Read time', 'Proposed outputs', 'Saved outputs', 'Reason']) head.append(element('th', title));
         const heading = element('thead'); heading.append(head); table.append(heading, body);
         for (const query of execution.queries || []) {
           const row = element('tr');
-          for (const value of [query.name, query.stage, query.state, query.rows ?? 'unknown', (query.elapsed_nanoseconds / 1e6).toFixed(1) + ' ms', query.proposed_outputs ?? '—', query.saved_outputs ?? 'unconfirmed', query.reason]) row.append(element('td', String(value)));
+          for (const value of [query.name, query.version || 'unknown', query.schema_version || 'unavailable', query.stage, query.state, query.rows ?? 'unknown', (query.elapsed_nanoseconds / 1e6).toFixed(1) + ' ms', query.proposed_outputs ?? '—', query.saved_outputs ?? 'unconfirmed', query.reason]) row.append(element('td', String(value)));
           body.append(row);
         }
         parent.append(table, element('p', 'Output counts describe each query’s contribution. Shared connections count once in the saved graph. Read time includes producing the query’s complete answer; stages show dependency order, not simultaneous execution.', 'muted'));
       }
 
       async function readSnapshot() {
-        const [bundle, plan, status, savedDraft] = await Promise.all([call('rules').catch(error => {
+        // Checking the plan can save a new schema pause. Fetch files afterwards.
+        const plan = await call('plan');
+        const [bundle, status, savedDraft] = await Promise.all([call('rules').catch(error => {
             if (error.status === 404 && error.message === 'no active rule bundle') {
               return { revision: '', files: {}, disabled: [] };
             }
             throw error;
-          }), call('plan'), loadStatus(), call('draft'), refreshNativeStatus()]);
+          }), loadStatus(), call('draft'), refreshNativeStatus()]);
         if (bundle.revision !== plan.revision) {
           throw Error('The active revision changed while loading. Refresh to load the complete plan.');
         }
@@ -816,7 +818,7 @@ SPDX-License-Identifier: Apache-2.0
         const dialog = byID('overwrite-dialog');
         byID('overwrite-name').textContent = name;
         byID('overwrite-effect').textContent = name.endsWith('.json')
-          ? 'This replaces this extension’s schema definitions. Review the resulting rule list before activation.'
+          ? 'Upload schemas through OpenGraph Management.'
           : 'This replaces the full query and its declared inputs and the rules it needs.';
         return new Promise(resolve => {
           const finish = action => {
@@ -872,22 +874,28 @@ SPDX-License-Identifier: Apache-2.0
           const files = {}, overwrite = [], seen = new Set();
           const savedFiles = { ...active.files, ...draft.files };
           for (const file of uploads) {
-            if (file.name !== 'schema.json' && !/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\.schema\.json|\.cypher)$/.test(file.name)) {
-              throw Error('Use schema.json, extension_name.schema.json, or snake_case.cypher filenames.');
+            if (!/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.cypher$/.test(file.name)) {
+              throw Error('Upload snake_case.cypher files here. Upload schemas through OpenGraph Management.');
             }
-            if (seen.has(file.name)) {
-              throw Error('Duplicate filename: ' + file.name);
-            }
-            seen.add(file.name);
             if (file.size > 1048576) {
               throw Error('File exceeds 1 MiB: ' + file.name);
             }
             const contents = await file.text();
-            if (Object.hasOwn(savedFiles, file.name)) {
-              if (savedFiles[file.name] === contents) {
+            // This groups the upload for review. The server independently
+            // validates leading comments and rejects conflicting identities.
+            const leading = contents.match(/^(?:\s+|\/\/[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)*/)[0];
+            const declarations = [...leading.matchAll(/^\s*\/\/\s*namespace:\s*([A-Za-z_][A-Za-z0-9_]*)\s*$/gm)];
+            if (declarations.length !== 1) {
+              throw Error(file.name + ' needs one namespace comment.');
+            }
+            const name = declarations[0][1] + '/' + file.name;
+            if (seen.has(name)) { throw Error('Duplicate analysis: ' + name); }
+            seen.add(name);
+            if (Object.hasOwn(savedFiles, name)) {
+              if (savedFiles[name] === contents) {
                 continue;
               }
-              const choice = await chooseOverwrite(file.name);
+              const choice = await chooseOverwrite(name);
               if (choice === 'cancel') {
                 message('Upload review cancelled.');
                 return;
@@ -895,9 +903,9 @@ SPDX-License-Identifier: Apache-2.0
               if (choice === 'skip') {
                 continue;
               }
-              overwrite.push(file.name);
+              overwrite.push(name);
             }
-            files[file.name] = contents;
+            files[name] = contents;
           }
           if (!Object.keys(files).length) {
             throw Error('Select new or changed files to upload.');

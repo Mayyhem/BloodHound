@@ -158,6 +158,9 @@ func ParseDefinition(contents []byte) (Definition, error) {
 	if err := decoder.Decode(&trailing); err != io.EOF {
 		return Definition{}, fmt.Errorf("schema.json: expected one JSON object")
 	}
+	if definition.Schema.DisplayName == "" {
+		definition.Schema.DisplayName = definition.Schema.Name
+	}
 	definition.LegacyProcessing = definition.PostProcessing != nil
 	if err := definition.validate(); err != nil {
 		return Definition{}, err
@@ -171,14 +174,11 @@ func (s Definition) validate() error {
 		relationships = make(map[string]bool)
 		prefix        = s.Schema.Namespace + "_"
 	)
-	if strings.TrimSpace(s.Schema.Name) == "" || strings.TrimSpace(s.Schema.DisplayName) == "" || !identifier.MatchString(s.Schema.Namespace) || !strings.HasPrefix(s.Schema.Version, "v") {
-		return fmt.Errorf("schema needs name, display_name, namespace, and a version beginning with v")
-	}
-	if s.NodeKinds == nil || s.RelationshipKinds == nil {
-		return fmt.Errorf("node_kinds and relationship_kinds must be arrays")
+	if strings.TrimSpace(s.Schema.Name) == "" || strings.TrimSpace(s.Schema.DisplayName) == "" || strings.TrimSpace(s.Schema.Namespace) == "" || strings.TrimSpace(s.Schema.Version) == "" {
+		return fmt.Errorf("schema needs name, namespace, and version")
 	}
 	for _, kind := range s.NodeKinds {
-		if !identifier.MatchString(kind.Name) || !strings.HasPrefix(kind.Name, prefix) || len(kind.Name) == len(prefix) {
+		if !strings.HasPrefix(kind.Name, prefix) || len(kind.Name) == len(prefix) {
 			return fmt.Errorf("node kind %q must have the schema namespace prefix %s", kind.Name, prefix)
 		}
 		if declared[kind.Name] {
@@ -187,7 +187,7 @@ func (s Definition) validate() error {
 		declared[kind.Name] = true
 	}
 	for _, kind := range s.RelationshipKinds {
-		if !identifier.MatchString(kind.Name) || !strings.HasPrefix(kind.Name, prefix) || len(kind.Name) == len(prefix) {
+		if !strings.HasPrefix(kind.Name, prefix) || len(kind.Name) == len(prefix) {
 			return fmt.Errorf("relationship kind %q must have the schema namespace prefix %s", kind.Name, prefix)
 		}
 		if relationships[kind.Name] {
@@ -196,9 +196,6 @@ func (s Definition) validate() error {
 		relationships[kind.Name] = true
 		if kind.ExistingEdgePolicy != "" && !kind.ExistingEdgePolicy.valid() {
 			return fmt.Errorf("relationship %q has an invalid existing_edge_policy", kind.Name)
-		}
-		if len(kind.CompatibleKinds) == 0 {
-			return fmt.Errorf("relationship %q needs explicit compatible_kinds pairs", kind.Name)
 		}
 		seen := make(map[Endpoint]bool)
 		for _, endpoint := range kind.CompatibleKinds {

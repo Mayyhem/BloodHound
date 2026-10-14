@@ -70,6 +70,19 @@ properties:
           type: boolean
         info:
           $ref: './model.graph-extension.kind-info-definition.yaml'
+        compatible_kinds:
+          type: array
+          description: Optional experimental analysis write boundaries. Each pair permits one source and target kind; ordinary collected relationships do not require this field.
+          items:
+            type: object
+            required: [source_kind, target_kind]
+            properties:
+              source_kind:
+                type: string
+                example: User
+              target_kind:
+                type: string
+                example: OGE_Computer
   environments:
     type: array
     items:
