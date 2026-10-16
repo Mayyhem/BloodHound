@@ -1,0 +1,7 @@
+64c64
+<     image: docker.io/specterops/bloodhound:${BLOODHOUND_TAG:-latest}
+---
+>     image: bh-upstream:eaf9c78
+72a73,74
+>       - bhe_default_admin_password=Upstream-Perf-Test1!
+>       - bhe_default_admin_expire_now=false

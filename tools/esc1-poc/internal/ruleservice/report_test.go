@@ -108,3 +108,24 @@ func TestReportsRejectInvalidCountsAndExpireMissingCompletion(t *testing.T) {
 		t.Fatalf("lost completion: %+v", latest)
 	}
 }
+
+func TestWaitingReportIsAcceptedAndNotCurrent(t *testing.T) {
+	store, err := ruleservice.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial, err := store.Update(files(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	waiting := ruleservice.Status{State: "waiting", Event: "second", RunID: "second/2", Revision: initial.Revision, Message: "New data arrived before the rules could run again."}
+	if err := store.Report(waiting); err != nil {
+		t.Fatalf("waiting report rejected: %v", err)
+	}
+	if status := store.LatestStatus(); status.State != "waiting" || !status.ResultsStale {
+		t.Fatalf("waiting must be shown as not current: %+v", status)
+	}
+	if err := store.Report(ruleservice.Status{State: "paused", Event: "x", RunID: "x/1"}); err == nil {
+		t.Fatal("unknown state accepted")
+	}
+}

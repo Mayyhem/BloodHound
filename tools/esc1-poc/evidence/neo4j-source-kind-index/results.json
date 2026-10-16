@@ -1,0 +1,79 @@
+{
+  "investigation": "Neo4j has no ID index for OpenGraph source kinds, so import time grows with the square of the object count",
+  "date": "2026-10-16",
+  "sources": {
+    "bloodhound_fork": "35cfded48fa99c2e148130d431fea11204b15afc",
+    "bloodhound_fork_upstream_base": "2cb6dbd37",
+    "dawgs_fork": "6d92ee1ed0605f6a08d614c4564a548b29d192b7",
+    "dawgs_fork_upstream_base": "1d7915c65f5fb40933016f3be2a09933caf4c158",
+    "dawgs_upstream_main_read": "c107686a5e8685693a7df660d2ee968c758c17af",
+    "bloodhound_upstream_main_built_and_run": "eaf9c78241ad81f5840cf281b8600ce60828b21e",
+    "bloodhound_upstream_reported_version": "v9.8.0",
+    "neo4j": "4.4.42 (lab and upstream)",
+    "openhound_fork": "5ad310c962c883d1628ec7f06bb31bf7a3c3ff1e plus uncommitted graph upload"
+  },
+  "direct_neo4j_merge_lab": {
+    "description": "One MERGE statement per run in the lab Neo4j, each with a fresh label. Seconds include about 1.24 s of cypher-shell start-up. With an index, timing starts after the index is ready.",
+    "cypher_shell_startup_seconds": 1.24,
+    "runs": [
+      {"objects": 1000, "index": false, "seconds": 1.55},
+      {"objects": 2000, "index": false, "seconds": 2.76},
+      {"objects": 4000, "index": false, "seconds": 5.50},
+      {"objects": 8000, "index": false, "seconds": 20.83},
+      {"objects": 16000, "index": false, "seconds": 95.12},
+      {"objects": 1000, "index": true, "seconds": 2.07},
+      {"objects": 8000, "index": true, "seconds": 4.07},
+      {"objects": 20000, "index": true, "seconds": 4.60},
+      {"objects": 50000, "index": true, "seconds": 6.26}
+    ],
+    "already_saved_objects_test": {
+      "description": "50,000 objects created and saved first, then 2,000 MERGEs against them. Shows saved objects cost as much to check as objects created in the same transaction.",
+      "create_50000_saved_objects_seconds": 2.40,
+      "merge_2000_new_into_50000_saved_seconds": 84.61,
+      "merge_2000_existing_into_50000_saved_seconds": 85.99,
+      "merge_2000_new_into_empty_label_seconds": 2.93,
+      "approximate_cost_per_object_checked_microseconds": 0.85
+    }
+  },
+  "lab_bloodhound_uploads": {
+    "description": "Uploads through OpenHound graph upload to the lab BloodHound. Job seconds include BloodHound's analysis after import; ingest seconds are BloodHound's own 'Ingest run finished' durations.",
+    "runs": [
+      {"job": 13, "source_kind": "TestBase", "objects": 12000, "relationships": 6000, "parts": 5, "label_size_before": 2, "job_seconds": 62},
+      {"job": 16, "source_kind": "PerfIdx", "objects": 20000, "index": true, "parts": 1, "job_seconds": 33, "ingest_seconds": 0.61},
+      {"job": 17, "source_kind": "PerfNoIdx", "objects": 20000, "index": false, "parts": 1, "job_seconds": 157, "ingest_seconds": 129.47},
+      {
+        "job": 14,
+        "source_kind": "TestBase",
+        "objects": 100000,
+        "relationships": 50000,
+        "parts": 3,
+        "label_size_before": 12002,
+        "outcome": "cancelled by hand",
+        "part_1_objects": 50000,
+        "part_1_seconds": 2201,
+        "note": "The lab BloodHound container was redeployed at 13:45:42, one minute into the job; the new container restarted the job's three parts at 13:45:43. Part 1 finished at 14:22:24. Parts 2 and 3 failed when their database transactions were terminated during cancellation. Projected total without cancellation: about 4 hours."
+      }
+    ]
+  },
+  "upstream_bloodhound_run": {
+    "description": "Upstream BloodHound main built from source and run with the upstream example docker compose file (Neo4j is its default graph driver), on separate ports and storage. Ingest seconds are BloodHound's 'Ingest run finished' durations. Transcribed from the session output; the throwaway stack was deleted afterwards.",
+    "indexes_at_start": 302,
+    "objectid_constraints_at_start": 42,
+    "indexes_after_installing_extension_schema_PX20k": 302,
+    "indexes_for_PX_labels_after_import": 0,
+    "runs": [
+      {"source_kind": "PY20k", "objects": 20000, "index": "created by hand before import", "ingest_seconds": 5.85},
+      {"source_kind": "PX10k", "objects": 10000, "index": false, "ingest_seconds": 48.66},
+      {"source_kind": "PX20k", "objects": 20000, "index": false, "extension_schema_installed": true, "ingest_seconds": 157.29}
+    ],
+    "query_plans": {
+      "PX20k_no_index": ["NodeByLabelScan", "Filter"],
+      "PY20k_with_index": ["NodeIndexSeek"]
+    }
+  },
+  "lab_query_plans": {
+    "TestBase_no_index": ["NodeByLabelScan", "Filter"],
+    "Base_built_in": ["NodeUniqueIndexSeek"],
+    "file": "raw/lab-query-plans.txt"
+  }
+}

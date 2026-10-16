@@ -17,7 +17,7 @@ The native workspace is **Administration → OpenGraph Analysis**. The older lab
 1. Upload its schema through **OpenGraph Management**. Click the **Upload** button in the bottom-left corner of the workspace graph, select its `.cypher` files or a `.zip` containing them, and click **Save upload and review**.
 2. Check the proposed additions and replacements. Then click **Activate reviewed revision**. A revision identifies one saved version of the rules.
 3. Upload collection data to BloodHound, or click **Run Analysis** to use data already stored.
-4. Open **Administration → OpenGraph Analysis** and click **Refresh rules and status** to inspect current rules. **Latest status report** opens the completed report in the bottom panel. Check the report before exploring calculated connections in BloodHound.
+4. Open **Administration → OpenGraph Analysis**. The status line in the top panel shows whether analysis is queued or running and how the last run ended, including which step failed and why; it updates by itself while a run is in progress. Click **Refresh rules and status** to inspect current rules. **Latest status report** opens the completed report in the bottom panel. Check the report before exploring calculated connections in BloodHound.
 
 **Activation saves the instructions; successful analysis updates the results.** This gives you a chance to review changes before they affect the graph.
 
@@ -131,7 +131,7 @@ There may be no matching facts, answers may already be correct, or no rules may 
 
 A failure before saving discards the run's extension changes, including other rules' changes. Previous results remain but may be outdated. This prevents partly updated answers. Imports and BloodHound's own completed analysis are not undone.
 
-Share the failed rule name and report with its supplier or administrator. Activate corrected files and request new analysis. Automatic retries use the original files. If another graph update has been attempted, the engine waits for new successful analysis before trying again.
+Share the failed rule name and report with its supplier or administrator. Activate corrected files and request new analysis. Automatic retries use the original files, and there is only one: if the retry fails too, the status line says retries have stopped, and the rules run again after the next analysis (Run Analysis or a data upload). If another graph update has been attempted, the engine waits for new successful analysis before trying again.
 
 ## What does an unavailable or uncertain report mean?
 

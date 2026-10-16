@@ -27,6 +27,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -260,7 +261,7 @@ func (s *Store) LatestStatus() Status {
 // The caller holds the store lock so rules and status can be read together.
 func (s *Store) latestStatus() Status {
 	var result = cloneStatus(s.status)
-	result.ResultsStale = result.SavedRevision == "" || result.SavedRevision != s.active.Revision || result.ResultsUncertain || result.State == "failed" || result.State == "running" || result.State == "unavailable" || result.State == "uncertain"
+	result.ResultsStale = result.SavedRevision == "" || result.SavedRevision != s.active.Revision || result.ResultsUncertain || result.State == "failed" || result.State == "running" || result.State == "waiting" || result.State == "unavailable" || result.State == "uncertain"
 	if result.Execution != nil {
 		result.ResultsStale = result.ResultsStale || result.Execution.CleanupPending || (s.plan.SchemaRevision != "" && result.Execution.SchemaRevision != s.plan.SchemaRevision)
 		for _, query := range result.Execution.Queries {
@@ -363,8 +364,10 @@ func (s *Store) Report(status Status) error {
 }
 
 func validateStatus(status Status) error {
-	if status.State != "success" && status.State != "failed" && status.State != "running" && status.State != "no-rules" && status.State != "uncertain" && status.State != "unavailable" {
-		return fmt.Errorf("status state must be success, failed, running, no-rules, uncertain, or unavailable")
+	// "waiting" means new data arrived before a retry, so the rules will run
+	// again after the next BloodHound analysis. Nothing failed.
+	if !slices.Contains([]string{"success", "failed", "running", "waiting", "no-rules", "uncertain", "unavailable"}, status.State) {
+		return fmt.Errorf("status state must be success, failed, running, waiting, no-rules, uncertain, or unavailable")
 	}
 	if len(status.RunID) > 180 || len(status.Backend) > 16 || len(status.History) > MaxRecentRuns {
 		return fmt.Errorf("report metadata exceeds its limits")

@@ -16,8 +16,11 @@
 
 import { Alert, Box, Button, Stack, Typography } from '@mui/material';
 import { apiClient } from 'bh-shared-ui';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useQuery } from 'react-query';
+import { runPhase } from './model';
+import RunStatus from './RunStatus';
+import { Workspace } from './types';
 import { RuleManagement } from './useRuleManagement';
 
 // The top panel's run and review controls. `children` (revisions and the
@@ -31,6 +34,9 @@ export default function ManagementControls({
     onRefresh,
     refreshing,
     children,
+    status,
+    onFocus,
+    onActiveChange,
 }: {
     management: RuleManagement;
     canEdit: boolean;
@@ -40,8 +46,16 @@ export default function ManagementControls({
     onRefresh: () => void;
     refreshing: boolean;
     children?: ReactNode;
+    // The latest extension report, so the status line can describe the whole run.
+    status: Workspace['status'];
+    onFocus: (name: string) => void;
+    // Tells the page whether a run is in progress, so it refreshes the report
+    // and graph by itself until the run finishes.
+    onActiveChange: (active: boolean) => void;
 }) {
     const [starting, setStarting] = useState(false);
+    const [requestedAt, setRequestedAt] = useState<number>();
+    const [active, setActive] = useState(false);
     const [runMessage, setRunMessage] = useState('');
     const [runUncertain, setRunUncertain] = useState(false);
     const {
@@ -57,15 +71,33 @@ export default function ManagementControls({
             ]);
             const request = queue.data.data.request_type;
             const status = processing.data.data.status;
+            const since = processing.data.data.updated_at;
+            const requestedAt = queue.data.data.requested_at;
+            const requestedBy = queue.data.data.requested_by;
+            const lastAnalysisAt = processing.data.data.last_complete_analysis_at;
             if (
                 !['', 'analysis', 'deletion'].includes(request) ||
                 !['idle', 'analyzing', 'ingesting', 'purging', 'pruning', 'starting', 'optimizing'].includes(status)
             )
                 throw Error('Unknown status');
-            return { request, status };
+            return { request, status, since, requestedAt, requestedBy, lastAnalysisAt };
         },
-        { enabled: canReadStatus, retry: false, refetchInterval: 10000, refetchOnWindowFocus: false }
+        // Check BloodHound's phase every 3 seconds while a run is in progress.
+        { enabled: canReadStatus, retry: false, refetchInterval: active ? 3000 : 10000, refetchOnWindowFocus: false }
     );
+    // While BloodHound is busy, redraw every 30 seconds so the elapsed time and
+    // the "taking much longer than usual" warning stay current.
+    const [, setRedraws] = useState(0);
+    useEffect(() => {
+        if (!active) return;
+        const timer = setInterval(() => setRedraws((count) => count + 1), 30000);
+        return () => clearInterval(timer);
+    }, [active]);
+    const phase = runPhase(native, status, requestedAt);
+    useEffect(() => {
+        setActive(phase.active);
+        onActiveChange(phase.active);
+    }, [phase.active, onActiveChange]);
     const unavailable = management.busy || management.locked || !canEdit;
     const review = management.pending?.review;
     const requestedRemoval = management.pending?.change.remove ?? [];
@@ -77,7 +109,7 @@ export default function ManagementControls({
         try {
             // This is the existing native action, authorized as the signed-in user.
             await apiClient.requestAnalysis();
-            setRunMessage('Analysis requested. It will use the active rules when it starts.');
+            setRequestedAt(Date.now());
         } catch {
             setRunUncertain(true);
             setRunMessage(
@@ -94,15 +126,7 @@ export default function ManagementControls({
                 <Button
                     className='text-link'
                     onClick={start}
-                    disabled={
-                        !canRun ||
-                        !native ||
-                        native.request !== '' ||
-                        native.status === 'analyzing' ||
-                        starting ||
-                        runUncertain ||
-                        !!review
-                    }>
+                    disabled={!canRun || !native || phase.active || starting || runUncertain || !!review}>
                     Run Analysis
                 </Button>
                 <Button
@@ -126,18 +150,7 @@ export default function ManagementControls({
                 </Typography>
             )}
             {children}
-            <Typography variant='caption'>
-                <strong>Analysis:</strong>{' '}
-                {!native
-                    ? 'Status unavailable'
-                    : native.request === 'analysis'
-                      ? 'Queued'
-                      : native.status === 'analyzing'
-                        ? 'Running'
-                        : native.request === 'deletion'
-                          ? 'Deletion queued'
-                          : native.status}
-            </Typography>
+            <RunStatus phase={phase} onFocus={onFocus} />
             {management.error && <Alert severity='error'>{management.error}</Alert>}
             {management.message && <Alert severity='info'>{management.message}</Alert>}
             {review && (

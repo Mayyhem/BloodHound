@@ -26,6 +26,8 @@ import {
     queryColors,
     relatedQueries,
     reportMatches,
+    runPhase,
+    stepTimes,
 } from './model';
 import { workspaceFixture } from './testData';
 import { Dependency } from './types';
@@ -165,6 +167,103 @@ describe('graph node colors', () => {
         expect(queryColor({ ...query, author_enabled: false })).toBe(queryColors.disabled.color);
         expect(queryColor({ ...query, author_enabled: false }, 'failed')).toBe(queryColors.disabled.color);
         expect(queryColors.disabled.color).toBe('#9e9e9e');
-        expect(queryColors.failed.color).toBe('#c62828');
+        expect(queryColors.failed.color).toBe('#ef5350');
+    });
+});
+
+describe('analysis run status line', () => {
+    const idle = { request: '', status: 'idle' };
+    it('walks through requested, queued, BloodHound analysis, and extension rules while active', () => {
+        const status = { ...workspaceFixture().status, updated_at: '2026-10-16T12:00:00Z' };
+        const requested = Date.parse('2026-10-16T12:00:30Z');
+        expect(runPhase(idle, status, requested, requested + 1000)).toMatchObject({
+            active: true,
+            text: 'Analysis requested. Waiting for BloodHound to start it.',
+        });
+        const now = Date.parse('2026-10-16T14:10:00Z');
+        const queued = runPhase(
+            { request: 'analysis', status: 'idle', requestedAt: '2026-10-16T14:09:30Z', requestedBy: 'init' },
+            status,
+            undefined,
+            now
+        );
+        expect(queued.active).toBe(true);
+        expect(queued.text).toMatch(
+            /^Queued\. BloodHound requested it at startup \(.+\)\. BloodHound starts it on its next processing check, usually within a minute, when no upload or data purge is in progress\. Extension rules run right after its analysis finishes\.$/
+        );
+        expect(
+            runPhase({ request: '', status: 'purging', since: '2026-10-16T14:08:00Z' }, status, undefined, now).text
+        ).toBe(
+            'BloodHound has been purging deleted data for 2 minutes. Analysis, extension rules, and editor tests wait until it finishes.'
+        );
+        // An analysis queued behind a long upload says what it waits for, for how long, and warns.
+        const slow = runPhase(
+            {
+                request: 'analysis',
+                status: 'ingesting',
+                since: '2026-10-16T13:45:43Z',
+                requestedBy: 'init',
+                requestedAt: '2026-10-16T13:45:43Z',
+                lastAnalysisAt: '2026-10-16T13:38:23Z',
+            },
+            status,
+            undefined,
+            now
+        );
+        expect(slow).toMatchObject({ active: true, severity: 'warning', slow: true });
+        expect(slow.text).toMatch(
+            /^BloodHound has been ingesting uploaded data for 24 minutes\. An analysis is queued after it\. BloodHound requested it at startup/
+        );
+        expect(slow.text).toContain('Analysis, extension rules, and editor tests wait until it finishes.');
+        expect(slow.text).toContain('This is taking much longer than usual');
+        expect(slow.text).toContain('The last BloodHound analysis finished at');
+        expect(runPhase(idle, { ...status, state: 'running' })).toMatchObject({
+            active: true,
+            text: 'Running extension rules…',
+        });
+        // A request that BloodHound never picked up stops spinning after two minutes.
+        expect(runPhase(idle, status, requested, requested + 121000).active).toBe(false);
+    });
+    it('reports how the last run ended, naming the failed step', () => {
+        const status = workspaceFixture().status;
+        expect(runPhase(idle, status)).toMatchObject({ active: false, severity: 'success' });
+        const failed = runPhase(idle, {
+            ...status,
+            state: 'failed',
+            message: 'The name property is empty (null) for 5 helper objects.',
+            execution: {
+                ...status.execution!,
+                failure: { query: 'PoC/domain_helpers.cypher', phase: 'check-answers', message: '' },
+            },
+        });
+        expect(failed).toMatchObject({ active: false, severity: 'error', failedQuery: 'PoC/domain_helpers.cypher' });
+        expect(failed.text).toContain('The name property is empty (null) for 5 helper objects.');
+        expect(runPhase(idle, { ...status, state: 'waiting', message: 'New data arrived.' })).toMatchObject({
+            active: false,
+            severity: 'info',
+        });
+    });
+});
+
+describe('step run times', () => {
+    it('counts a success only from a run that saved its results', () => {
+        const workspace = workspaceFixture();
+        const saved = { ...workspace.status, run_id: 'saved', updated_at: '2026-10-14T10:00:00Z' };
+        const failedRun = {
+            ...workspace.status,
+            run_id: 'failed',
+            state: 'failed',
+            updated_at: '2026-10-14T13:00:00Z',
+            execution: { ...workspace.status.execution!, save: 'not-started' },
+        };
+        workspace.status = { ...workspace.status, ...failedRun, history: [failedRun, saved] };
+        const times = stepTimes(workspace, 'PoC_AD/users.cypher');
+        // It ran (and calculated) in the failed run, but that run saved nothing.
+        expect(times.lastRun).toEqual({ at: '2026-10-14T13:00:00Z', state: 'succeeded' });
+        expect(times.lastSuccess).toBe('2026-10-14T10:00:00Z');
+        expect(stepTimes(workspace, 'PoC_Other/missing.cypher')).toEqual({
+            lastRun: undefined,
+            lastSuccess: undefined,
+        });
     });
 });

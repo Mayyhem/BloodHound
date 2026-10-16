@@ -14,11 +14,33 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { Alert, Box, Button, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
-import { completedState, duration, latestCompleted, observedTime, reportMatches } from './model';
+import {
+    Alert,
+    Box,
+    Button,
+    Link,
+    Stack,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableRow,
+    Typography,
+} from '@mui/material';
+import { completedState, duration, latestCompleted, observedTime, reportMatches, stepTimes } from './model';
 import { Workspace } from './types';
 
-export default function RunSummary({ workspace, onFocus }: { workspace: Workspace; onFocus: (name: string) => void }) {
+export default function RunSummary({
+    workspace,
+    onFocus,
+    onOpenRun,
+}: {
+    workspace: Workspace;
+    onFocus: (name: string) => void;
+    // Opens a step's details panel on its Last run tab.
+    onOpenRun: (name: string) => void;
+}) {
+    const inRules = (name: string) => workspace.plan.queries.some((query) => query.name === name);
     const report = latestCompleted(workspace);
     const matching = reportMatches(workspace, report);
     const execution = report?.execution;
@@ -167,19 +189,55 @@ export default function RunSummary({ workspace, onFocus }: { workspace: Workspac
                                                 <TableCell>Outcome</TableCell>
                                                 <TableCell>Rows</TableCell>
                                                 <TableCell>Time</TableCell>
+                                                <TableCell>Last ran</TableCell>
+                                                <TableCell>Last success</TableCell>
                                                 <TableCell>Explanation</TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
-                                            {execution.queries.map((query) => (
-                                                <TableRow key={query.name}>
-                                                    <TableCell>{query.name}</TableCell>
-                                                    <TableCell>{completedState(query.state)}</TableCell>
-                                                    <TableCell>{query.rows ?? 'Unavailable'}</TableCell>
-                                                    <TableCell>{duration(query.elapsed_nanoseconds)}</TableCell>
-                                                    <TableCell>{query.reason}</TableCell>
-                                                </TableRow>
-                                            ))}
+                                            {execution.queries.map((query) => {
+                                                const times = stepTimes(workspace, query.name);
+                                                const open = inRules(query.name)
+                                                    ? () => onOpenRun(query.name)
+                                                    : undefined;
+                                                return (
+                                                    <TableRow
+                                                        key={query.name}
+                                                        hover={!!open}
+                                                        onClick={open}
+                                                        className={open ? 'cursor-pointer' : undefined}>
+                                                        <TableCell>
+                                                            {open ? (
+                                                                <Link
+                                                                    component='button'
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        open();
+                                                                    }}
+                                                                    className='text-left [overflow-wrap:anywhere]'>
+                                                                    {query.name}
+                                                                </Link>
+                                                            ) : (
+                                                                `${query.name} (not in current rules)`
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell>{completedState(query.state)}</TableCell>
+                                                        <TableCell>{query.rows ?? 'Unavailable'}</TableCell>
+                                                        <TableCell>{duration(query.elapsed_nanoseconds)}</TableCell>
+                                                        <TableCell>
+                                                            {times.lastRun
+                                                                ? observedTime(times.lastRun.at)
+                                                                : 'Not kept'}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {times.lastSuccess
+                                                                ? observedTime(times.lastSuccess)
+                                                                : 'None kept'}
+                                                        </TableCell>
+                                                        <TableCell>{query.reason}</TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
                                         </TableBody>
                                     </Table>
                                 </Box>

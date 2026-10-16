@@ -279,7 +279,7 @@ it('shows revisions and a colored legend in the top panel', async () => {
     expect(within(legend).getByText('Blocked').previousElementSibling).toHaveStyle({
         backgroundColor: '#ed8b00',
     });
-    expect(within(legend).getByText('Failed').previousElementSibling).toHaveStyle({ backgroundColor: '#c62828' });
+    expect(within(legend).getByText('Failed').previousElementSibling).toHaveStyle({ backgroundColor: '#ef5350' });
     expect(within(legend).getByText('Disabled').previousElementSibling).toHaveStyle({ backgroundColor: '#9e9e9e' });
     expect(screen.queryByText(/Click a node or arrow/)).not.toBeInTheDocument();
 });
@@ -406,8 +406,8 @@ it('widens the entity panel with the keyboard and keeps intermediate counts out 
     await screen.findByRole('table', { name: 'Current analysis rules' });
     await userEvent.click(screen.getByRole('button', { name: 'Graph PoC_AD/users.cypher' }));
     fireEvent.keyDown(screen.getByRole('separator', { name: 'Resize entity panel' }), { key: 'ArrowLeft' });
-    expect(screen.getByRole('complementary', { name: 'Analysis entity panel' })).toHaveStyle({ width: '432px' });
-    expect(screen.getByTestId('analysis-workspace').style.getPropertyValue('--analysis-panel-space')).toBe('472px');
+    expect(screen.getByRole('complementary', { name: 'Analysis entity panel' })).toHaveStyle({ width: '512px' });
+    expect(screen.getByTestId('analysis-workspace').style.getPropertyValue('--analysis-panel-space')).toBe('552px');
     const panel = screen.getByRole('region', { name: 'Query details' });
     await userEvent.click(within(panel).getByRole('tab', { name: 'Last run' }));
     expect(within(panel).getByText('Graph outputs:').parentElement).toHaveTextContent('Not applicable');
@@ -492,7 +492,7 @@ it('shows each file fact once: header lines only in the Cypher tab', async () =>
     const panel = screen.getByRole('region', { name: 'Query details' });
     // Actions share one row in the header, beside the status.
     expect(within(panel).getByRole('button', { name: 'Disable' })).toBeVisible();
-    expect(within(panel).getByRole('button', { name: 'Edit analysis file' })).toBeVisible();
+    expect(within(panel).getByRole('button', { name: 'Edit/Test analysis file' })).toBeVisible();
     // Overview shows connections, not the declarations already in the file.
     expect(within(panel).getByText('Needs')).toBeVisible();
     expect(within(panel).getByRole('button', { name: 'PoC_AD/users.cypher' })).toBeVisible();
@@ -516,4 +516,114 @@ it('offers Disable for an enabled rule and Enable for a disabled one', async () 
     // Bulk actions on a mixed selection still offer both.
     expect(screen.getByRole('button', { name: 'Enable selected' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Disable selected' })).toBeInTheDocument();
+});
+
+it('shows a failed run with a link to the failed step, and a spinner while rules run', async () => {
+    workspace.status.state = 'failed';
+    workspace.status.message = 'The name property is empty (null) for 5 helper objects.';
+    workspace.status.execution!.failure = { query: 'PoC_AD/users.cypher', phase: 'check-answers', message: '' };
+    render(<AnalysisWorkspace />);
+    const line = await screen.findByLabelText('Analysis status');
+    await waitFor(() => expect(line).toHaveTextContent('Failed at PoC_AD/users.cypher.'));
+    expect(line).toHaveTextContent('The name property is empty (null) for 5 helper objects.');
+    expect(line).toHaveClass('MuiAlert-standardError');
+    await userEvent.click(within(line).getByRole('button', { name: 'PoC_AD/users.cypher' }));
+    expect(
+        within(screen.getByRole('region', { name: 'Query details' })).getByRole('heading', {
+            name: 'PoC_AD/users.cypher',
+        })
+    ).toBeVisible();
+});
+
+it('shows a spinner and disables Run Analysis while extension rules run', async () => {
+    workspace.status.state = 'running';
+    render(<AnalysisWorkspace />);
+    const line = await screen.findByLabelText('Analysis status');
+    await waitFor(() => expect(line).toHaveTextContent('Running extension rules…'));
+    expect(within(line).getByLabelText('Analysis in progress')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run Analysis' })).toBeDisabled();
+});
+
+it('warns and links to File Ingest when BloodHound has been busy for a long time', async () => {
+    server.use(
+        rest.get('/api/v2/datapipe/status', (_, response, context) =>
+            response(
+                context.json({
+                    data: {
+                        status: 'ingesting',
+                        updated_at: new Date(Date.now() - 20 * 60000).toISOString(),
+                        last_complete_analysis_at: '2026-10-16T13:38:23Z',
+                    },
+                })
+            )
+        ),
+        rest.get('/api/v2/analysis/status', (_, response, context) =>
+            response(
+                context.json({
+                    data: { request_type: 'analysis', requested_by: 'init', requested_at: new Date().toISOString() },
+                })
+            )
+        )
+    );
+    render(<AnalysisWorkspace />);
+    const line = await screen.findByLabelText('Analysis status');
+    await waitFor(() => expect(line).toHaveTextContent('BloodHound has been ingesting uploaded data for 20 minutes.'));
+    expect(line).toHaveClass('MuiAlert-standardWarning');
+    expect(line).toHaveTextContent('Analysis, extension rules, and editor tests wait until it finishes.');
+    expect(within(line).getByRole('link', { name: 'Open File Ingest' })).toHaveAttribute(
+        'href',
+        '/administration/file-ingest'
+    );
+});
+
+it('shows why the failed step failed in its Last run tab', async () => {
+    workspace.status.state = 'failed';
+    workspace.status.execution!.queries[0].state = 'failed';
+    workspace.status.execution!.queries[0].reason = 'The rules are new or changed.';
+    workspace.status.execution!.failure = {
+        query: 'PoC_AD/users.cypher',
+        phase: 'check-answers',
+        message: 'The name property is empty (null) for 5 helper objects.',
+    };
+    render(<AnalysisWorkspace />);
+    await screen.findByRole('table', { name: 'Current analysis rules' });
+    await userEvent.click(screen.getByRole('button', { name: 'Graph PoC_AD/users.cypher' }));
+    const panel = screen.getByRole('region', { name: 'Query details' });
+    await userEvent.click(within(panel).getByRole('tab', { name: 'Last run' }));
+    expect(within(panel).getByLabelText('Why it failed')).toHaveTextContent(
+        'The name property is empty (null) for 5 helper objects.'
+    );
+    expect(within(panel).getByText('Why it ran:').parentElement).toHaveTextContent('The rules are new or changed.');
+    // Another step's panel does not show this step's failure.
+    await userEvent.click(screen.getByRole('button', { name: 'Graph PoC_Vault/users.cypher' }));
+    await userEvent.click(
+        within(screen.getByRole('region', { name: 'Query details' })).getByRole('tab', { name: 'Last run' })
+    );
+    expect(screen.queryByLabelText('Why it failed')).not.toBeInTheDocument();
+});
+
+it('opens a step on its Last run tab from the analysis report, with last ran and last success times', async () => {
+    const earlier = {
+        ...workspace.status,
+        run_id: 'attempt-0',
+        updated_at: '2026-10-14T11:00:00Z',
+        history: undefined,
+    };
+    workspace.status.history = [earlier];
+    render(<AnalysisWorkspace />);
+    await screen.findByRole('table', { name: 'Current analysis rules' });
+    await userEvent.click(screen.getByRole('button', { name: 'Latest status report' }));
+    const report = await screen.findByRole('table', { name: 'Completed query outcomes' });
+    expect(within(report).getByRole('columnheader', { name: 'Last success' })).toBeVisible();
+    await userEvent.click(within(report).getByRole('button', { name: 'PoC_Vault/users.cypher' }));
+    const panel = screen.getByRole('region', { name: 'Query details' });
+    expect(within(panel).getByRole('heading', { name: 'PoC_Vault/users.cypher' })).toBeVisible();
+    expect(within(panel).getByRole('tab', { name: 'Last run' })).toHaveAttribute('aria-selected', 'true');
+    // The newest successful run counts, not the older one kept in history.
+    expect(within(panel).getByText('Last ran:').parentElement).toHaveTextContent(
+        new Date('2026-10-14T12:01:00Z').toLocaleString()
+    );
+    expect(within(panel).getByText('Last success:').parentElement).toHaveTextContent(
+        new Date('2026-10-14T12:01:00Z').toLocaleString()
+    );
 });

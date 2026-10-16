@@ -201,6 +201,10 @@ func TestServiceRetriesPinnedRulesAndWaitsForNewAnalysisAfterGraphChanges(t *tes
 	if *calls != 1 || service.pending != nil {
 		t.Fatal("retried against changed evidence")
 	}
+	// New data is not a failure: the report says the next analysis will run the rules.
+	if last := client.statuses[len(client.statuses)-1]; last.State != "waiting" || last.Message != waitingMessage {
+		t.Fatalf("changed evidence reported as %q: %s", last.State, last.Message)
+	}
 	if _, err := service.AfterAnalysis(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -427,5 +431,42 @@ func TestNewServiceInstallsEditorAndOrdinaryAnalysis(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("ordinary analysis did not execute")
+	}
+}
+
+func TestServiceRetriesAFailedRunOnceThenStops(t *testing.T) {
+	service, client, now, _ := newServiceTest(t)
+	ctx := context.Background()
+	attempts := 0
+	service.execute = func(context.Context, extension.Plan, runner.Options) (runner.Report, error) {
+		attempts++
+		return runner.Report{}, errors.New("the same rule problem every time")
+	}
+	if _, err := service.AfterAnalysis(ctx); err == nil {
+		t.Fatal("failure hidden")
+	}
+	if last := client.statuses[len(client.statuses)-1]; last.State != "failed" || !strings.HasSuffix(last.Message, "It will be tried once more in about a minute.") {
+		t.Fatalf("first failure: %q %s", last.State, last.Message)
+	}
+	*now = now.Add(time.Minute)
+	if _, err := service.Retry(ctx); err == nil {
+		t.Fatal("retry failure hidden")
+	}
+	if last := client.statuses[len(client.statuses)-1]; !strings.Contains(last.Message, "Automatic retries have stopped") {
+		t.Fatalf("second failure: %s", last.Message)
+	}
+	if service.pending != nil {
+		t.Fatal("a third automatic attempt is still scheduled")
+	}
+	*now = now.Add(time.Hour)
+	if _, err := service.Retry(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if attempts != 2 {
+		t.Fatalf("expected the first try and one retry, got %d attempts", attempts)
+	}
+	// A new BloodHound analysis starts again with a fresh retry allowance.
+	if _, err := service.AfterAnalysis(ctx); err == nil || attempts != 3 {
+		t.Fatalf("new analysis did not run the rules: %v, %d attempts", err, attempts)
 	}
 }

@@ -199,6 +199,75 @@ Provide a no-code style canvas that lets extension authors write an OpenHound co
 
 **Done when:** an author can use the designer to create and test an OpenHound collector for a REST API while navigating its collection flow with familiar BloodHound controls.
 
+## 15. Run a single analysis step from its entity panel
+
+Requested 16 October 2026: a play button at the top of the entity panel for a selected step, which calculates and saves that step's results without a full Run Analysis. Today the only way to save results is **Run Analysis**, which runs every enabled rule that collected-data changes affect. The editor's play button tests a file but never saves. This is new engine work that changes saved graph data, so agree the design before coding.
+
+- [ ] Decide what runs. The step needs its prerequisite chain, but those intermediate answers are not saved. It also needs every other producer of the same relationship or helper kind, because their answers are combined and saving one producer alone would retire the others' connections. The editor's plan selection already builds this chain.
+- [ ] Decide what happens downstream. Queries that read this step's output would be out of date afterward. Either run them too (which approaches the normal affected-rules run) or mark their saved results as possibly stale until the next full run.
+- [ ] Go through BloodHound's normal analysis request and the existing graph-write gate, so a single-step run cannot overlap ingestion, another analysis, or editor tests. Use the same permission as Run Analysis.
+- [ ] Keep all-or-nothing saving, complete-result validation, and the existing protections for shared calculations and cleanup.
+- [ ] Record it as a partial run in the status report. Steps that were not part of it show "not run in this attempt" rather than losing their earlier outcome.
+- [ ] Add the play button at the top of the entity panel, disabled with a reason for disabled or blocked steps. Clicking it shows a confirmation listing what will be calculated and what will be saved.
+
+**Done when:** an author can save results for one step from its entity panel, the saved graph matches what a full run would save for the same outputs, other steps' results are untouched or clearly marked stale, and the status report shows exactly what that run did.
+
+## 16. Index extension objects by ID on Neo4j so large uploads stay fast
+
+**Found 16 October 2026, while testing OpenHound's `graph upload`; confirmed on unmodified upstream BloodHound.** Neo4j is the default database in BloodHound's example setup, so every Community Edition user with a large extension collection is affected.
+
+When BloodHound imports an object, it looks for an existing object with the same ID and the same source kind (the `source_kind` named in the upload's `metadata`). Neo4j can only find it quickly if that source kind has an ID index. BloodHound creates ID indexes only for its own built-in object types, such as `Base`, `User` and `Computer`. Nothing creates one for an extension's source kind: not registering the source kind during import, and not installing the extension's schema. Without the index, Neo4j checks every object of that kind, one by one, for every object imported. Doubling the upload size roughly quadruples the import time. PostgreSQL is not affected in the code, because it keeps one ID index covering all object types; this was not tested.
+
+Measured import times for 20,000 objects of one new source kind, from BloodHound's own import log (not counting the analysis that follows):
+
+| Where | With an ID index | Without |
+|---|---|---|
+| Upstream BloodHound `main` (`eaf9c78`, v9.8.0) on Neo4j 4.4, extension schema installed | 5.9 seconds | 157 seconds |
+| This lab | 0.6 seconds | 129 seconds |
+
+Full measurements, versions, query plans and the scripts to repeat them are in [the evidence](evidence/neo4j-source-kind-index/README.md).
+
+In the lab, a 150,000-object upload had spent 37 minutes on its first 50,000 objects, and was on course to take about 4 hours in total. Neo4j's query plan shows the cause directly: without the index it reads every object of the kind (`NodeByLabelScan`), with it it looks the ID up (`NodeIndexSeek`). Neither DAWGS nor BloodHound changes in this repository cause it: the Neo4j driver code is identical to DAWGS `main`.
+
+**Temporary workaround:** an administrator creates the index directly in Neo4j, once per source kind: `CREATE INDEX IF NOT EXISTS FOR (n:<SourceKind>) ON (n.objectid)`. This needs direct database access, because BloodHound's Cypher page cannot make changes by default. BloodHound removes the index again on its next restart, because its startup check deletes every index that is not in its built-in list (the lab log shows it removing our own `poc_endpoint_*` indexes at startup). So it must be created again after every restart, before the next large upload. OpenHound cannot do this for users: it only talks to BloodHound's web API, which cannot create indexes.
+
+- [ ] Agree where the fix lives before coding. Recommended: in BloodHound, include every registered source kind (already listed in the `source_kinds` table) in the list of object types whose IDs are indexed, everywhere BloodHound checks its indexes. The alternative is a new DAWGS feature that only adds indexes and never removes any; it is tidier for callers but changes a shared interface both databases must support.
+- [ ] Never ask DAWGS to check indexes with only the new source kind. Its check removes every index it is not told about, so that would delete all the built-in indexes. Always supply the complete list.
+- [ ] Create the index when a source kind is first registered during import, before its objects are written, so the first large upload is fast.
+- [ ] Keep the indexes through restarts by including the registered source kinds in the startup check.
+- [ ] Handle two imports registering the same new source kind at the same time, and an index being built for a source kind that already holds many objects, without failing either import.
+- [ ] Check that PostgreSQL behaviour is unchanged, and measure it with the same 10,000- and 20,000-object uploads to confirm it is not affected.
+- [x] Record the measurements, versions and query plans under [`evidence/neo4j-source-kind-index`](evidence/neo4j-source-kind-index/README.md).
+- [ ] Add a regression test that fails if an extension source kind has no ID index after import on Neo4j.
+- [ ] Report it upstream to SpecterOps (BloodHound, and DAWGS if the fix is placed there) with a short reproduction on upstream `main`, the measurements, the workaround and the proposed fix. No existing public issue was found.
+- [ ] Update [END_USERS.md](END_USERS.md) with the workaround until the fix is available.
+
+**Done when:** on Neo4j, importing 20,000 objects of a brand-new extension source kind takes about as long as for a kind that already has an index, the index survives a BloodHound restart, and no built-in index is lost.
+
+Start in [source kind registration](../../cmd/api/src/services/graphify/tasks.go) (`RegisterSourceKind`), [the startup index check](../../cmd/api/src/migrations/graph.go), and the [Neo4j index code](../DAWGS/drivers/neo4j/index.go) (`assertSchema`). This changes BloodHound, so per the project rules it needs approval before coding.
+
+## 17. Accept extension names that look like true, false or a number
+
+**Found 16 October 2026, while testing OpenHound's `schema upload` with an extension named `T`.** The upload fails with a 500 error, whether or not the extension already exists. `GH`, `ADCS` and `GitHub` work.
+
+When an extension is uploaded, BloodHound looks for an existing one with the same name. That lookup does not say the name is text (`IsStringData` is not set), so the shared filter builder guesses the value's type. It tries a whole number, then a decimal number, then true/false, and only then treats it as text. Go reads `T` as true, so the database is asked for `name = true` and refuses to compare text with true/false.
+
+Affected names are exactly `1, t, T, TRUE, true, True, 0, f, F, FALSE, false, False`, any whole or decimal number (`12`, `1.5`, `1e5`, `0x10`), and `NaN`, `Inf` or `Infinity` in any capitalization. Mixed capitalization such as `tRUE` is unaffected. Two other name lookups, `GetEnvironmentKindName` and `GetSchemaFindingByName`, have the same omission but nothing calls them yet. The data-quality `environment_id` filter also omits it; real environment IDs (security identifiers, tenant GUIDs) never look like numbers or true/false, so it is left out of this fix.
+
+**Temporary workaround:** give the extension a name that does not look like true/false or a number, such as `Test`.
+
+- [ ] Decide where the fix goes. Recommended: a branch of its own from `experimental-postprocessing`, so it can also be offered upstream as a separate pull request. It is a general BloodHound bug, not post-processing work.
+- [ ] Add `IsStringData: true` to the name filter in `findOrCreateExtension`.
+- [ ] Add the same to `GetEnvironmentKindName` and `GetSchemaFindingByName` so they do not fail once something calls them.
+- [ ] Add integration tests that upload extensions named `T`, `false`, `1`, `12` and `NaN`. Each must be created on the first upload and updated, not duplicated, on the second. Add a test that looks up a finding named `T`.
+- [ ] Run the database integration tests, rebuild the lab, and repeat `schema upload` with the extension named `T`.
+- [ ] Write a change note with the test evidence and a suggested commit message.
+- [ ] Optionally report the type-guessing filter builder to SpecterOps as a separate issue. Making the builder know which columns hold text would prevent this everywhere, but it touches every filtered API and needs their review.
+
+**Done when:** an extension named `T`, `1` or `NaN` can be uploaded, uploaded again as an update, and found by name, and the new tests cover these names.
+
+Start in [extension lookup](../../cmd/api/src/database/upsert_schema_extension.go) (`findOrCreateExtension`), [the filter builder](../../cmd/api/src/database/helper.go) (`buildSQLFilter`), [the other two name lookups](../../cmd/api/src/database/graphschema.go), and [the extension upload tests](../../cmd/api/src/database/upsert_schema_extension_integration_test.go). This changes BloodHound, so per the project rules it needs approval before coding.
+
 ## Done
 
 ### 2. Catch mistakes before rules are activated

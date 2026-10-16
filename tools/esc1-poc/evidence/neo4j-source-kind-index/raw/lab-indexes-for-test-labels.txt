@@ -1,0 +1,8 @@
+name, labelsOrTypes
+"base_domainsid_index", ["Base"]
+"base_environmentid_index", ["Base"]
+"base_name_index", ["Base"]
+"base_objectid_constraint", ["Base"]
+"base_system_tags_index", ["Base"]
+"base_tenantid_index", ["Base"]
+"base_user_tags_index", ["Base"]

@@ -17,7 +17,7 @@
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Alert, Box, Button, IconButton, Link, Stack, Tab, Tabs, Tooltip, Typography } from '@mui/material';
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
 import {
     availability,
     completedState,
@@ -28,6 +28,7 @@ import {
     latestCompleted,
     observedTime,
     queryColor,
+    stepTimes,
 } from './model';
 import { Dependency, Query, QueryOutcome, Workspace } from './types';
 
@@ -42,9 +43,13 @@ interface Props {
     onEdit: () => void;
     // Enable, Disable, and Delete, shown in the header's action row.
     actions?: ReactNode;
+    // The open tab. The page keeps it so a click in the analysis report can
+    // open a step straight on its Last run tab.
+    section: DetailsSection;
+    onSection: (section: DetailsSection) => void;
 }
 
-type Section = 'overview' | 'cypher' | 'run';
+export type DetailsSection = 'overview' | 'cypher' | 'run';
 
 // The details panel shows each fact once. Anything written in the file's
 // header lines (namespace, version, allowed schema versions, depends-on, and
@@ -61,8 +66,9 @@ export default function QueryDetails({
     canEdit,
     onEdit,
     actions,
+    section,
+    onSection,
 }: Props) {
-    const [section, setSection] = useState<Section>('overview');
     const prerequisites = workspace.dependencies.filter((connection) => connection.consumer === query.name);
     const consumers = workspace.dependencies.filter((connection) => connection.prerequisite === query.name);
     const peerNames = [...new Set(query.outputs.flatMap((output) => output.producers ?? []))].filter(
@@ -95,10 +101,7 @@ export default function QueryDetails({
         </Box>
     );
     return (
-        <Box
-            component='section'
-            aria-label='Query details'
-            className='p-4 border border-neutral-300 dark:border-neutral-600 [overflow-wrap:anywhere]'>
+        <Box component='section' aria-label='Query details' className='px-4 pb-4 [overflow-wrap:anywhere]'>
             <Stack spacing={1}>
                 <Typography variant='h6' component='h2'>
                     {query.name}
@@ -118,7 +121,7 @@ export default function QueryDetails({
                 </Stack>
                 <Stack direction='row' flexWrap='wrap' useFlexGap spacing={1} alignItems='center'>
                     <Button className='text-link' onClick={onEdit} disabled={!canEdit}>
-                        Edit analysis file
+                        Edit/Test analysis file
                     </Button>
                     <Button className='text-link' onClick={onDownload} disabled={downloading}>
                         {downloading ? 'Downloading…' : 'Download query'}
@@ -127,7 +130,7 @@ export default function QueryDetails({
                 </Stack>
                 <Tabs
                     value={section}
-                    onChange={(_, value: Section) => setSection(value)}
+                    onChange={(_, value: DetailsSection) => onSection(value)}
                     aria-label='Query details sections'
                     variant='fullWidth'>
                     <Tab value='overview' label='Overview' />
@@ -248,9 +251,33 @@ export default function QueryDetails({
 }
 
 function LastRun({ query, workspace, outcome }: { query: Query; workspace: Workspace; outcome?: QueryOutcome }) {
+    const times = stepTimes(workspace, query.name);
+    const timeLines = (
+        <Box className='pb-1'>
+            <Typography>
+                <strong>Last ran:</strong>{' '}
+                {times.lastRun
+                    ? `${observedTime(times.lastRun.at)} · ${completedState(times.lastRun.state)}`
+                    : 'Not in the kept run history'}
+            </Typography>
+            <Typography>
+                <strong>Last success:</strong>{' '}
+                {times.lastSuccess ? observedTime(times.lastSuccess) : 'None in the kept run history'}
+            </Typography>
+        </Box>
+    );
     if (!outcome)
-        return <Typography className='pt-1'>No matching completed outcome is available for this query.</Typography>;
-    const saveState = latestCompleted(workspace)?.execution?.save;
+        return (
+            <Box className='pt-1'>
+                {timeLines}
+                <Typography>No matching completed outcome is available for this query.</Typography>
+            </Box>
+        );
+    const execution = latestCompleted(workspace)?.execution;
+    const saveState = execution?.save;
+    // The run report stores why the run failed separately from each step's
+    // outcome. Show it here when this step is the one that failed.
+    const failure = execution?.failure?.query === query.name ? execution.failure : undefined;
     const savedCount =
         outcome.saved_outputs ??
         (saveState === 'uncertain'
@@ -260,9 +287,25 @@ function LastRun({ query, workspace, outcome }: { query: Query; workspace: Works
               : 'Not reported');
     return (
         <Box className='pt-1'>
+            {timeLines}
             <Typography>
-                <strong>Outcome:</strong> {completedState(outcome.state)} — {outcome.reason}
+                <strong>Outcome:</strong> {completedState(outcome.state)}
             </Typography>
+            {failure && (
+                <Alert severity='error' aria-label='Why it failed' className='my-1'>
+                    {failure.message}
+                </Alert>
+            )}
+            {outcome.reason && (
+                <Typography variant='body2'>
+                    <strong>
+                        {['skipped', 'waiting', 'canceled', 'disabled'].includes(outcome.state)
+                            ? 'Why it did not run:'
+                            : 'Why it ran:'}
+                    </strong>{' '}
+                    {outcome.reason}
+                </Typography>
+            )}
             <Typography>
                 <strong>Time:</strong> {duration(outcome.elapsed_nanoseconds)}
             </Typography>

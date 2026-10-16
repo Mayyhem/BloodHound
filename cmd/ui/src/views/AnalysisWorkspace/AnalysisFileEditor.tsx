@@ -259,14 +259,20 @@ export default function AnalysisFileEditor({ open, workspace, canEdit, initial, 
         ? preview.plan.queries.filter((query) => query.name !== workingCopy.name).map((query) => query.name)
         : [];
 
+    // The page refreshes the workspace while analysis runs, which gives this
+    // component a new workspace object. Opening the editor reads the latest
+    // one, but a refresh must not reset what the author is typing.
+    const latestWorkspace = useRef(workspace);
+    latestWorkspace.current = workspace;
     useEffect(() => {
         session.current++;
         abortController.current?.abort();
         if (!open) return;
         const controller = new AbortController();
         const epoch = session.current;
-        setWorkingCopy({ ...(initial || defaultCopy(workspace)), base_revision: workspace.plan.revision });
-        setOriginal(initial || defaultCopy(workspace));
+        const opened = latestWorkspace.current;
+        setWorkingCopy({ ...(initial || defaultCopy(opened)), base_revision: opened.plan.revision });
+        setOriginal(initial || defaultCopy(opened));
         setReceipt(undefined);
         setReview(undefined);
         setMessage(undefined);
@@ -288,7 +294,7 @@ export default function AnalysisFileEditor({ open, workspace, canEdit, initial, 
             controller.abort();
             abortController.current?.abort();
         };
-    }, [open, initial, workspace, canEdit]);
+    }, [open, initial, canEdit]);
 
     const updateCopy = (change: Partial<EditorWorkingCopy>) => {
         setWorkingCopy((previous) => {

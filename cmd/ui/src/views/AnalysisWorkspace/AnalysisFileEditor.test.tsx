@@ -445,3 +445,15 @@ it('always recalculates: no test mode or reusable source choice exists', async (
     const request = vi.mocked(api.testEditorFile).mock.calls[0][0];
     expect(Object.keys(request).sort()).toEqual(['base_revision', 'name', 'schema_revision', 'text']);
 });
+
+it('keeps what the author typed when the page refreshes the workspace', async () => {
+    const view = renderEditor();
+    const editor = screen.getByLabelText('Cypher') as HTMLTextAreaElement;
+    fireEvent.change(editor, { target: { value: editor.value.replace('RETURN 1', 'RETURN 7') } });
+    const refreshed = {
+        ...view.props.workspace,
+        status: { ...view.props.workspace.status, updated_at: '2026-10-16T13:39:24Z' },
+    };
+    view.rerender(<AnalysisFileEditor {...view.props} workspace={refreshed} />);
+    expect((screen.getByLabelText('Cypher') as HTMLTextAreaElement).value).toContain('RETURN 7');
+});

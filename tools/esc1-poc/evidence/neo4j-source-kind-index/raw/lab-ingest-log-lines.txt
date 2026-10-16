@@ -1,0 +1,11 @@
+{"time":"2026-10-16T13:45:43.392390621Z","level":"INFO","message":"Ingest run starting","task_count":3}
+{"time":"2026-10-16T14:22:24.560840479Z","level":"INFO","message":"Ingest task processed","task_id":60,"file":"huge.part-0001.json"}
+{"time":"2026-10-16T14:27:50.317936597Z","level":"ERROR","message":"Ingest task failed","task_id":61,"file":"huge.part-0002.json","err":"update nodes by error on statement (unwind $p as p merge (n:TestBase {objectid:p.objectid}) set n += p, n:TestBase, n:TestN
+{"time":"2026-10-16T14:28:35.043516343Z","level":"ERROR","message":"Ingest task failed","task_id":62,"file":"huge.part-0003.json","err":"Neo4jError: Neo.ClientError.Transaction.Terminated (The transaction has been terminated. Retry your operation in a new tran
+{"time":"2026-10-16T14:28:35.055023189Z","level":"INFO","message":"Ingest run finished","duration":2571662630154,"task_count":3}
+{"time":"2026-10-16T14:37:26.436061071Z","level":"INFO","message":"Ingest run starting","task_count":1}
+{"time":"2026-10-16T14:37:27.026126263Z","level":"INFO","message":"Ingest task processed","task_id":64,"file":"PerfIdx.json"}
+{"time":"2026-10-16T14:37:27.049184683Z","level":"INFO","message":"Ingest run finished","duration":613118046,"task_count":1}
+{"time":"2026-10-16T14:38:03.12525864Z","level":"INFO","message":"Ingest run starting","task_count":1}
+{"time":"2026-10-16T14:40:12.57453533Z","level":"INFO","message":"Ingest task processed","task_id":65,"file":"PerfNoIdx.json"}
+{"time":"2026-10-16T14:40:12.597216821Z","level":"INFO","message":"Ingest run finished","duration":129471953737,"task_count":1}

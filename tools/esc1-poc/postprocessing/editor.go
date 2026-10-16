@@ -134,7 +134,7 @@ func (s *Service) TestAnalysisFile(ctx context.Context, owner string, request Ed
 			if ctx.Err() != nil {
 				err = &EditorError{http.StatusRequestTimeout, "The test was canceled. No successful test was recorded."}
 			} else {
-				err = &EditorError{http.StatusServiceUnavailable, "The editor could not obtain a stable graph. Try again when graph changes finish."}
+				err = &EditorError{http.StatusServiceUnavailable, "BloodHound is still changing the graph, for example ingesting an upload or running analysis, so the test could not start. Tests wait for that to finish; try again when the status line on the analysis page shows it is done."}
 			}
 		}
 		return EditorTestResult{}, err

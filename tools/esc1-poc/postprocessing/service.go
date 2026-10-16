@@ -49,6 +49,18 @@ type ruleClient interface {
 	Report(context.Context, ruleservice.Status) error
 }
 
+// A failed calculation is retried once, about a minute later. If that also
+// fails, automatic retries stop: a failure caused by a rule would only repeat,
+// and repeated failures would push useful runs out of the recent history.
+// The next BloodHound analysis (Run Analysis or a data upload) starts again.
+const maxRunAttempts = 2
+
+// errGraphChangedWhileWaiting means new data arrived before this run could
+// start. That is not a failure: the next successful analysis runs the rules.
+var errGraphChangedWhileWaiting = errors.New("graph changed while waiting; another successful native analysis is required")
+
+const waitingMessage = "New data arrived before the rules could run again. The next BloodHound analysis will run them."
+
 type pendingRun struct {
 	event        string
 	changeNumber uint64
@@ -155,7 +167,7 @@ func (s *Service) Retry(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 	if s.pending.changeNumber != s.gate.ChangeNumber() {
-		s.report(ctx, "failed", "Graph changed after the last successful analysis. Waiting for the next successful native analysis.")
+		s.report(ctx, "waiting", waitingMessage)
 		s.pending = nil
 		return false, nil
 	}
@@ -181,14 +193,15 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 	}
 	plan, err := ruleservice.ValidateBundle(pending.bundle)
 	if err != nil {
-		s.report(ctx, "failed", "The downloaded rules failed validation; existing results were retained.")
+		s.report(ctx, "failed", "The downloaded rules failed validation; existing results were retained."+s.retryNote())
+		s.stopIfLastAttempt()
 		return false, err
 	}
 	s.report(ctx, "running", "Calculating rules after successful native analysis. Graph queries remain available.")
 	var report runner.Report
 	err = s.gate.Alone(ctx, 30*time.Second, func(turnContext context.Context) error {
 		if s.gate.ChangeNumber() != pending.changeNumber {
-			return fmt.Errorf("graph changed while waiting; another successful native analysis is required")
+			return errGraphChangedWhileWaiting
 		}
 		// Keep every observed change until publication succeeds. In particular,
 		// a failed rule followed by another upload must retry BOTH sets of changes.
@@ -237,6 +250,11 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 		}
 		return runError
 	})
+	if errors.Is(err, errGraphChangedWhileWaiting) {
+		s.report(ctx, "waiting", waitingMessage)
+		s.pending = nil
+		return false, nil
+	}
 	if err != nil {
 		state := "failed"
 		if errors.Is(err, runner.ErrCommitUncertain) {
@@ -248,7 +266,8 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 		if state == "uncertain" {
 			report.Execution.Save = "uncertain"
 		}
-		s.report(ctx, state, runner.FailureMessage(err), report.Execution)
+		s.report(ctx, state, runner.FailureMessage(err)+s.retryNote(), report.Execution)
+		s.stopIfLastAttempt()
 		return false, err
 	}
 	if report.Skipped {
@@ -258,6 +277,23 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 	}
 	s.pending = nil
 	return report.Committed, nil
+}
+
+// retryNote ends a failure message by saying whether another automatic try is
+// coming.
+func (s *Service) retryNote() string {
+	if s.pending.attempt < maxRunAttempts {
+		return " It will be tried once more in about a minute."
+	}
+	return " Automatic retries have stopped; the rules run again after the next BloodHound analysis (Run Analysis or a data upload)."
+}
+
+// stopIfLastAttempt drops the pending run after its last allowed attempt, so
+// no more automatic retries happen until a new BloodHound analysis.
+func (s *Service) stopIfLastAttempt() {
+	if s.pending != nil && s.pending.attempt >= maxRunAttempts {
+		s.pending = nil
+	}
 }
 
 func (s *Service) report(ctx context.Context, state, message string, execution ...*runner.Execution) {

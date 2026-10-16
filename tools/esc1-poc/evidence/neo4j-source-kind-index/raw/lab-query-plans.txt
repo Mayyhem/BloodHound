@@ -1,0 +1,32 @@
+== EXPLAIN UNWIND ['x'] AS id MERGE (n:TestBase {objectid: id}) RETURN n
+| n |
+| Plan      | Statement    | Version      | Planner | Runtime       | Time |
+| "EXPLAIN" | "READ_WRITE" | "CYPHER 4.4" | "COST"  | "INTERPRETED" | 101  |
+| Operator                 | Details                            | Estimated Rows |
+| +ProduceResults@neo4j    | n                                  |             10 |
+| |                        +------------------------------------+----------------+
+| +Apply@neo4j             |                                    |             10 |
+| |\                       +------------------------------------+----------------+
+| | +Merge@neo4j           | CREATE (n:TestBase {objectid: id}) |             10 |
+| | |                      +------------------------------------+----------------+
+| | +Filter@neo4j          | n.objectid = id                    |          31001 |
+| | |                      +------------------------------------+----------------+
+| | +NodeByLabelScan@neo4j | n:TestBase                         |         620020 |
+| |                        +------------------------------------+----------------+
+| +Unwind@neo4j            | $autolist_0 AS id                  |             10 |
+
+== EXPLAIN UNWIND ['x'] AS id MERGE (n:Base {objectid: id}) RETURN n
+| n |
+| Plan      | Statement    | Version      | Planner | Runtime       | Time |
+| "EXPLAIN" | "READ_WRITE" | "CYPHER 4.4" | "COST"  | "INTERPRETED" | 52   |
+| Operator                              | Details                                     | Estimated Rows |
+| +ProduceResults@neo4j                 | n                                           |             10 |
+| |                                     +---------------------------------------------+----------------+
+| +Apply@neo4j                          |                                             |             10 |
+| |\                                    +---------------------------------------------+----------------+
+| | +Merge@neo4j                        | CREATE (n:Base {objectid: id})              |             10 |
+| | |                                   +---------------------------------------------+----------------+
+| | +NodeUniqueIndexSeek(Locking)@neo4j | UNIQUE n:Base(objectid) WHERE objectid = id |             10 |
+| |                                     +---------------------------------------------+----------------+
+| +Unwind@neo4j                         | $autolist_0 AS id                           |             10 |
+

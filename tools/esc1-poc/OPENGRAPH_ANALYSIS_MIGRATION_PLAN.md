@@ -1,6 +1,6 @@
 # OpenGraph analysis migration plan
 
-**Target branch:** `opengraph-analysis` in both BloodHound and DAWGS
+**Target branches:** a family of small pull request branches named `opengraph-analysis-<topic>` in both BloodHound and DAWGS, plus one local integration branch named `opengraph-analysis` in each repository (see "Pull request plan")
 
 **Source branch:** `experimental-postprocessing` in both repositories
 
@@ -8,7 +8,7 @@
 
 ## Purpose
 
-The current experimental branches prove the main ideas, but their commits mix code, tests, generated files, documentation, and large research records. That makes the changes difficult to review. This plan rebuilds the finished design on current `origin/main` as a series of small commits. Each commit should solve one understandable problem, build on the commit before it, and include the tests that prove its behavior.
+The current experimental branches prove the main ideas, but their commits mix code, tests, generated files, documentation, and large research records. That makes the changes difficult to review. This plan rebuilds the finished design on current `origin/main` as a series of small commits. Each commit should solve one understandable problem and include the tests that prove its behavior. The commits are then grouped into pull requests by one rule: **merge independently useful changes first and on their own; stack only the changes that truly depend on earlier ones.** A reviewer who can understand and approve a change without the rest of the feature gets it as a separate pull request. A reviewer who needs an earlier change to understand or check it gets a stacked pull request on top of that change.
 
 This is a clean migration of the final design. It is not a replay of every experiment. Superseded fields and formats must not be reintroduced just because they appear in an older commit.
 
@@ -28,7 +28,8 @@ Until then:
 
 ## Rules for the migration
 
-- Create `opengraph-analysis` from the latest fetched `origin/main` in each repository.
+- Create every independent pull request branch from the latest fetched `origin/main`. Create every stacked branch from the branch directly below it. Never put an independent change behind the feature just because it was written during the feature.
+- Do not push branches or open pull requests without the user's approval. Pushing publishes the work.
 - Back up and prove the backups before fetching or changing either working tree.
 - Never run migration commands in the dirty DAWGS source checkout.
 - Never use `git clean -fdx`, rewrite history, or discard existing work.
@@ -92,12 +93,84 @@ After the backups pass:
 1. Fetch `origin` in BloodHound and DAWGS without switching either source checkout.
 2. Record the newly fetched `origin/main` commit and date in both repositories.
 3. Review upstream changes that touch any file or behavior in this plan. Mark each old change as still needed, already upstream, superseded, or changed by the new base.
-4. Create the BloodHound `opengraph-analysis` worktree from its fetched `origin/main`.
-5. Make BloodHound commit B01 first. It keeps the nested DAWGS worktree out of BloodHound and records the migration rules.
-6. Create the DAWGS `opengraph-analysis` worktree at `<new BloodHound worktree>/tools/DAWGS`. This location preserves the existing local Go replacements such as `../DAWGS` and `../..`.
-7. Build all remaining commits only in these clean worktrees.
+4. Create the BloodHound integration worktree on a new local branch `opengraph-analysis` from its fetched `origin/main`. It is where the finished pull requests are combined and tested together. It is never itself a pull request.
+5. Make BloodHound commit B01 first, on its own independent branch `opengraph-analysis-workspace`. It keeps the nested DAWGS worktree out of BloodHound and records the migration rules. Merge that branch into the integration branch.
+6. Create the DAWGS integration worktree on a new local branch `opengraph-analysis` at `<new BloodHound worktree>/tools/DAWGS`. This location preserves the existing local Go replacements such as `../DAWGS` and `../..`. As each DAWGS pull request branch is finished, merge it into this integration branch.
+7. Build each pull request's commits in its own clean worktree, following the "Pull request plan". Do this one pull request at a time, in the order the plan lists.
 
-If either branch name already exists locally or on the remote, stop and inspect it instead of overwriting it. When cleaning up later, remove the DAWGS worktree before removing the BloodHound worktree.
+Git cannot hold both a branch named `opengraph-analysis` and branches named `opengraph-analysis/<something>`, so pull request branches use a hyphen, not a slash.
+
+If any branch name already exists locally or on the remote, stop and inspect it instead of overwriting it. When cleaning up later, remove the DAWGS worktree before removing the BloodHound worktree.
+
+## Pull request plan
+
+Commit numbers (D01, B02, and so on) stay as stable names for the work. This section groups them into pull requests. Pull request titles follow the repository format: `<conventional commit tag>: <Title> <Jira tag>`.
+
+### How each pull request is handled
+
+- **Independent** pull requests go straight to `main`. They do not wait for the feature.
+- **Stacked** pull requests follow [GitHub's stacked pull request model](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs). The bottom pull request targets `main`. Each pull request above it targets the branch of the one directly below it, so its diff shows only its own layer. Open them as **drafts**, marked "blocked by" the pull request below, and link each to its neighbors.
+- The key rule from GitHub: if code in one layer depends on code in another, the dependency must be in the same branch or a lower one. Start a new layer when the concern changes or the layer is big enough to review on its own.
+- Every description says what this layer adds, what the reviewer should focus on, what it deliberately does not do, and what tests were run.
+- A stack is one straight chain. The BloodHound layer table below is a tree, so the "main chain" is one stack, and each side branch (BH-1b, BH-6/7, BH-16, BH-17, BH-18) is opened against the branch it hangs from and retargeted to `main` once that branch merges. Side branches merge after their base.
+- All branches in a stack must be in the same repository; GitHub does not support stacks across forks. BloodHound and DAWGS are separate repositories, so they can never be in one stack. Cross-repository dependencies (for example BH-10 needing DAWGS pull requests) are handled by links and "blocked by" notes, not by stacking. Before opening anything, confirm with the user whether branches will be pushed to the upstream repositories or to forks. If forks, stacking is unavailable and the layers must be opened one at a time as each base merges.
+- Stacked pull requests merge from the bottom up. Merging a middle pull request also merges every pull request below it; the ones above it stay open and retarget automatically. Merging the top pull request merges the whole stack. The stack does not have to merge all at once.
+- Rebasing is cascading. Prefer GitHub's server-side cascading rebase or the `gh stack` command-line extension over rebasing branches by hand. After a lower branch changes, rerun the focused tests of every branch above it. When the bottom pull request merges, GitHub rebases the rest so the next one targets `main`. The agent recommends these commands; the user runs them.
+- Merge requirements for every pull request in a stack come from the bottom pull request's base branch (`main`). Branch protection rules, code owner approvals, and the CI checks that run for pull requests to `main` apply to every layer, including middle ones. Run `just prepare-for-codereview` per layer so each one passes on its own.
+- A pull request may not merge if it leaves a broken or misleading product. Until the settings commit (B45) lands, nothing in a merged layer may run analysis by default. Unused library additions are acceptable because nothing calls them.
+- Reorder commits inside a pull request freely if needed for safety, but never move a commit into a lower pull request than the one that supplies what it needs.
+
+### DAWGS pull requests (all independent of each other except where noted)
+
+| PR | Commits | Why this grouping | Target |
+| --- | --- | --- | --- |
+| DAWGS-1 | D01 | Contributor workflow documentation stands alone. | `main` |
+| DAWGS-2 | D02, D05, D08 | PostgreSQL correctness fixes (reused graph IDs, kind caches, exact JSON values) that help every DAWGS user. | `main` |
+| DAWGS-3 | D09, D15, D17, D18, D19, D20 | Corrections to existing Cypher translation. Each fixes a wrong or unsafe answer and needs nothing from this feature. | `main` |
+| DAWGS-4 | D10, D11, D12, D13, D14, D16 | New standard Cypher support (maps, trim, toFloat, VALUES parts). Additive. D10 comes before D11 and D12. | `main` |
+| DAWGS-5 | D21, D22, D23, D24, D25, D26 | Path and input-row corrections. D24 and D25 build on D22, so they stack inside this pull request. D21 changes unbounded path answers and gets its own explanation in the description. May need DAWGS-3 first if the tests share cases. | `main` |
+| DAWGS-6 | D03, D04 | Graph write pause and write-activity reporting. Safe library additions that nothing calls until BloodHound uses them. | `main` |
+| DAWGS-7 | D06, D07 | Explicit PostgreSQL transactions and guarded batches. Stacked on DAWGS-6 because the batches honor the write guard. | DAWGS-6 branch |
+
+If DAWGS maintainers prefer smaller pull requests, split any row by commit; the commits are already independent enough. BloodHound cannot drop its local DAWGS replacement (B42) until every DAWGS pull request it needs is merged and released.
+
+### BloodHound pull requests
+
+Independent:
+
+| PR | Commits | Notes |
+| --- | --- | --- |
+| BH-0 | B01 | Workspace preparation and agent rules. No runtime behavior. |
+| BH-E1 | B49, B59, B63, B66, B67, B69 | Historical evidence records only, preserved byte-for-byte. Documentation only, so it can merge at any time. Open these last and mark them low priority. Each is its own pull request if reviewers prefer, since each stands alone. |
+
+Stack (each layer is built on the one before it; merge bottom first):
+
+| Layer | Commits | What it adds | Depends on |
+| --- | --- | --- | --- |
+| BH-1 Schema contract | B02, B03, B04, B05 | The final schema format, complete query checks, output checks, and cross-extension ordering. The shared contract everything else reads. | `main` |
+| BH-1b Schema viewer | B06 | Offline model viewer. Stands beside the stack: needs only BH-1 and does not block BH-2. | BH-1 |
+| BH-2 Calculation core | B07, B08, B09, B14 | Resource limits first, exact answers, ordinary Cypher rules, and explanation reports. | BH-1, DAWGS-3, DAWGS-5 |
+| BH-3 Advanced calculation | B10, B11, B12, B13 | Reachability rules, overlap detection, input batching, and parallel execution. | BH-2 |
+| BH-4 Shared results | B15, B16 | Update policies and atomic publishing of shared relationship results. | BH-3 |
+| BH-5 Database saving | B17, B18 | Neo4j and PostgreSQL adapters with matching behavior. | BH-4, DAWGS-7 |
+| BH-6 Standalone runner | B19, B20, B21, B22 | Collection loading, the command, its container, and the local lab. | BH-5 |
+| BH-7 Examples | B23, B24, B25 | ESC1, vault, and cross-extension examples with written answers. | BH-6 |
+| BH-8 Rule storage | B26, B27, B28, B29, B30, B31 | Stored revisions, drafts, activation, safe pause and removal, and bounded reports. | BH-5 |
+| BH-9 Secured service | B32, B33, B34, B35 | The authenticated API, management page, report history, and signing client. Security checks land with the first endpoint, in B32. | BH-8 |
+| BH-10 Native connection | B42, B36 | The DAWGS build link and adapters to BloodHound's real graph access. B42's local DAWGS `replace` line is for local integration only and must never merge. Before BH-10 can leave draft, replace it with the released DAWGS version (a normal version bump with its `go.sum` changes) once the needed DAWGS pull requests are merged and released. | BH-5, all needed DAWGS PRs |
+| BH-11 Write coordination | B37, B43, B44 | Pause graph writes during analysis, guard direct writes, restrict maintenance. | BH-10, DAWGS-6 |
+| BH-12 Settings and selection | B45, B38, B39 | Settings (feature off by default) come first, then change tracking and selective rule execution. | BH-11 |
+| BH-13 Automatic analysis | B40, B41, B48 | Run after native analysis, block writes after uncertain saves, and the manual Run Analysis action. | BH-12, BH-9 |
+| BH-14 Packaging and labs | B46, B47 | Persistent service images and disposable labs. | BH-13 |
+| BH-15 Documentation | B51, B52, B53 | Author guide, design explanation, and the one final proposal. Merges last among the stack so it describes landed code. | BH-14 |
+| BH-16 Cypher comparison | B54, B55, B56, B57, B58, B60 | Ordinary Cypher example, measurement, comparison command, studies, and findings. Optional; may be deferred or dropped without affecting the feature. | BH-7 |
+| BH-17 Preparation follow-ups | B61, B62, B64, B65 | Preparation timing, identity-check improvement, and their explanations. | BH-5 |
+| BH-18 Path-input explanation | B68 | Plain-English account of the path input correction. | DAWGS-5, BH-2 |
+| BH-19 Final validation | B50, B70, B71 | Fresh validation of the integrated branch, and the handoff map. Run on the integration branch after everything else has merged. | all above |
+
+Dependencies between layers on different rows are minimums. Where two layers do not depend on each other (for example BH-6 and BH-8), they can be reviewed in parallel and merged in either order after their shared base.
+
+The safety gates in the next sections still control order inside and between pull requests. If a gate and this table disagree, the gate wins and the table is corrected.
 
 ## Commit message format
 
@@ -124,17 +197,60 @@ Tests:
 
 Write the `Tests` section from actual results. Never copy planned tests into a commit message as though they passed.
 
+### Pre-commit code cleanup pass (required for every code commit)
+
+The experimental code was written quickly, partly by AI, and is rebuilt here for human reviewers. Before the cleanliness check below, give each commit a deliberate cleanup pass. The goal is code a new reader can follow without help. The agent may use the `simplify` skill as a starting point, but must read the result itself.
+
+1. **Remove what is not used.** Delete unused functions, types, fields, parameters, constants, imports, flags, test helpers, and options that nothing in the final design calls. Delete dead and commented-out code. Do not keep anything "in case it is needed later" or for backwards compatibility; this project has no other users.
+2. **Simplify.** Replace long or deeply nested functions with short ones that each do one thing. Remove needless layers, wrappers, and abstractions that exist for only one caller. Prefer the plain, direct way over the clever way. Merge near-duplicate code. Remove defensive checks for cases that cannot happen, but keep checks that guard real failures.
+3. **Make it readable.** Use full descriptive names with no abbreviations. Make the order of the file follow the order a reader would think about the problem. Keep functions and files a reviewable size.
+4. **Fix the comments.** Every comment explains why, or what happens, in plain English a non-engineer can follow, and it is true to the code beside it. Remove comments that only repeat the code, mention earlier experiments or superseded designs, narrate edits ("added", "now", "fixed"), or contain notes to the agent. Add a short explanation wherever the reason for a choice is not obvious.
+5. **Check the tests the same way.** Remove duplicate and unused tests and helpers. Each test name says what it proves, and each test fails when the behavior it covers breaks.
+6. **Match the surrounding code.** Follow the repository's existing naming, comment style, and the Go standards in `AGENTS.md` (receiver name `s`, no named returns, grouped `var` blocks, `any` instead of `interface{}`, rich variable names). Generated files are not hand-edited.
+7. **Change no behavior.** The cleanup must not change what the code does. Rerun the commit's focused tests after cleanup, and rerun `just test` or `make test_all` where the plan requires it. If cleanup would need a behavior change, stop and raise it as a separate decision.
+8. **Report it.** The commit handoff lists what was removed, simplified, or reworded, in a few plain sentences. If nothing needed cleanup, say so.
+
+Historical evidence commits are exempt, because their contents must stay unchanged.
+
+### Pre-commit cleanliness check (required for every commit)
+
+Before the agent hands over any commit for manual staging, it checks the staged-to-be files and reports the result. A commit is not ready until this check is clean or every finding is explained.
+
+1. **Secrets.** Search the exact files and their diff for passwords, bearer tokens, API keys, signing keys, connection strings with credentials, private keys, certificates, cookies, and local `.env` contents. Include test fixtures, Compose files, logs, and screenshots. Use a secret scanner if one is installed (for example `gitleaks` or `trufflehog`), and also read the diff by eye. Test values must be obviously fake and generated at run time where possible.
+2. **Files that do not belong in the final change.** List every changed and new path and confirm each one is needed for this commit's purpose. Look specifically for:
+   - scratch notes, to-do lists, drafts, and personal documentation;
+   - agentic coding instructions and agent state (for example `AGENTS.md` changes, `CLAUDE.md`, `.claude/`, memory or prompt files), except the one deliberate `AGENTS.md` addition in B01;
+   - test data, sample collections, database dumps, and generated output that no test or document in this commit uses;
+   - editor and operating system files, build output, coverage files, local lab data directories, and backup archives;
+   - debugging code, commented-out code, leftover `TODO` markers without an issue, and temporary logging;
+   - absolute paths, usernames, email addresses, hostnames, and other personal or machine-specific details.
+3. **Local configuration that is wrong for production.** Review every changed configuration, build, and dependency file and confirm nothing only makes sense on this machine or in the lab. Look specifically for:
+   - Go `replace` lines pointing to a local path (such as `../DAWGS` or `../..`) in `go.mod` or `go.work`, and `go.sum` changes that come only from them;
+   - dependencies pinned to a branch, a commit, or an unreleased version instead of a release;
+   - `localhost`, `127.0.0.1`, `bloodhound.localhost`, or the lab ports (`25432`, `27687`) in application code, default settings, shipped configuration, or Docker and Compose files used outside the lab;
+   - database names, credentials, or Compose project names from the experiments;
+   - features switched on by default, security checks relaxed for testing (disabled authentication, skipped certificate checks, loosened Host/Origin rules), or raised limits and debug flags;
+   - build and image settings that assume a local worktree, the nested `tools/DAWGS` checkout, or locally built images;
+   - ignore rules, settings, or `.env` files changed for the local setup rather than for the product.
+
+   Lab-only files (labs, studies, examples) may use local values, but only in files that are clearly lab-only and never loaded by the product. Any local value that remains in a commit must be listed in the handoff with the reason it is safe.
+4. **Deliberate exceptions.** Historical evidence commits (B49, B59, B63, B66, B67, B69) intentionally include raw results and must stay byte-for-byte unchanged. For them, still run the secrets check, and redact or exclude only with the user's approval, because redaction would alter the evidence. Record any such decision in the evidence manifest.
+5. **Report.** The handoff for each commit states: the scanner used (or that none was available), what was searched, every finding (secrets, unneeded files, and local configuration), and what was done about it. Add the "Files changed" list from this check to the commit handoff so the user can compare it with `git status` before staging.
+6. **Never fix by hiding.** If a secret is found in a file, tell the user so the secret can be rotated; removing it from the next commit does not remove it from history. Do not stage, push, or open a pull request until the user has decided.
+
+Order for every commit: build the change, run the cleanup pass, run the focused tests, run the cleanliness check, then run `just prepare-for-codereview` (or `make format` and the DAWGS suites). Rerun the affected steps after any later edit to the commit.
+
 Before each BloodHound commit, run `just prepare-for-codereview` as required by the repository instructions. Because that command currently does not run the full tests, also run the focused tests and `just test` for code changes. Inspect generated files before staging.
 
 After each DAWGS code change, run `make format` and focused tests. Before a DAWGS checkpoint, run `make test_all` once with a fresh PostgreSQL `CONNECTION_STRING` and once with a fresh Neo4j `CONNECTION_STRING`. The user must provide or approve those connection strings at execution time. Shared cases must keep the same answers on both databases.
 
 ## Ordered commit series
 
-The intended repository order is:
+The commit numbers are stable names, not a single required chain. The "Pull request plan" decides which commits travel together and in what order. The default build order is:
 
 1. BloodHound B01, which prepares the nested worktree safely.
-2. DAWGS D01 through D26.
-3. BloodHound B02 through B71.
+2. The DAWGS pull requests, DAWGS-1 through DAWGS-7.
+3. The BloodHound stack, BH-1 upward, with independent pull requests built whenever convenient.
 
 If a change is already present on the newly fetched `main`, record that in the migration inventory and omit the empty commit. If two adjacent changes cannot compile independently, combine only those changes and explain why in the final map.
 
@@ -236,7 +352,7 @@ Do not merge D24 into a new reachability feature. It is a correction to ordinary
 | B39 | `feat: Select rules only for known changes` | Selective execution is safe only when the change set is complete. Use it for fully known changes and fall back to all enabled rules on first run, restart, revision change, raw access, overflow, failure, or uncertainty. | Compare selected and full runs on both databases; every fallback reason appears in the report. |
 | B40 | `feat: Run extension analysis after native analysis` | Extension rules must see the graph produced by BloodHound's own analysis. Start them only after native success and keep native behavior unchanged when the feature is disabled. | Native success/failure, disabled setting, order, cancellation, and saved-result checks. |
 | B41 | `fix: Block writes after uncertain saves` | A lost connection during commit leaves the graph state unknown. Keep graph writes blocked until inspection or restart; retry a failed report separately without rerunning a confirmed save. | Known rollback releases; uncertain outcome blocks; inspection/restart recovery; report-only retry. |
-| B42 | `build: Use the OpenGraph DAWGS worktree` | BloodHound now reaches unreleased DAWGS APIs. Add the root DAWGS replacement and the PoC module requirement in the first root commit that imports them, with `go.sum` changes beside the dependency. | Clean module graph, builds from the nested worktree, and no unrelated dependency changes. |
+| B42 | `build: Use the OpenGraph DAWGS worktree` | BloodHound now reaches unreleased DAWGS APIs. Add the root DAWGS replacement and the PoC module requirement in the first root commit that imports them, with `go.sum` changes beside the dependency. **Local integration only:** the replacement points to a local path and must not merge. The pull request version of this commit requires the released DAWGS version instead. | Clean module graph, builds from the nested worktree, and no unrelated dependency changes. For the pull request version: no `replace` lines and no local paths. |
 | B43 | `fix: Guard direct BloodHound graph writes` | Some writes bypass the main import path. Put tag deletion, raw PostgreSQL deletion, database switching, and migration-related writes behind the same coordination boundary where applicable. | Tests for each path, pending writers, cancellation, and release after failure. |
 | B44 | `fix: Restrict maintenance during analysis` | Maintenance that changes graph state cannot run during a protected analysis. Return a clear busy result or wait according to the existing operation contract. | Maintenance, migration, switch, shutdown, timeout, and no-deadlock cases. |
 | B45 | `feat: Add OpenGraph analysis settings` | Operators need an explicit off switch, worker address, secret source, and limits. Add validated settings with the feature disabled when no address is configured. | Defaults, invalid values, secret redaction, disabled behavior, and config loading. |
@@ -380,13 +496,16 @@ Historical evidence explains what happened on the experimental commits. It does 
 
 ## Upstream movement during the migration
 
-Fetch `origin/main` again before final handoff. If either main branch moved:
+Fetch `origin/main` again before final handoff and whenever a pull request lands. If either main branch moved:
 
 1. Inspect the new commits that overlap this work.
 2. Integrate them without rewriting or discarding the source work.
-3. Rerun every affected focused and integration test.
-4. Update the old-to-new map and fresh validation manifest.
-5. Do not claim the branch is current until both recorded base commits match the fetched refs used for final testing.
+3. Rebase each open stacked branch onto the one below it, from the bottom up (use GitHub's cascading rebase or `gh stack`), and rerun its focused tests.
+4. Rerun every affected focused and integration test.
+5. Update the old-to-new map, the pull request table, and the fresh validation manifest.
+6. Do not claim the integration branch is current until both recorded base commits match the fetched refs used for final testing.
+
+When a pull request merges, GitHub retargets the pull request above it to `main`. Mark it ready only after its own checks pass. Side branches (not part of the main chain) must be retargeted by hand.
 
 ## Proposed permanent `AGENTS.md` addition
 
@@ -396,8 +515,11 @@ Keep the migration rules in the BloodHound root `AGENTS.md`, which is loaded for
 ## OpenGraph analysis work
 
 - Split non-trivial work into small, working changes. Each change should solve one problem and include its tests, generated files, and documentation.
+- Send changes that stand alone straight to `main` as their own pull requests. Stack a change on another only when it cannot be understood or tested without it. Open stacked pull requests as drafts, link them to their neighbors, and say what each layer adds and what to focus on.
 - Implement the final design directly. Add dependencies in the first change that uses them.
 - Agents must not stage or commit changes. Show the user the changed files, actual test results, and exact suggested commands.
+- Before the checks below, clean up AI-generated code: remove unused code, simplify complex code, make names and structure readable, and rewrite comments in plain English that match the code. Do not change behavior; rerun the tests afterward.
+- Before handing over any commit, check the changed files for secrets, for files that do not belong in the final change (scratch notes, personal documentation, agent instructions or state, unused test data), and for local configuration that is wrong for production (local-path dependency replacements, localhost addresses, lab ports, relaxed security, features on by default). Report what was checked and found.
 - For BloodHound code, run focused tests and `just test`. Also run `just prepare-for-codereview` before each commit; do not describe it as proof of tests it did not run.
 - For DAWGS code, run `make format` after edits and test PostgreSQL and Neo4j whenever query meaning changes. Keep each Cypher correction and its tests and generated SQL fixtures together.
 - Ordinary Cypher is the default author experience. Advanced controls remain optional and need measured, documented reasons. Get explicit approval before changing extension author requirements.
@@ -407,13 +529,18 @@ Keep the migration rules in the BloodHound root `AGENTS.md`, which is loaded for
 
 The one-time requirement to branch from the latest `origin/main` belongs in this migration plan, not in permanent repository instructions.
 
+## References
+
+- [About stacked pull requests](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs) (GitHub Docs). Source for the stack rules in "How each pull request is handled": same-repository requirement, base-branch targeting, the dependency-in-same-or-lower-layer rule, bottom-up merging, cascading rebase and `gh stack`, and how branch protection and CI apply to every layer. Stacks are not supported in GitHub Desktop.
+- Merge independently useful, atomic changes first and stack only dependent ones: the principle this plan's "Pull request plan" applies. A reviewer who can approve a change without the rest of the feature gets it as an independent pull request.
+
 ## Manual review and commit workflow
 
 For each planned commit, the agent should stop after producing a reviewable working-tree change and provide:
 
-1. The problem and final behavior in plain English.
+1. The problem and final behavior in plain English, and which pull request and layer this commit belongs to.
 2. The exact files changed.
-3. The actual tests and results.
+3. The cleanup pass summary, the actual tests and results, and the pre-commit cleanliness check result (secrets scan, unneeded-file review, and local-configuration review).
 4. Any material risk or known limit.
 5. Exact `git add` commands naming only that commit's files.
 6. The full proposed commit message using the template above.
@@ -424,7 +551,11 @@ The user reviews, stages, and commits. After the user confirms the commit, conti
 
 The migration is complete only when:
 
-- Both `opengraph-analysis` branches start from the recorded current `origin/main` commits.
+- Every independent pull request branch starts from the recorded current `origin/main`, and every stacked branch starts from the branch below it.
+- Every code commit had its cleanup pass: no unused code, no needless complexity, and comments that are plain and true to the code.
+- Every commit passed the pre-commit cleanliness check, and a final scan of each pull request's full diff found no secrets, no files that should not ship, and no local-only configuration (in particular, no local DAWGS `replace` line).
+- Each pull request is described, linked to its neighbors, and marked draft or blocked until its base lands.
+- The integrated result, with every pull request merged in dependency order, has been verified across BloodHound and DAWGS together.
 - Every source change is mapped to a new commit, upstream code, a superseded design, or immutable evidence.
 - Each commit builds and its focused tests pass.
 - DAWGS passes its full required checks on both databases with no coverage loss.

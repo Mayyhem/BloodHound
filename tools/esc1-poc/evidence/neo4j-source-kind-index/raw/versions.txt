@@ -1,0 +1,8 @@
+BloodHound fork HEAD: 35cfded48fa99c2e148130d431fea11204b15afc
+BloodHound fork base (upstream): 2cb6dbd37
+DAWGS fork HEAD: 6d92ee1ed0605f6a08d614c4564a548b29d192b7
+DAWGS fork base (upstream): 1d7915c65f5fb40933016f3be2a09933caf4c158
+DAWGS upstream main checked: c107686a5e8685693a7df660d2ee968c758c17af
+BloodHound upstream main built: eaf9c78241ad81f5840cf281b8600ce60828b21e
+Lab graph database image: docker.io/library/neo4j:4.4.42@sha256:73b5a47eb9952f47fcc42fcc80bdd6bd0d6b71eea9a1a345c216675498c790e4
+OpenHound fork HEAD: 5ad310c962c883d1628ec7f06bb31bf7a3c3ff1e (graph upload uncommitted)

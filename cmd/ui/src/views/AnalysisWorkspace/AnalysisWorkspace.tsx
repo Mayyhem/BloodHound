@@ -60,7 +60,7 @@ import {
     relatedQueries,
     reportMatches,
 } from './model';
-import QueryDetails from './QueryDetails';
+import QueryDetails, { DetailsSection } from './QueryDetails';
 import QueryGraph from './QueryGraph';
 import RuleActions from './RuleActions';
 import RunSummary from './RunSummary';
@@ -69,6 +69,7 @@ import UploadDialog from './UploadDialog';
 import useRuleManagement from './useRuleManagement';
 
 export default function AnalysisWorkspace() {
+    const [runActive, setRunActive] = useState(false);
     const {
         data: activeWorkspace,
         isLoading,
@@ -79,19 +80,26 @@ export default function AnalysisWorkspace() {
         retry: false,
         refetchOnWindowFocus: false,
         cacheTime: 0,
+        // Refresh the report, colors, and table every 4 seconds while a run is
+        // in progress, and every 10 seconds otherwise, so automatic retries and
+        // changes made elsewhere also appear without clicking Refresh.
+        refetchInterval: runActive ? 4000 : 10000,
     });
     const [focused, setFocused] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [extension, setExtension] = useState('');
     const [downloadError, setDownloadError] = useState('');
     const [downloading, setDownloading] = useState(false);
-    const [panelWidth, setPanelWidth] = useState(400);
+    // Explore's details panel is a fixed 400 pixels. This panel holds more
+    // (tabs, file text, run results), so it starts wider; drag its edge to resize.
+    const [panelWidth, setPanelWidth] = useState(480);
     const [tableHeight, setTableHeight] = useState(320);
     const [tableView, setTableView] = useState<'rules' | 'report' | null>('rules');
     const [checked, setChecked] = useState<Set<string>>(new Set());
     const [editorOpen, setEditorOpen] = useState(false);
     const [editorInitial, setEditorInitial] = useState<EditorWorkingCopy>();
     const [uploadOpen, setUploadOpen] = useState(false);
+    const [detailsSection, setDetailsSection] = useState<DetailsSection>('overview');
     const { checkPermission } = usePermissions();
     const canEdit = checkPermission(Permission.OPENGRAPH_WRITE);
     const canRun = checkPermission(Permission.APP_WRITE_APPLICATION_CONFIGURATION);
@@ -307,7 +315,10 @@ export default function AnalysisWorkspace() {
                                         setChecked(new Set());
                                         void management.refresh();
                                     }}
-                                    onReport={() => setTableView('report')}>
+                                    onReport={() => setTableView('report')}
+                                    status={activeWorkspace!.status}
+                                    onFocus={focusQuery}
+                                    onActiveChange={setRunActive}>
                                     <Typography variant='caption' className='[overflow-wrap:anywhere]'>
                                         <strong>Current rule revision:</strong>{' '}
                                         {activeWorkspace!.plan.revision || 'No activated rules'}
@@ -391,7 +402,14 @@ export default function AnalysisWorkspace() {
                     </Stack>
                     <Box className='overflow-auto min-h-0 flex-1 px-3 pb-3'>
                         {tableView === 'report' ? (
-                            <RunSummary workspace={workspace} onFocus={focusQuery} />
+                            <RunSummary
+                                workspace={workspace}
+                                onFocus={focusQuery}
+                                onOpenRun={(name) => {
+                                    focusQuery(name);
+                                    setDetailsSection('run');
+                                }}
+                            />
                         ) : (
                             <>
                                 <Stack
@@ -553,6 +571,8 @@ export default function AnalysisWorkspace() {
                     {selected ? (
                         <>
                             <QueryDetails
+                                section={detailsSection}
+                                onSection={setDetailsSection}
                                 actions={
                                     <RuleActions
                                         names={[selected.name]}
