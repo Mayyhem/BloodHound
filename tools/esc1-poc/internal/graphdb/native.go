@@ -82,8 +82,85 @@ func RunNative(ctx context.Context, database graph.Database, backend string, pla
 	return report, err
 }
 
+// errDiscardNativeTest tells the legacy Neo4j driver to roll back its outer
+// transaction after runner.Test has finished. It stays private because a nil
+// callback result means commit in that driver.
+var errDiscardNativeTest = errors.New("discard native editor test")
+
+// TestNative calculates an editor-selected plan against a borrowed graph
+// transaction and confirms that its changes were discarded. It prepares only
+// kinds and endpoint indexes declared by the selected plan before the test
+// transaction opens. That catalog work is an established database metadata
+// boundary; graph objects and test results still remain rollback-only.
+func TestNative(ctx context.Context, database graph.Database, backend string, plan extension.Plan, options runner.Options) (runner.Report, error) {
+	var (
+		started           = time.Now()
+		validationElapsed time.Duration
+		report            runner.Report
+		err               error
+	)
+	if database == nil {
+		return runner.Report{}, errors.New("native graph database is required")
+	}
+	if err := options.Limits.Validate(); err != nil {
+		return runner.Report{}, err
+	}
+	if options.BatchID == "" || !options.IngestionComplete || !options.WritersPaused {
+		return runner.Report{}, errors.New("native test requires completed ingestion and the graph write gate")
+	}
+	for _, statement := range plan.Queries {
+		if statement.Text == "" {
+			continue
+		}
+		if err := validatePostgresRead(statement.Text); err != nil {
+			report = runner.RejectedQueryReport(plan, options, statement.Name, err)
+			recordNativeValidation(&report, time.Since(started))
+			return report, fmt.Errorf("%s (%s): %w", statement.Name, backend, err)
+		}
+	}
+	validationElapsed = time.Since(started)
+	var driver, postgres = graph.AsDriver[*pg.Driver](database)
+	switch backend {
+	case "pg", "postgres", "postgresql":
+		if !postgres || driver == nil {
+			return runner.Report{}, errors.New("native PostgreSQL driver does not match the selected backend")
+		}
+		prepared := &nativePostgresDatabase{PostgresDatabase: &PostgresDatabase{driver: driver}, native: database}
+		preparationStarted := time.Now()
+		if err = runner.PrepareDatabase(ctx, prepared, plan); err != nil {
+			report.Elapsed = time.Since(started)
+			report.Preparation.Database = time.Since(preparationStarted)
+			report.PreparationElapsed = report.Preparation.Database
+			return report, err
+		}
+		preparationElapsed := time.Since(preparationStarted)
+		report, err = runner.Test(ctx, prepared, plan, options)
+		recordNativePreparation(&report, preparationElapsed)
+	case "neo4j":
+		if postgres {
+			return runner.Report{}, errors.New("native Neo4j driver does not match the selected backend")
+		}
+		report, err = testNativeNeo4j(ctx, database, plan, options)
+	default:
+		return runner.Report{}, fmt.Errorf("unsupported native graph backend %q", backend)
+	}
+	recordNativeValidation(&report, validationElapsed)
+	return report, err
+}
+
 func recordNativeValidation(report *runner.Report, elapsed time.Duration) {
 	report.Preparation.QueryValidation = elapsed
+	report.PreparationElapsed += elapsed
+	report.Elapsed += elapsed
+	if report.Execution != nil {
+		report.Execution.Elapsed = report.Elapsed
+	}
+}
+
+// recordNativePreparation includes catalog work that happens before runner.Test
+// opens its rollback-only transaction.
+func recordNativePreparation(report *runner.Report, elapsed time.Duration) {
+	report.Preparation.Database += elapsed
 	report.PreparationElapsed += elapsed
 	report.Elapsed += elapsed
 	if report.Execution != nil {
@@ -279,6 +356,83 @@ func runNativeNeo4j(ctx context.Context, database graph.Database, plan extension
 	report.Committed = borrowed.main != nil && borrowed.main.commitRequested
 	runner.ConfirmNativeSave(&report, nil)
 	return report, nil
+}
+
+func testNativeNeo4j(ctx context.Context, database graph.Database, plan extension.Plan, options runner.Options) (runner.Report, error) {
+	var (
+		started                           = time.Now()
+		limits                            = options.Limits
+		report                            runner.Report
+		callbackError                     error
+		callbackStarted, callbackFinished time.Time
+		entered                           bool
+		databaseElapsed                   time.Duration
+		borrowed                          = &nativeNeo4jDatabase{database: database}
+	)
+	if limits == (runner.Limits{}) {
+		limits = runner.DefaultLimits()
+	}
+	ctx, cancel := context.WithTimeout(ctx, limits.RunTimeout)
+	defer cancel()
+	if err := runner.PrepareDatabase(ctx, borrowed, plan); err != nil {
+		report.PreparationElapsed = time.Since(started)
+		report.Preparation.Database = report.PreparationElapsed
+		report.Elapsed = report.PreparationElapsed
+		return report, err
+	}
+	databaseElapsed = time.Since(started)
+	borrowed.prepared = true
+	err := database.WriteTransaction(ctx, func(transaction graph.Transaction) error {
+		callbackStarted = time.Now()
+		entered = true
+		borrowed.main = &nativeNeo4jTransaction{database: borrowed, transaction: transaction}
+		report, callbackError = runner.Test(ctx, borrowed, plan, options)
+		callbackFinished = time.Now()
+		// Rollback on nativeNeo4jTransaction only closes the borrowed wrapper.
+		// Do not claim discard until the driver's outer callback returns this
+		// sentinel error and therefore confirms it rolled the transaction back.
+		report.Tested = false
+		report.Discarded = false
+		// The legacy driver ignores errors from its deferred Close. Explicitly
+		// close here and check the acknowledgement before returning the sentinel.
+		// Close on an uncommitted Neo4j transaction discards its changes.
+		closer, supported := transaction.(interface{ Close() error })
+		if !supported {
+			return fmt.Errorf("%w: native transaction cannot confirm close", runner.ErrTestDiscardUncertain)
+		}
+		if closeError := closer.Close(); closeError != nil {
+			return fmt.Errorf("%w: %w", runner.ErrTestDiscardUncertain, closeError)
+		}
+		if callbackError != nil {
+			return callbackError
+		}
+		return errDiscardNativeTest
+	}, nativeTimeout(ctx))
+	if entered {
+		report.PreparationElapsed += callbackStarted.Sub(started)
+		report.Preparation.Database += databaseElapsed
+		report.Preparation.Transaction += callbackStarted.Sub(started) - databaseElapsed
+		report.SavingElapsed += time.Since(callbackFinished)
+	} else {
+		report.PreparationElapsed = time.Since(started)
+		report.Preparation.Database = databaseElapsed
+		report.Preparation.Transaction = report.PreparationElapsed - databaseElapsed
+	}
+	report.Elapsed = time.Since(started)
+	if errors.Is(err, errDiscardNativeTest) {
+		report.Tested = true
+		report.Discarded = true
+		report.GraphObjectsChanged = 0
+		return report, nil
+	}
+	if err != nil {
+		report.GraphObjectsChanged = 0
+		return report, err
+	}
+	// A nil result here means the driver committed. Treat it as an error even
+	// if a custom driver accidentally swallowed the discard sentinel.
+	report.GraphObjectsChanged = 0
+	return report, fmt.Errorf("%w: native editor test did not confirm rollback", runner.ErrTestDiscardUncertain)
 }
 
 func (s *nativeNeo4jDatabase) Begin(ctx context.Context) (runner.Transaction, error) {

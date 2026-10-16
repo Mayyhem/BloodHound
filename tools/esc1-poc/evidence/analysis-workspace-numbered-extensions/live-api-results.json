@@ -1,0 +1,19 @@
+{
+  "url": "http://127.0.0.1:28080/ui/administration/opengraph-analysis",
+  "login": true,
+  "workspace_status": 200,
+  "draft_status": 200,
+  "query_count": 29,
+  "dependency_count": 31,
+  "rule_revision": "93be3af449c5905810606e2084f202d2c361788d33047f2433a24fa5a4d64939",
+  "schema_revision": "ac5c48e6a3033ece2c46b0da33ca82c41d195cdb13703854b7f2912232bc6b86",
+  "draft_present": true,
+  "analysis_state": "failed",
+  "analysis_save": "not-started",
+  "failure": {
+    "query": "PoC/domain_helpers.cypher",
+    "stage": 1,
+    "phase": "check-answers",
+    "message": "This step failed. Check its query and inputs; private application logs contain the database details."
+  }
+}

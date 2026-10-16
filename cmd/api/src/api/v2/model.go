@@ -17,6 +17,8 @@
 package v2
 
 import (
+	"context"
+
 	"github.com/gorilla/schema"
 	"github.com/specterops/bloodhound/cmd/api/src/api"
 	"github.com/specterops/bloodhound/cmd/api/src/auth"
@@ -31,6 +33,7 @@ import (
 	"github.com/specterops/bloodhound/cmd/api/src/services/upload"
 	"github.com/specterops/bloodhound/packages/go/cache"
 	"github.com/specterops/bloodhound/server/alerts"
+	"github.com/specterops/bloodhound/tools/esc1-poc/postprocessing"
 	"github.com/specterops/dawgs/graph"
 )
 
@@ -108,6 +111,17 @@ type Resources struct {
 	OpenGraphSchemaService     OpenGraphSchemaService
 	DogTags                    dogtags.Service
 	AlertPublisher             alerts.Publisher
+	AnalysisEditor             AnalysisEditor
+}
+
+// AnalysisEditor keeps the API dependent on the small, safe editor contract.
+// The postprocessing service owns all graph work and never receives browser
+// supplied database addresses or file paths.
+type AnalysisEditor interface {
+	PreviewAnalysisFile(context.Context, string, postprocessing.EditorTestRequest) (postprocessing.EditorPlanPreview, error)
+	TestAnalysisFile(context.Context, string, postprocessing.EditorTestRequest) (postprocessing.EditorTestResult, error)
+	ReviewAnalysisFile(context.Context, string, string) (postprocessing.WorkspacePreview, error)
+	ActivateAnalysisFile(context.Context, string, string, string) (string, error)
 }
 
 func NewResources(
@@ -124,7 +138,12 @@ func NewResources(
 	dogtagsService dogtags.Service,
 	openGraphSchemaService OpenGraphSchemaService,
 	alertPublisher alerts.Publisher,
+	analysisEditor ...AnalysisEditor,
 ) Resources {
+	var editor AnalysisEditor
+	if len(analysisEditor) > 0 {
+		editor = analysisEditor[0]
+	}
 	return Resources{
 		Decoder:                    schema.NewDecoder(),
 		DB:                         rdms,
@@ -141,5 +160,6 @@ func NewResources(
 		DogTags:                    dogtagsService,
 		OpenGraphSchemaService:     openGraphSchemaService,
 		AlertPublisher:             alertPublisher,
+		AnalysisEditor:             editor,
 	}
 }

@@ -46,7 +46,14 @@ func validateEndpoints(ctx context.Context, transaction Transaction, binding ext
 		}
 		for _, identifier := range identifiers {
 			if len(resolved[identifier]) == 0 {
-				return fmt.Errorf("%s endpoint %q must identify exactly one graph node", binding.Kind, identifier)
+				side := "target"
+				for _, pair := range pairs {
+					if pair.Source == identifier {
+						side = "source"
+						break
+					}
+				}
+				return &EndpointError{Kind: binding.Kind, Side: side, Object: identifier}
 			}
 		}
 	}
@@ -62,7 +69,7 @@ func validateEndpoints(ctx context.Context, transaction Transaction, binding ext
 				return err
 			}
 			if len(rows) != 1 {
-				return fmt.Errorf("%s endpoint %q must identify exactly one graph node; found %d", binding.Kind, identifier, len(rows))
+				return &EndpointError{Kind: binding.Kind, Side: []string{"source", "target"}[index], Object: identifier, Found: len(rows)}
 			}
 			kinds[index] = rows[0]["kinds"]
 		}
@@ -77,7 +84,7 @@ func validateEndpoints(ctx context.Context, transaction Transaction, binding ext
 			}
 		}
 		if !allowed {
-			return fmt.Errorf("%s has an incompatible endpoint pair %q -> %q", binding.Kind, pair.Source, pair.Target)
+			return &EndpointError{Kind: binding.Kind, Object: pair.Source, PairOther: pair.Target}
 		}
 	}
 	return nil
@@ -86,7 +93,7 @@ func validateEndpoints(ctx context.Context, transaction Transaction, binding ext
 // publishHelper receives the current node found by the shared helper scan.
 // It never looks up an unlabelled object ID once per helper: on Neo4j that
 // would repeatedly scan the whole graph. The caller checks duplicate IDs.
-func publishHelper(ctx context.Context, transaction Transaction, binding extension.NodeBinding, row, existing map[string]any, parameterLimit int64) (int, error) {
+func publishHelper(ctx context.Context, transaction Transaction, binding extension.NodeBinding, row, existing map[string]any, parameterLimit int64, writeToGraph bool) (int, error) {
 	var (
 		identifier, valid = row["id"].(string)
 		stored            = map[string]any{"objectid": identifier}
@@ -126,6 +133,9 @@ func publishHelper(ctx context.Context, transaction Transaction, binding extensi
 		if bytes.Equal(previousJSON, storedJSON) {
 			return 0, nil
 		}
+	}
+	if !writeToGraph {
+		return 0, nil
 	}
 	var err error
 	if publisher, ok := transaction.(Publisher); ok {

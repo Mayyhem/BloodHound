@@ -254,6 +254,11 @@ func (s *Store) activate(candidate Bundle, plan extension.Plan) (Bundle, error) 
 func (s *Store) LatestStatus() Status {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	return s.latestStatus()
+}
+
+// The caller holds the store lock so rules and status can be read together.
+func (s *Store) latestStatus() Status {
 	var result = cloneStatus(s.status)
 	result.ResultsStale = result.SavedRevision == "" || result.SavedRevision != s.active.Revision || result.ResultsUncertain || result.State == "failed" || result.State == "running" || result.State == "unavailable" || result.State == "uncertain"
 	if result.Execution != nil {

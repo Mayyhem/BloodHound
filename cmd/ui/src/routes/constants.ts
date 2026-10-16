@@ -14,7 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { ROUTE_PRIVILEGE_ZONES, SubNavSection } from 'bh-shared-ui';
+import { Permission, ROUTE_PRIVILEGE_ZONES, SubNavSection } from 'bh-shared-ui';
 import { lazy } from 'react';
 
 export const ROUTE_HOME = '/';
@@ -38,6 +38,7 @@ export const ROUTE_ADMINISTRATION_SSO_CONFIGURATION = ROUTE_ADMINISTRATION + 'ss
 export const ROUTE_ADMINISTRATION_EARLY_ACCESS_FEATURES = ROUTE_ADMINISTRATION + 'early-access-features';
 export const ROUTE_ADMINISTRATION_BLOODHOUND_CONFIGURATION = ROUTE_ADMINISTRATION + 'bloodhound-configuration';
 export const ROUTE_ADMINISTRATION_OPENGRAPH_MANAGEMENT = ROUTE_ADMINISTRATION + 'opengraph-management';
+export const ROUTE_ADMINISTRATION_ANALYSIS_WORKSPACE = ROUTE_ADMINISTRATION + 'opengraph-analysis';
 export const ROUTE_API_EXPLORER = '/api-explorer';
 
 export const ENVIRONMENT_SUPPORTED_ROUTES = [ROUTE_GROUP_MANAGEMENT, ROUTE_ADMINISTRATION_DATA_QUALITY];
@@ -114,6 +115,14 @@ export const adminSections: SubNavSection[] = [
                 component: lazy(() => import('bh-shared-ui/OpenGraphManagement')),
                 adminOnly: false,
                 featureFlag: 'opengraph_extension_management',
+            },
+            {
+                label: 'OpenGraph Analysis',
+                path: ROUTE_ADMINISTRATION_ANALYSIS_WORKSPACE,
+                component: lazy(() => import('src/views/AnalysisWorkspace/AnalysisWorkspace')),
+                adminOnly: false,
+                featureFlag: 'opengraph_extension_management',
+                permissions: [Permission.OPENGRAPH_READ],
             },
         ],
     },

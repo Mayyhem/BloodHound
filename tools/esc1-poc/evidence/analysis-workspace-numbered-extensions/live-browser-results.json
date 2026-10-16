@@ -1,0 +1,53 @@
+{
+  "mocked_responses": false,
+  "checks": [
+    {
+      "step": "fit",
+      "font_px": 10.1058
+    },
+    {
+      "step": "Zoom in",
+      "font_px": 12.3771
+    },
+    {
+      "step": "Zoom out",
+      "font_px": 10.1058
+    },
+    {
+      "step": "Zoom out",
+      "font_px": 8.25137
+    }
+  ],
+  "errors": [],
+  "analysis_requested": false,
+  "rules_changed": false,
+  "theme_switches": [
+    {
+      "dark": true,
+      "edge_colors": [
+        "#ffffff"
+      ]
+    },
+    {
+      "dark": false,
+      "edge_colors": [
+        "#121212"
+      ]
+    },
+    {
+      "dark": true,
+      "edge_colors": [
+        "#ffffff"
+      ]
+    }
+  ],
+  "numbered_filter": [
+    "All extensions",
+    "1. ESC1 processing experiment (PoC)",
+    "2. Active Directory (PoC_AD)",
+    "3. CyberArk (PoC_CyberArk)",
+    "4. ESC1 using ordinary Cypher (PoC_Cypher)"
+  ],
+  "query_count": 29,
+  "rule_revision": "93be3af449c5905810606e2084f202d2c361788d33047f2433a24fa5a4d64939"
+}

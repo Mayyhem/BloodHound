@@ -18,21 +18,30 @@ import { Box, CircularProgress, Container } from '@mui/material';
 import { AppNavigate, flattenRoutes, GenericErrorBoundaryFallback, getSubRoute, useSubNavRoutes } from 'bh-shared-ui';
 import React, { Suspense } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useMatch } from 'react-router-dom';
 import { fullyAuthenticatedSelector } from 'src/ducks/auth/authSlice';
-import { adminSections, DEFAULT_ADMINISTRATION_ROUTE, ROUTE_ADMINISTRATION } from 'src/routes/constants';
+import {
+    adminSections,
+    DEFAULT_ADMINISTRATION_ROUTE,
+    ROUTE_ADMINISTRATION,
+    ROUTE_ADMINISTRATION_ANALYSIS_WORKSPACE,
+} from 'src/routes/constants';
 import { useAppSelector } from 'src/store';
 
 const Administration: React.FC = () => {
+    const canvasPage = !!useMatch(ROUTE_ADMINISTRATION_ANALYSIS_WORKSPACE);
     const fullyAuthenticated = useAppSelector(fullyAuthenticatedSelector);
     const { routes: adminRoutes, areRoutesLoading } = useSubNavRoutes(adminSections, fullyAuthenticated);
 
     return (
         <div className='flex h-full'>
             <Box flexGrow={1} position='relative' minWidth={0}>
-                <div>
-                    <Container maxWidth='xl' disableGutters>
-                        <Box py={2}>
+                <div className={canvasPage ? 'h-full' : undefined}>
+                    <Container
+                        maxWidth={canvasPage ? false : 'xl'}
+                        disableGutters
+                        className={canvasPage ? 'h-full' : undefined}>
+                        <Box py={canvasPage ? 0 : 2} className={canvasPage ? 'h-full' : undefined}>
                             <Suspense
                                 fallback={
                                     <Box

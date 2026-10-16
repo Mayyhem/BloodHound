@@ -1,0 +1,13 @@
+{
+  "files": [
+    "cmd/api/src/api/v2/analysis_editor_test.go",
+    "cmd/api/src/api/v2/analysis_editor_working_copies_test.go",
+    "cmd/api/src/api/v2/analysis_workspace_management_test.go",
+    "tools/esc1-poc/internal/ruleservice/editor_plan.go",
+    "tools/esc1-poc/postprocessing/graph_version_test.go",
+    "tools/esc1-poc/postprocessing/workspace_management.go",
+    "cmd/api/src/api/v2/model.go",
+    "cmd/api/src/api/registration/analysis_editor_working_copies_test.go"
+  ],
+  "changes": "Import spacing/explicit v2 aliases and one complete license header only; no behavior changes."
+}

@@ -1,0 +1,40 @@
+--- tools/esc1-poc/work/workspace-graph-details/build-checkout/cmd/ui/src/views/AnalysisWorkspace/QueryGraph.tsx	2026-10-14 14:21:17.400628542 -0400
++++ cmd/ui/src/views/AnalysisWorkspace/QueryGraph.tsx	2026-10-14 14:39:51.787161942 -0400
+@@ -29,6 +29,7 @@
+ } from 'bh-shared-ui';
+ import { KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
+ import { MAX_CAMERA_RATIO, MIN_CAMERA_RATIO, resetCamera } from 'src/ducks/graph/utils';
++import drawEdgeLabel from 'src/rendering/programs/edge-label';
+ import EdgeArrowProgram from 'src/rendering/programs/edge.arrow';
+ import drawHover from 'src/rendering/programs/node-hover';
+ import drawLabel from 'src/rendering/programs/node-label';
+@@ -108,6 +109,13 @@
+             size: Number(data.size),
+             inverseSqrtZoomRatio: 1 / Math.sqrt(camera.ratio),
+         }));
++        // Explore scales both kinds of labels with the camera. Edge labels
++        // need the same zoom value as node labels on every redraw.
++        sigma.setSetting('edgeReducer', (_name, data) => ({
++            ...data,
++            size: Number(data.size),
++            inverseSqrtZoomRatio: 1 / Math.sqrt(camera.ratio),
++        }));
+         const refresh = () => sigma.refresh();
+         camera.on('updated', refresh);
+         return () => {
+@@ -173,6 +181,7 @@
+                 // and its details identify the exact connection being inspected.
+                 size: edge === focused ? DEFAULT_GRAPH_EDGE_SIZE * 1.5 : DEFAULT_GRAPH_EDGE_SIZE,
+                 label: focused && !related.edges.has(edge) ? '' : attributes.reason,
++                backgroundColor: background,
+             });
+         });
+         sigma.refresh();
+@@ -238,6 +247,7 @@
+                     edgeProgramClasses: { arrow: EdgeArrowProgram },
+                     hoverRenderer: drawHover,
+                     labelRenderer: drawLabel,
++                    edgeLabelRenderer: drawEdgeLabel,
+                     renderEdgeLabels: true,
+                     enableEdgeClickEvents: true,
+                     labelFont: 'Figtree',

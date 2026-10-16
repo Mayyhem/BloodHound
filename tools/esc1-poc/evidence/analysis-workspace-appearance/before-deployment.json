@@ -1,0 +1,36 @@
+{
+  "captured_at": "2026-10-14T15:43:28.698738+00:00",
+  "containers": [
+    {
+      "name": "/esc1-workspace-manual-bloodhound-1",
+      "id": "55d034ac4504d49df5815b887e53fdd3b2745b2cd08383b922f95d9bfdddffe9",
+      "image": "sha256:01888908e17e4b3f42ee3646e31a526b071ee7b5c32b8a52399002c185b0aa4b",
+      "state": "running",
+      "started_at": "2026-10-14T14:17:50.566601317Z"
+    },
+    {
+      "name": "/esc1-workspace-manual-rule-service-1",
+      "id": "059e2839a6a78216c3fc51422da536b202b14da121a654e98f7967fb1e8b76a1",
+      "image": "sha256:e9bf40688883dcd9218784f891eead5be8ca0fb8e3d21e03a0015fa4c67b7ae9",
+      "state": "running",
+      "started_at": "2026-10-14T14:17:28.160721792Z"
+    },
+    {
+      "name": "/esc1-workspace-manual-app-db-1",
+      "id": "efb6e6aff4b802018aeb2757fd10eaf0e7475a7175251dc52f217f200c8b161c",
+      "image": "sha256:29754c7520f4b9654cf8ff98e19ac73b88e255c3a53f6236ebe9d52249bb6df3",
+      "state": "running",
+      "started_at": "2026-10-14T14:17:28.158517697Z"
+    },
+    {
+      "name": "/esc1-workspace-manual-graph-db-1",
+      "id": "3aaccb2437c229014c59fd91abfb15d86472321a0accd5ed66c0d8916f357a06",
+      "image": "sha256:c3d8ad3b006d7822b29e0180bb36e0543b420ed4ed2e0cff62fa5af7a3059ec7",
+      "state": "running",
+      "started_at": "2026-10-14T14:17:28.153895283Z"
+    }
+  ],
+  "rules": {
+    "active.json": "16ed733e9ed4458cda9cf455aa372d59394d2ef03e89422b0c68e6fdf678c8b7"
+  }
+}

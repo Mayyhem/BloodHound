@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -42,6 +43,10 @@ type answerSpace struct {
 	bytes         int64
 	peak          int64
 	observeAnswer func(string, map[string]any) error
+	// inspectTestAnswer lets the editor read the tested file's complete answer
+	// before temporary files are removed. Normal analysis leaves it empty.
+	inspectTestAnswer func(context.Context, Transaction, string, CompleteAnswer) error
+	testTarget        string
 }
 
 type answerFile struct {
@@ -85,6 +90,12 @@ func (s *answerSpace) create() (*answerWriter, error) {
 
 func (s *answerWriter) append(row map[string]any) error {
 	if err := validateRows(Rows{row}); err != nil {
+		// Rows arrive one at a time, so number the problem by its place in
+		// the whole answer rather than within this single row.
+		var problem *AnswerValueError
+		if errors.As(err, &problem) {
+			problem.Row = s.answer.rows + 1
+		}
 		return err
 	}
 	// The driver has already supplied this row. Reject clearly oversized values

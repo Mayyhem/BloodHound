@@ -1,0 +1,9 @@
+{
+  "dependency_count": 16,
+  "login": true,
+  "query_count": 16,
+  "rule_revision": "3fd70540902b632f9d12f0b7e4e9a2515e04c8633c2fdbf1a63891b51398a6d9",
+  "schema_revision": "a5e9c3d88e9c36d3f280e8e602b275ef93d3ed569e45ebf4884c25ab7e19cabe",
+  "url": "http://127.0.0.1:28080/ui/administration/opengraph-analysis",
+  "workspace_http_status": 200
+}

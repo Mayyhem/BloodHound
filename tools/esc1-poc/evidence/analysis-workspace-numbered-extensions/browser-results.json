@@ -1,0 +1,129 @@
+{
+  "checks": [
+    {
+      "theme": "light",
+      "zoom_in_out_and_return": [
+        {
+          "camera_ratio": 1,
+          "rendered_font_px": [
+            12.0
+          ]
+        },
+        {
+          "camera_ratio": 2,
+          "rendered_font_px": [
+            8.48528
+          ]
+        },
+        {
+          "camera_ratio": 0.5,
+          "rendered_font_px": [
+            16.9706
+          ]
+        },
+        {
+          "camera_ratio": 1,
+          "rendered_font_px": [
+            12.0
+          ]
+        }
+      ],
+      "theme_css": {
+        "contrast": "#121212",
+        "bg": "#ffffff",
+        "settings": {
+          "color": "#121212"
+        },
+        "samples": [
+          {
+            "text": "As $ad_users",
+            "font": "12px Figtree",
+            "color": "#121212",
+            "alpha": 1
+          },
+          {
+            "text": "As $ad_users",
+            "font": "12px Figtree",
+            "color": "#121212",
+            "alpha": 1
+          }
+        ]
+      }
+    },
+    {
+      "theme": "dark",
+      "zoom_in_out_and_return": [
+        {
+          "camera_ratio": 1,
+          "rendered_font_px": [
+            12.0
+          ]
+        },
+        {
+          "camera_ratio": 2,
+          "rendered_font_px": [
+            8.48528
+          ]
+        },
+        {
+          "camera_ratio": 0.5,
+          "rendered_font_px": [
+            16.9706
+          ]
+        },
+        {
+          "camera_ratio": 1,
+          "rendered_font_px": [
+            12.0
+          ]
+        }
+      ],
+      "theme_css": {
+        "contrast": "#ffffff",
+        "bg": "#121212",
+        "settings": {
+          "color": "#ffffff"
+        },
+        "samples": [
+          {
+            "text": "As $ad_users",
+            "font": "12px Figtree",
+            "color": "#ffffff",
+            "alpha": 1
+          },
+          {
+            "text": "As $ad_users",
+            "font": "12px Figtree",
+            "color": "#ffffff",
+            "alpha": 1
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [],
+  "data": "Synthetic example responses; actual canvas text drawing.",
+  "theme_switch": {
+    "css": "#ffffff",
+    "settings": {
+      "color": "#ffffff"
+    },
+    "labels": [
+      {
+        "text": "As $ad_users",
+        "font": "12px Figtree",
+        "color": "#ffffff",
+        "alpha": 1
+      },
+      {
+        "text": "As $ad_users",
+        "font": "12px Figtree",
+        "color": "#ffffff",
+        "alpha": 1
+      }
+    ]
+  },
+  "numbered_icons_match_filter": true,
+  "stable_icon_urls_after_refresh": true,
+  "switch_back_to_light": true
+}

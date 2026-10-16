@@ -19,14 +19,17 @@ package runner
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
 )
 
-// Execution contains only rule names, counts, timings, and fixed explanations.
-// It can be stored in the rule service without copying any graph answers.
+// Execution contains only rule names, counts, timings, and explanations. An
+// explanation may name a property, answer column, or connection type and count
+// the affected objects, but never copies object IDs or answer values. It can
+// be stored in the rule service without copying any graph answers.
 type Execution struct {
 	CleanupPending bool          `json:"cleanup_pending,omitempty"`
 	SchemaRevision string        `json:"schema_revision,omitempty"`
@@ -85,6 +88,25 @@ func FailureMessage(err error) string {
 		return "The time limit was reached. Reduce the query's work or review its limits."
 	case errors.Is(err, context.Canceled):
 		return "The run was canceled before completion."
+	}
+	// The shared report names properties, columns, and connection types, and
+	// counts affected objects, but never lists object IDs.
+	var (
+		helperProperty *HelperPropertyError
+		answerValue    *AnswerValueError
+		endpoint       *EndpointError
+	)
+	switch {
+	case errors.As(err, &helperProperty) && errors.Is(err, ErrEmptyPropertyValue):
+		return fmt.Sprintf("%s is empty (null) for %s. Give it a fallback value, for example with coalesce(), or leave out the rows without one.", propertyLabel(helperProperty.Property), HelperObjects(helperProperty.Count))
+	case errors.As(err, &helperProperty):
+		return fmt.Sprintf("%s of %s is not text, a number, true/false, or a list of one of those.", propertyLabel(helperProperty.Property), HelperObjects(helperProperty.Count))
+	case errors.Is(err, ErrEmptyPropertyValue):
+		return "A returned property is empty (null) for at least one object. Give it a fallback value, for example with coalesce(), or leave out the rows without one."
+	case errors.As(err, &answerValue):
+		return fmt.Sprintf("Column %s on row %d holds a whole graph object (a node, relationship, or path). Return plain values instead, such as its objectid.", SafeName(answerValue.Column, "(unnamed)"), answerValue.Row)
+	case errors.As(err, &endpoint):
+		return endpointMessage(endpoint, false)
 	}
 	var cause = err
 	for errors.Unwrap(cause) != nil {
@@ -253,4 +275,39 @@ func RejectedQueryReport(plan extension.Plan, options Options, name string, err 
 	report.Execution.fail(name, "language-check", err)
 	finishReport(&report, time.Now(), err)
 	return report
+}
+
+// propertyLabel names a property in a sentence: "The name property", or
+// "A property" when the name is unusual.
+func propertyLabel(name string) string {
+	if SafeName(name, "") == "" {
+		return "A property"
+	}
+	return "The " + name + " property"
+}
+
+// endpointMessage explains a connection whose source or target cannot be
+// used. withObject adds the object IDs, for the author in the editor only.
+func endpointMessage(problem *EndpointError, withObject bool) string {
+	kind := SafeName(problem.Kind, "proposed")
+	if problem.Side == "" {
+		if withObject {
+			return fmt.Sprintf("The %s connection from %q to %q joins kinds of objects that this connection type does not allow. Check its compatible_kinds in the schema, or change which objects the query connects.", kind, problem.Object, problem.PairOther)
+		}
+		return fmt.Sprintf("A %s connection joins kinds of objects that this connection type does not allow. Check its compatible_kinds in the schema.", kind)
+	}
+	object := ""
+	if withObject {
+		object = fmt.Sprintf(" (%q)", problem.Object)
+	}
+	if problem.Found > 1 {
+		return fmt.Sprintf("The %s of a %s connection%s matches %d objects. Each object ID must belong to exactly one object.", problem.Side, kind, object, problem.Found)
+	}
+	return fmt.Sprintf("The %s of a %s connection%s matches no object in the graph. Return the object ID of an existing object.", problem.Side, kind, object)
+}
+
+// EndpointMessage is the editor's version of the endpoint explanation. It
+// includes the object IDs, which the author's own query returned.
+func EndpointMessage(problem *EndpointError) string {
+	return endpointMessage(problem, true)
 }

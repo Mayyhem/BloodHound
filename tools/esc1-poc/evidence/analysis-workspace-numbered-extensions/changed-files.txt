@@ -1,0 +1,8 @@
+cmd/ui/src/rendering/utils/utils.ts
+cmd/ui/src/views/AnalysisWorkspace/AnalysisWorkspace.test.tsx
+cmd/ui/src/views/AnalysisWorkspace/AnalysisWorkspace.tsx
+cmd/ui/src/views/AnalysisWorkspace/QueryGraph.tsx
+cmd/ui/src/views/AnalysisWorkspace/model.ts
+tools/esc1-poc/DESIGN.md
+tools/esc1-poc/END_USERS.md
+tools/esc1-poc/USAGE.md

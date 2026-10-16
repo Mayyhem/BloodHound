@@ -1,0 +1,40 @@
+{
+  "mocked_responses": false,
+  "checks": [
+    "Normal login and current query table",
+    "Pointer/keyboard entity width, coordinated table width, depth tooltip, exact displayed download",
+    "Intermediate-query detail inspected without claiming graph output counts",
+    "Special Groups requested/additional deletion warning; preview discarded"
+  ],
+  "page_errors": [],
+  "workspace_responses": [
+    {
+      "path": "/api/v2/analysis-workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/v2/analysis-workspace/draft",
+      "status": 200
+    },
+    {
+      "path": "/api/v2/analysis-workspace/query",
+      "status": 200
+    },
+    {
+      "path": "/api/v2/analysis-workspace/preview",
+      "status": 200
+    },
+    {
+      "path": "/api/v2/analysis-workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/v2/analysis-workspace/draft",
+      "status": 200
+    }
+  ],
+  "activation_performed": false,
+  "analysis_requested": false,
+  "query_count": 16,
+  "rule_revision": "0c3a067899ad822e19328f2d523ef63c824203121c3908dee5f611cb11fcaea4"
+}

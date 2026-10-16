@@ -1,0 +1,246 @@
+[
+  {
+    "path": "_plans/opengraph-analysis-workspace.md",
+    "sha256": "3be35ad2b30d8086a8e19404dbffbb59d0aac8df2ef49eefa7fc7b7a10230592"
+  },
+  {
+    "path": "cmd/api/src/api/registration/analysis_workspace_test.go",
+    "sha256": "6455daffe3118c82bada836f146519f02f8782d2f63feaa5096deb53a7beb628"
+  },
+  {
+    "path": "cmd/api/src/api/registration/v2.go",
+    "sha256": "3dc8f0c97d0c287b6d1bd59a04755ff0b4d3854f6adebc10fdfac753cb221be8"
+  },
+  {
+    "path": "cmd/api/src/api/v2/analysis_workspace.go",
+    "sha256": "f899159f3eca257f0e27d71ed2b6ed040988b2e0e309a49b864099656107b905"
+  },
+  {
+    "path": "cmd/api/src/api/v2/analysis_workspace_test.go",
+    "sha256": "9e7adc106d46d700642697daf48a2f008180f47516463c7276bc0af7b7310796"
+  },
+  {
+    "path": "cmd/ui/src/rendering/utils/sequentialLayout.ts",
+    "sha256": "32587b85122358f25627a879a361e7c6446710696fff4f0cb98b90a853520cc4"
+  },
+  {
+    "path": "cmd/ui/src/rendering/utils/utils.ts",
+    "sha256": "19d6ca412ff3605fe878baf8b7196c741dbf498ee383d39335bd130670a2fd7c"
+  },
+  {
+    "path": "cmd/ui/src/routes/constants.ts",
+    "sha256": "e7c0eed8d3b6794f7cef806b93de3cb26c47115148e455ec87f9b767306cd60c"
+  },
+  {
+    "path": "cmd/ui/src/views/AnalysisWorkspace/AnalysisWorkspace.test.tsx",
+    "sha256": "21bee36b3c34781e53c94454c2e97a909327b12670e76054c94325f6ba2b6fb9"
+  },
+  {
+    "path": "cmd/ui/src/views/AnalysisWorkspace/AnalysisWorkspace.tsx",
+    "sha256": "e83942550584301ab2fb4d9c9dca515dcf31a58c4bec0e8608d133fc64d94d35"
+  },
+  {
+    "path": "cmd/ui/src/views/AnalysisWorkspace/QueryDetails.tsx",
+    "sha256": "1eeb6f0b23a46ee99c073fcdb6da7a255bd602fee31d3d148b308f47dd876e6d"
+  },
+  {
+    "path": "cmd/ui/src/views/AnalysisWorkspace/QueryGraph.tsx",
+    "sha256": "0ece82a71b7a0fdb5d93cc476f5563c31433023f2c0832ddea1faf30a3b76aa5"
+  },
+  {
+    "path": "cmd/ui/src/views/AnalysisWorkspace/RunSummary.tsx",
+    "sha256": "383c6f74c0087d773b1fa37f16b3fb3a22ae4b8520c6894d08f4c4d32833f2e9"
+  },
+  {
+    "path": "cmd/ui/src/views/AnalysisWorkspace/api.ts",
+    "sha256": "0670c1c3c71f38d556e3b0a8f86adce5c0663538174e42da5c153c8b885a3bbf"
+  },
+  {
+    "path": "cmd/ui/src/views/AnalysisWorkspace/graph.ts",
+    "sha256": "77379955fddf52882c972c0c241319c7a66080c13025f440a14dd68f4eb4d942"
+  },
+  {
+    "path": "cmd/ui/src/views/AnalysisWorkspace/model.test.ts",
+    "sha256": "5ef6f74ff2083d29341f29c060d5297729a4793f2fb07e3f941af07667545345"
+  },
+  {
+    "path": "cmd/ui/src/views/AnalysisWorkspace/model.ts",
+    "sha256": "761ef22da893974706d5049d91a23984ea86dedc5e9efc8ec5be1237e0493a9f"
+  },
+  {
+    "path": "cmd/ui/src/views/AnalysisWorkspace/testData.ts",
+    "sha256": "2e8e5162a41f4e068e866389a4f36783f4864de793ed4adaa0e86a49a419de8f"
+  },
+  {
+    "path": "cmd/ui/src/views/AnalysisWorkspace/types.ts",
+    "sha256": "513164f98152cdc62aa7d20130c1c952e5614aed6fc2c58635a8e71e96d810b9"
+  },
+  {
+    "path": "cmd/ui/src/views/Explore/utils.ts",
+    "sha256": "d7f287ca2d4c420ec27cd8580b35d6fa14e5fcaf27cfca080c4c5b982ffe83c3"
+  },
+  {
+    "path": "packages/go/openapi/doc/openapi.json",
+    "sha256": "eb3acb3e4d18d1e02faa3f4c7cbcfc79c76ece86b6417e383dc73f5e22589e00"
+  },
+  {
+    "path": "packages/go/openapi/src/openapi.yaml",
+    "sha256": "2449dab38c15d620cf175fd26a2c7a8e722db5dc54255bb6f59de9e3998376e9"
+  },
+  {
+    "path": "packages/go/openapi/src/paths/opengraph.analysis-query.yaml",
+    "sha256": "a2d5199d9ade9760d675a79f852fb4eafed3cb61eafe09a7bde8c165fb8dd894"
+  },
+  {
+    "path": "packages/go/openapi/src/paths/opengraph.analysis-workspace.yaml",
+    "sha256": "b2937a008d9014fb18c38626e87a33b9e891c973fc6c128183c31176be972d56"
+  },
+  {
+    "path": "packages/go/openapi/src/schemas/model.analysis-execution.yaml",
+    "sha256": "9771339537dc6df567aef6392b9cbe3cfaa59649ff4c1bcbcd8c850e0db6e508"
+  },
+  {
+    "path": "packages/go/openapi/src/schemas/model.analysis-query.yaml",
+    "sha256": "fe081852806d0ff939a83c1c3a879db40b9973e61374efae521d60992a3a042c"
+  },
+  {
+    "path": "packages/go/openapi/src/schemas/model.analysis-run.yaml",
+    "sha256": "6da1e53315a461b3b566de109fa9948c11e2dd34b1a836b4e76457b1f8cf5331"
+  },
+  {
+    "path": "packages/go/openapi/src/schemas/model.analysis-status.yaml",
+    "sha256": "db603a642a69255563d02a5d8fde9a22202f87e8cc8e653d98a272bd9906c93e"
+  },
+  {
+    "path": "packages/go/openapi/src/schemas/model.analysis-workspace.yaml",
+    "sha256": "a0ce0711f40bf7d5d5272dd448f73d371e6fab29460b6ed9bb33cf029d0aeae7"
+  },
+  {
+    "path": "packages/javascript/bh-shared-ui/src/utils/permissions.ts",
+    "sha256": "9597d15579c9b651316c78e38b7aa867bb7cac3803fa70f41dd7fae53df3d30f"
+  },
+  {
+    "path": "tools/esc1-poc/DESIGN.md",
+    "sha256": "d2fe3f3269b945935b2598ea189628f7c7207e390b92dbed18efbe4d60ae6ab3"
+  },
+  {
+    "path": "tools/esc1-poc/DEVELOPERS.md",
+    "sha256": "1658476a3eb0cff4591c2ba261535859fc62eb9ee642f17d411b52f319a2499d"
+  },
+  {
+    "path": "tools/esc1-poc/END_USERS.md",
+    "sha256": "aeeacd89c97fbcb583283edc5a22a8a13c85961d5034492458bdadb7403ac51f"
+  },
+  {
+    "path": "tools/esc1-poc/HANDOFF.md",
+    "sha256": "120b50dff74998f5e74f53d33c566193c23d010f09cbdf2565f5eff73f3cfdf7"
+  },
+  {
+    "path": "tools/esc1-poc/README.md",
+    "sha256": "96ead6f52f6c9f569ae824364645d099ea08a2921c96ab33172ddc23e929ffae"
+  },
+  {
+    "path": "tools/esc1-poc/REVIEW.md",
+    "sha256": "dd334b1c0179fd173855aee7bcdce111b0182c1a5ab22980e212a98c59e33208"
+  },
+  {
+    "path": "tools/esc1-poc/TODO.md",
+    "sha256": "d88b1782110db233fc54efa1b227c6f91dee8367db9791910ab90f0b6e02a2a4"
+  },
+  {
+    "path": "tools/esc1-poc/USAGE.md",
+    "sha256": "a3ca111b23e967b647f88725b6c442367f6faa0bb154f0b743186d53512560e8"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace-deployment/README.md",
+    "sha256": "6a863a4a2ca157ebf8edd873aa6c3e152e8221254d02ce415b2bcab636c0a680"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace-deployment/build-source-files.json",
+    "sha256": "13a34c0ce86e84cbe569aa1edf4a1ff47543327470aa334d9185a9abd59be4d7"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace-deployment/changed-files.txt",
+    "sha256": "231c500f2d609440b1a0d299b49c2d1da7633f4db49edf73b16cd7dd054221e6"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace-deployment/deployment-state.json",
+    "sha256": "85904472fcfd9724cccf929903e773266b54c0ce7e2bd5e0bc6965406e3e7133"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace-deployment/live-api-results.json",
+    "sha256": "3de4a4403eb6ea687ba9e3575b0a1b61f0e7b73dc6a8232d1c542f32e6eff500"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace-deployment/live-browser-results.json",
+    "sha256": "65b35d25d6f95deb4741402ad4b80311a3cef8d89f336fe8a823bdee1e4d7aee"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace-deployment/source-state.json",
+    "sha256": "2fa2baaf0b30a13389d1bd68f6cec89e73ae85f43a9bea86fc3f6ac2320ef158"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace/README.md",
+    "sha256": "f7b4ab48091c7fd185dbb7da2e018c3863f77fbffa0f6c2658296e1140f5f6cb"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace/browser-results.json",
+    "sha256": "5a9b93730be080da1efcc30f1da0994ab5d258cc9a5a52beb6875ba636c55c96"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace/changed-files.txt",
+    "sha256": "ba7983992f21f650f0a9c54fad1105b6164f7ff33a47f26a94465495eaf1bc69"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace/results.json",
+    "sha256": "ea27fb4385a627262f6a4ac6262354a42aa9f9989a12c11605b815ea65252942"
+  },
+  {
+    "path": "tools/esc1-poc/evidence/analysis-workspace/source-files.json",
+    "sha256": "eac9378e6e437be6f23bc5c28e61db02c1b23a78aee51cadec68cbabd492d8a3"
+  },
+  {
+    "path": "tools/esc1-poc/go.mod",
+    "sha256": "e33b5e93f592ebd6d22f08ed1dde667dadd2c638d1ccebb86e305e4794f1f2f9"
+  },
+  {
+    "path": "tools/esc1-poc/go.sum",
+    "sha256": "08962019595497c250c28ab45f44d092969020c0e5162e45373878c8fb6e64eb"
+  },
+  {
+    "path": "tools/esc1-poc/internal/extension/extension.go",
+    "sha256": "dd4bc2ac8335b18afee7332ee2fb7c1a39d4a85020fce7510fe90861e485c329"
+  },
+  {
+    "path": "tools/esc1-poc/internal/extension/workspace_test.go",
+    "sha256": "840324d82a7247e3e385e1ce0150a1b1608c4b1204f836b0e98ae7217ef45f34"
+  },
+  {
+    "path": "tools/esc1-poc/internal/ruleservice/http.go",
+    "sha256": "fb3e37e44cf34d44a643f2a1ffb4e693cba2ea5ee8bf8c7c88d4927ab866ee59"
+  },
+  {
+    "path": "tools/esc1-poc/internal/ruleservice/store.go",
+    "sha256": "91bfa07cc160ffd95684582348bc560497439a43f07507027311eaa222b4ae88"
+  },
+  {
+    "path": "tools/esc1-poc/internal/ruleservice/view.go",
+    "sha256": "f5a5495d640cb29f0b7ad19d0ebc24f8ceaf910eaf8f8aa6a99b55223df8a264"
+  },
+  {
+    "path": "tools/esc1-poc/internal/ruleservice/workspace.go",
+    "sha256": "ffc58e0e0b29f6fda6b5b1f38991037ccd769ac00364b42cde75f40949eea6a8"
+  },
+  {
+    "path": "tools/esc1-poc/internal/ruleservice/workspace_test.go",
+    "sha256": "3b8abea4aa532a240f4856b361217460f37c35cb50f150400d04dce71f6f1245"
+  },
+  {
+    "path": "tools/esc1-poc/postprocessing/workspace.go",
+    "sha256": "9bf19d212cc5cec894fbb2b336957c8e16c0ba180ce6be349636698c8c2e2903"
+  },
+  {
+    "path": "tools/esc1-poc/postprocessing/workspace_test.go",
+    "sha256": "9655eeed77fd56818bfb045143036f335638d47c1dcd6018be1f0cd4a6d140ab"
+  }
+]

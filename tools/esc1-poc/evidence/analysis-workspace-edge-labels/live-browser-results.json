@@ -1,0 +1,26 @@
+{
+  "mocked_responses": false,
+  "checks": [
+    {
+      "step": "fit",
+      "font_px": 10.1058
+    },
+    {
+      "step": "Zoom in",
+      "font_px": 12.3771
+    },
+    {
+      "step": "Zoom out",
+      "font_px": 10.1058
+    },
+    {
+      "step": "Zoom out",
+      "font_px": 8.25137
+    }
+  ],
+  "errors": [],
+  "analysis_requested": false,
+  "rules_changed": false,
+  "query_count": 16,
+  "rule_revision": "0c3a067899ad822e19328f2d523ef63c824203121c3908dee5f611cb11fcaea4"
+}

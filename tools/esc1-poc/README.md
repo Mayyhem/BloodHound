@@ -13,7 +13,7 @@ You install two parts once: an extra container that stores the rules, and a modi
 1. Upload schemas through BloodHound’s OpenGraph Management page. On the local rule page, inspect, review, and activate their `.cypher` files. The supplied Compose setup needs no pasted browser token.
 2. Upload collection data to BloodHound as usual, or click **Run Analysis** to check data already stored. The button requires a one-time server connection setup. Both ordinary BloodHound and OpenGraph collections are supported.
 3. After BloodHound successfully finishes its own analysis, it runs the affected rules and saves their calculated connections.
-4. Explore those connections in BloodHound's normal interface.
+4. Inspect current rules and completed reports in **Administration → OpenGraph Analysis**, then explore calculated connections in BloodHound’s normal interface.
 
 Later collections can change the answer. A vault account collected before its matching directory user can be connected after that user arrives, without recollecting the vault. The engine also removes calculated connections that are no longer justified by stored facts. Simply leaving an object out of a later collection does not establish that it was removed; stale collected evidence remains a separate problem.
 
@@ -40,6 +40,7 @@ Existing settings give BloodHound the rule container's address and access secret
 - Up to five ready queries can run together. A ready query can start without waiting for an unrelated slow query. Queries run one at a time after supporting objects are created, so they can see those new objects before saving.
 - First runs, changed rules, restarts, and incomplete change tracking run all enabled rules. Tracking is bounded, so large uploads can also require a full run of enabled rules.
 - Large-graph safeguards are implemented. The [Cypher comparison](CYPHER_COMPARISON.md) reports measured object and connection counts separately, along with remaining limits. Capacity at 100 million objects and Enterprise compatibility have not been demonstrated. The [review guide](REVIEW.md) includes the checks and unresolved work.
+- **No BloodHound Enterprise analysis features.** This solution does not account for privileged zone (Tier Zero) rules, findings, exposure or impact analysis, or other BloodHound Enterprise capabilities. Calculated connections are ordinary graph edges; they are not evaluated against zone membership, and no findings or attack-path exposure are produced from them.
 
 ## Where to go next
 
@@ -59,4 +60,12 @@ Existing settings give BloodHound the rule container's address and access secret
 | See the connections described by an example | [ESC1 model](model.html) or [vault model](examples/vault/model.html), opened in a browser |
 | Continue the work or investigate an earlier experiment | [Handoff notes and historical evidence](HANDOFF.md) |
 
-A native BloodHound page could reuse its existing login and proxy through the server; [the proposed minimal integration](DESIGN.md#a-native-bloodhound-page) explains the remaining work. The current setup keeps BloodHound running. The earlier standalone command that stopped the application is documented in the handoff notes for reproducing its experiments.
+The native **OpenGraph Analysis** page uses the existing login for inspection, rule management, and the analysis file editor; [workspace instructions](USAGE.md#inspect-the-analysis-workspace) explain navigation, report matching, and downloads. The editor can test a file and its prerequisites without permanently changing the graph. The current setup keeps BloodHound running. The earlier standalone command that stopped the application is documented in the handoff notes for reproducing its experiments.
+
+The native analysis workspace now includes the requested Explore-style canvas, resizable bottom rules/report panel, right entity panel, uploads and draft review, individual/multiple-rule enable/disable/delete, and Run Analysis. See [workspace usage](USAGE.md#inspect-the-analysis-workspace) for permissions and revision checks. Collapsed graph groups, historical diagrams, and live query progress remain later work. Temporary editor tests are available now. The older rules page remains available.
+
+## 14 October 2026 — analysis file editor
+
+The workspace now also has an analysis file editor. A signed-in person can save unfinished files as private working copies, resume them later, test one exact file without changing the graph permanently, inspect the returned rows as a table, review the proposed change, then activate only that file. The shared upload draft remains separate throughout.
+
+Testing always recalculates only the needed query chain. A row-only file can now be reviewed and activated on its own. All graph writes, including temporary editor work, go through the same BloodHound process. The editor is production-built and deployed at <http://127.0.0.1:28080/ui/administration/opengraph-analysis>; real browser checks passed. See the [analysis workspace editor evidence](evidence/analysis-workspace-editor/README.md).

@@ -150,7 +150,7 @@ func (s *inputs) EnterOC_RelationshipPattern(value *parser.OC_RelationshipPatter
 	}
 }
 func (s *inputs) EnterOC_FunctionInvocation(value *parser.OC_FunctionInvocationContext) {
-	switch strings.ToLower(value.OC_FunctionName().GetText()) {
+	switch strings.ToLower(unquote(value.OC_FunctionName().GetText())) {
 	case "labels", "type":
 		s.result.BroadRead = true
 	}

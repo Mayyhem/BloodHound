@@ -40,6 +40,7 @@ export enum Permission {
     OPENGRAPH_WRITE,
     ALERTS_READ,
     ALERTS_MANAGE,
+    OPENGRAPH_READ,
 }
 
 export type PermissionDefinition = {
@@ -139,6 +140,10 @@ export const PERMISSIONS: PermissionDefinitions = {
     [Permission.WIPE_DB]: {
         authority: 'db',
         name: 'Wipe',
+    },
+    [Permission.OPENGRAPH_READ]: {
+        authority: 'opengraph',
+        name: 'Read',
     },
     [Permission.OPENGRAPH_WRITE]: {
         authority: 'opengraph',

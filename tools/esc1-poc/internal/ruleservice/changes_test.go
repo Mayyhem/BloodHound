@@ -424,3 +424,23 @@ func TestReopenValidatesInsideTheRuleDirectory(t *testing.T) {
 		t.Fatal("reopen changed the rules", err)
 	}
 }
+
+func TestRemovalPreservesIndependentIntermediateFiles(t *testing.T) {
+	store := open(t)
+	original := files(t)
+	name := "PoC_Vault/working_step.cypher"
+	text := "// namespace: PoC_Vault\n// version: v1.0.0\n// depends-on: none\nRETURN 1 AS value"
+	original[name] = text
+	initial, err := store.Update(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := applyChange(t, store, ruleservice.Change{BaseRevision: initial.Revision, Remove: []string{"PoC_Vault/account_users.cypher"}})
+	if changed.Files[name] != text {
+		t.Fatal("deleting another branch removed an independent development step")
+	}
+	removed := applyChange(t, store, ruleservice.Change{BaseRevision: changed.Revision, Remove: []string{name}})
+	if _, exists := removed.Files[name]; exists {
+		t.Fatal("explicitly selected intermediate file was not removed")
+	}
+}

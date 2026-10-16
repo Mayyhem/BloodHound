@@ -4,7 +4,7 @@ Give extension authors a clear path from an idea to working rules: create an ext
 
 Open items describe proposed improvements; completed work is listed under [Done](#done). Keep the engine's existing shared calculations, scope and identity checks, complete-result validation, and all-or-nothing saving. The interactive execution graph below replaces the earlier suggestion for a separate development-mode execution preview.
 
-Earlier validation and useful execution reports are implemented. Next, build a read-only analysis workspace MVP for current rules and completed runs. Management, collapsed views, live progress, and interactive testing follow in later phases. Keep the completed authoring documentation current as the engine changes. Coordinate the Cypher work with the existing [implementation plan](CYPHER_IMPLEMENTATION_PLAN.md).
+Earlier validation and useful execution reports are implemented. The read-only analysis workspace MVP for current rules and completed runs is implemented; [verification and remaining checks](evidence/analysis-workspace/README.md) describe its review status. Management, collapsed views, live progress, and interactive testing follow in later phases. Keep the completed authoring documentation current as the engine changes. Coordinate the Cypher work with the existing [implementation plan](CYPHER_IMPLEMENTATION_PLAN.md).
 
 ## 3. Build an interactive analysis workspace using BloodHound's sequential layout
 
@@ -16,11 +16,11 @@ The MVP links to the current rules page for upload, activation, rule management,
 
 ### MVP: understand current rules and completed runs
 
-- [ ] Draw the current activated rules in sequential layout, using complete runner-derived dependencies and showing shared prerequisites once. No new execution modes, storage, or DAWGS changes are required by the MVP.
-- [ ] Reuse pan, zoom, fit, search, extension filters, and keyboard navigation. Highlight prerequisites and downstream consumers; explain filtered-out dependencies and let the author reveal them.
-- [ ] Coordinate one focused query between graph, basic rule table, and details panel. Show existing properties, full Cypher, enabled/disabled choice and blocking reasons; provide individual download tied to the displayed revision.
-- [ ] Show existing completed-run counts, timings, failures, and saving outcomes on the graph only when the report matches its revision. Explain older or unavailable reports separately. Existing overall running status must not imply live per-query progress.
-- [ ] Provide Refresh and links to existing management controls. Handle no active rules and missing reports clearly. Keep existing permissions and normal Explore behavior intact; loading or navigating the page writes no collected graph data.
+- [x] Draw the current activated rules in sequential layout, using complete runner-derived dependencies and showing shared prerequisites once. No new execution modes, storage, or DAWGS changes are required by the MVP.
+- [x] Reuse pan, zoom, fit, search, extension filters, and keyboard navigation. Highlight prerequisites and downstream consumers; explain filtered-out dependencies and let the author reveal them.
+- [x] Coordinate one focused query between graph, basic rule table, and details panel. Show existing properties, full Cypher, enabled/disabled choice and blocking reasons; provide individual download tied to the displayed revision.
+- [x] Show existing completed-run counts, timings, failures, and saving outcomes on the graph only when the report matches its revision. Explain older or unavailable reports separately. Existing overall running status must not imply live per-query progress.
+- [x] Provide Refresh and links to existing management controls. Handle no active rules and missing reports clearly. Keep existing permissions and normal Explore behavior intact; loading or navigating the page writes no collected graph data.
 
 **MVP done when:** an author can inspect the current ESC1 or cross-extension rules, follow prerequisites and consumers, inspect/download a query, understand its availability and matching completed outcome, and reach existing management controls. Full TODO 3 remains open after this milestone.
 
@@ -28,12 +28,12 @@ The MVP links to the current rules page for upload, activation, rule management,
 
 After the MVP, add rule management, then focused/collapsed views, then historical diagrams/live progress, then isolated testing and answer inspection. The complete checklist below retains all original requirements across these phases; it is not the MVP release gate. The picture must always distinguish dependency order from observed execution timing.
 
-- [ ] Supply complete dependency connections from the runner's plan before drawing the graph. Show a shared prerequisite once, with arrows to all its consumers. Label supplied answers/parameters and dependencies through calculated graph data distinctly; shared-output availability does not itself establish execution order.
+- [x] Supply complete dependency connections from the runner's plan before drawing the graph. Show a shared prerequisite once, with arrows to all its consumers. Label supplied answers/parameters and dependencies through calculated graph data distinctly; shared-output availability does not itself establish execution order.
 - [ ] Support pan, zoom, fit, search, extension filtering, and expanding or collapsing chains. Selecting a query should highlight its prerequisites and downstream consumers, with navigation in both directions.
 - [ ] Coordinate graph focus, table rows, and query details. Let the table show selected rules, prerequisites, downstream consumers, or the whole highlighted chain. Keep explanatory highlighting separate from the explicit selection used for actions; preserve selection between views of the same revision and show hidden selection counts. Historical runs are read-only; changing revisions clears action selections.
 - [ ] Keep invalid/incomplete drafts usable through a file table and validation explanations when no execution plan can be drawn. Retained rules whose schemas are missing remain visible and downloadable. Do not invent execution order or enable Test/Activate before their required checks pass.
-- [ ] Show each query's name, extension, order, stage, date added, and enabled state. Explain when a query is paused because a prerequisite is disabled.
-- [ ] Open a details panel from a query block with its full Cypher, graph inputs, prerequisite parameters, consumers, helper types and ID prefixes, relationship types, allowed endpoints, and existing-edge policy. Include any optional reachability, group-overlap, and batching instructions and explain their effect on the answer and execution.
+- [x] Show each query's name, extension, order, stage, date added, and enabled state. Explain when a query is paused because a prerequisite is disabled.
+- [x] Open a details panel from a query block with its full Cypher, graph inputs, prerequisite parameters, consumers, helper types and ID prefixes, relationship types, allowed endpoints, and existing-edge policy. Include any optional reachability, group-overlap, and batching instructions and explain their effect on the answer and execution.
 - [ ] Provide query download, individual and multiple selection, enable, disable, and delete actions through the graph and table. Right-click is an optional shortcut to visible, keyboard-accessible controls. Distinguish all filtered rules from all rules in the displayed revision, with counts. Highlight requested changes and every additional effect in both graph and table, revealing affected groups and other extensions. Preserve the existing review and activation checks and show the target revision.
 - [ ] Make upload review, activation, refresh, and Run Analysis available from the graph workspace. Clearly identify the proposed, activated, running, and last successfully applied revisions.
 - [ ] Show enabled/disabled choice and any blocking reason separately from execution and saving: idle/waiting/running/succeeded/failed/skipped/canceled, and confirmed/uncertain/unavailable saved results. Add bounded live updates, counts, durations, and reasons when available. Identify stale updates and retain bounded historical plans rather than substituting today's files. Keep positions stable; queries at the same stage need not run together.
@@ -189,6 +189,16 @@ The #12 investigation found that PostgreSQL could combine each `UNWIND` input wi
 
 **Done when:** each result remains associated with the input that selected it, on both databases, and the unnecessary combinations are absent without losing requested repeated rows. See [the recorded query and answers](PREPARATION_AND_REACHABILITY.md#what-the-ordinary-reachability-plans-showed). The correction is in DAWGS `buildExpansionPatternRoot` and `buildExpansionPatternStep`, with the input handling in `cypher/models/pgsql/translate/expansion_input.go`. It was implemented following the user's subsequent request to fix #13 and then complete #12.
 
+## 14. Create an OpenGraph Extension Designer page
+
+Provide a no-code style canvas that lets extension authors write an OpenHound collector targeting a REST API, using familiar BloodHound graph navigation.
+
+- [ ] Create the OpenGraph Extension Designer page with a visual canvas and familiar graph navigation, including pan, zoom, selection, and details panels.
+- [ ] Let authors describe REST API requests and map the returned data to OpenGraph objects, properties, and relationships through the canvas.
+- [ ] Let authors review and test the collection flow and produce the corresponding OpenHound collector.
+
+**Done when:** an author can use the designer to create and test an OpenHound collector for a REST API while navigating its collection flow with familiar BloodHound controls.
+
 ## Done
 
 ### 2. Catch mistakes before rules are activated
@@ -246,3 +256,11 @@ Maintain [DEVELOPERS.md](DEVELOPERS.md) and [the example documentation](examples
 - [x] Save incomplete uploads as inactive drafts, retain them across restarts, and accept additional files in later uploads. Keep active rules unchanged; require complete validation and explicit review before activation. Circular calculation dependencies still prevent activation.
 
 The offline viewer opens accompanying schemas together. The native kind check also identified and corrected the ESC1 example's `LocalGroup` label to BloodHound's actual `ADLocalGroup` label. See [REVIEW.md](REVIEW.md#schema-kind-declarations-and-inactive-drafts) for validation and [USAGE.md](USAGE.md#change-the-active-rules) for draft handling.
+
+The native analysis workspace now includes the requested Explore-style canvas, resizable bottom rules/report panel, right entity panel, uploads and draft review, individual/multiple-rule enable/disable/delete, and Run Analysis. See [workspace usage](USAGE.md#inspect-the-analysis-workspace) for permissions and revision checks. Collapsed graph groups, historical diagrams, and live query progress remain later work. The editor follow-up below adds temporary query tests. The older rules page remains available.
+
+Requested collected-data inspection example: retain the completed `usable_cas` answer and open its matching collected objects in the workspace. This belongs to the bounded answer-inspection phase. Do not rerun today's query and label it the last run, or treat current graph properties as a historical snapshot. The active lab includes the optional advanced ESC1 bundle and the ordinary Cypher bundle in separate namespaces.
+
+## 14 October 2026 — editor follow-up
+
+The analysis file editor, its private working copies, temporary tests, exact-file review, and activation are implemented. The remaining display work is a standalone archived-answer viewer and a historical graph snapshot viewer. Those are different from the editor's current result preview and must preserve their source versions and graph state.

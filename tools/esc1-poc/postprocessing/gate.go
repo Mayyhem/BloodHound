@@ -34,6 +34,7 @@ type Gate struct {
 	changed      chan struct{}
 	writers      int
 	changeNumber uint64
+	version      GraphVersion
 	turn         *writeTurn
 	blocked      error
 }
@@ -44,8 +45,9 @@ type writeTurn struct {
 	writers int
 }
 type turnKey struct{}
+type temporaryGraphChangesKey struct{}
 
-func NewGate() *Gate { return &Gate{changed: make(chan struct{})} }
+func NewGate() *Gate { return &Gate{changed: make(chan struct{}), version: newGraphVersion()} }
 
 func (s *Gate) notify() {
 	close(s.changed)
@@ -59,6 +61,29 @@ func (s *Gate) ChangeNumber() uint64 {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	return s.changeNumber
+}
+
+// Version returns the current local graph freshness identity. It advances for
+// every ordinary admitted write, even when that write later fails, and for
+// normal analysis/schema turns. See GraphVersion for its process boundary.
+func (s *Gate) Version() GraphVersion {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.version
+}
+
+func (s *Gate) advanceVersion() { s.version.Revision++ }
+
+// TemporaryGraphChanges marks graph writes that a rollback-only editor turn
+// will discard. The marker is honored only when it carries the active private
+// turn back to the same gate. Calling this with an ordinary context has no
+// effect, so ordinary writes cannot claim to be temporary.
+func TemporaryGraphChanges(ctx context.Context) context.Context {
+	turn, ok := ctx.Value(turnKey{}).(*writeTurn)
+	if !ok {
+		return ctx
+	}
+	return context.WithValue(ctx, temporaryGraphChangesKey{}, turn)
 }
 
 // EnterWrite fits DatabaseSwitch's optional write hook. The returned function
@@ -80,6 +105,9 @@ func (s *Gate) EnterWrite(ctx context.Context) (context.Context, func(), error) 
 				return ctx, nil, fmt.Errorf("the extension's turn to change the graph has ended")
 			}
 			turn.writers++
+			if temporaryTurn, temporary := ctx.Value(temporaryGraphChangesKey{}).(*writeTurn); !temporary || temporaryTurn != turn {
+				s.advanceVersion()
+			}
 			s.mutex.Unlock()
 			var once sync.Once
 			return ctx, func() {
@@ -94,6 +122,7 @@ func (s *Gate) EnterWrite(ctx context.Context) (context.Context, func(), error) 
 		if s.turn == nil {
 			s.writers++
 			s.changeNumber++
+			s.advanceVersion()
 			s.mutex.Unlock()
 			var once sync.Once
 			return ctx, func() {

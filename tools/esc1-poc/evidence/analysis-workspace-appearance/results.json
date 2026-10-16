@@ -1,0 +1,21 @@
+{
+  "focused_ui": {
+    "passed": 34,
+    "final_workspace_rerun": 21
+  },
+  "types": "passed",
+  "lint": "passed",
+  "ui_build": "passed",
+  "native_build": "passed",
+  "synthetic_browser": "passed",
+  "live_browser": "passed",
+  "just_test": {
+    "status": "failed",
+    "workspace": "bh-shared-ui",
+    "exit_code": 1,
+    "reported_duration": "19m 48s",
+    "individual_case_output": "not present in command log",
+    "log": "tools/esc1-poc/work/workspace-appearance/just-test-final.log"
+  },
+  "prepare_for_codereview": "not rerun for appearance follow-up; earlier limitations remain"
+}

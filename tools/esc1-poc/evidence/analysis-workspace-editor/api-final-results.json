@@ -1,0 +1,9 @@
+{
+  "login": true,
+  "workspace": true,
+  "prerequisite_preview": true,
+  "standalone_test": true,
+  "exact_test_review": true,
+  "activated": false,
+  "graph_changes_saved": false
+}

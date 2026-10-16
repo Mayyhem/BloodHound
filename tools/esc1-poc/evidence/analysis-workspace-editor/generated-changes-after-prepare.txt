@@ -1,0 +1,138 @@
+ M _plans/opengraph-analysis-workspace.md
+ M cmd/api/src/api/registration/registration.go
+ M cmd/api/src/api/registration/v2.go
+ D cmd/api/src/api/static/assets/keep
+ M cmd/api/src/api/v2/model.go
+ M cmd/api/src/database/migration/extensions/ad_graph_schema.sql
+ M cmd/api/src/database/migration/extensions/az_graph_schema.sql
+ M cmd/api/src/database/migration/migrations/20261013180000_v9_extension_analysis_definitions.sql
+ M cmd/api/src/services/entrypoint.go
+ M cmd/ui/src/rendering/utils/utils.ts
+ M cmd/ui/src/routes/constants.ts
+ M cmd/ui/src/views/Administration/Administration.tsx
+ M cmd/ui/src/views/Explore/utils.ts
+ M go.mod
+ M go.sum
+ M packages/go/openapi/doc/openapi.json
+ M packages/go/openapi/src/openapi.yaml
+ M packages/go/openapi/src/paths/analysis.asset-groups.id.combo-node.yaml
+ M packages/go/openapi/src/paths/analysis.meta-nodes.id.yaml
+ M packages/go/openapi/src/paths/analysis.meta-trees.id.yaml
+ M packages/go/openapi/src/paths/datapipe.analysis.yaml
+ M packages/javascript/bh-shared-ui/src/utils/permissions.ts
+ M tools/esc1-poc/DESIGN.md
+ M tools/esc1-poc/DEVELOPERS.md
+ M tools/esc1-poc/END_USERS.md
+ M tools/esc1-poc/HANDOFF.md
+ M tools/esc1-poc/README.md
+ M tools/esc1-poc/REVIEW.md
+ M tools/esc1-poc/TODO.md
+ M tools/esc1-poc/USAGE.md
+ M tools/esc1-poc/evidence/cypher-comparison/query-plans/after.sql
+ M tools/esc1-poc/evidence/cypher-comparison/query-plans/before.sql
+ M tools/esc1-poc/evidence/path-input-followup/input-after13.sql
+ M tools/esc1-poc/evidence/path-input-followup/input-before.sql
+ M tools/esc1-poc/evidence/path-input-followup/membership-after13-1.sql
+ M tools/esc1-poc/evidence/path-input-followup/membership-before-1.sql
+ M tools/esc1-poc/evidence/preparation-followup/identity-after-plan.sql
+ M tools/esc1-poc/evidence/preparation-followup/identity-before-plan.sql
+ M tools/esc1-poc/evidence/preparation-followup/membership-plan.sql
+ M tools/esc1-poc/evidence/preparation-followup/reach-input-check.sql
+ M tools/esc1-poc/evidence/preparation-followup/reach-input-release-v0.9.0.sql
+ M tools/esc1-poc/evidence/preparation-followup/reach-input-release-v0.9.1.sql
+ M tools/esc1-poc/evidence/preparation-followup/reach-plan.sql
+ M tools/esc1-poc/examples/vault/model.html
+ M tools/esc1-poc/go.mod
+ M tools/esc1-poc/go.sum
+ M tools/esc1-poc/internal/extension/extension.go
+ M tools/esc1-poc/internal/extension/extension_test.go
+ M tools/esc1-poc/internal/extension/output.go
+ M tools/esc1-poc/internal/graphdb/native.go
+ M tools/esc1-poc/internal/graphdb/native_test.go
+ M tools/esc1-poc/internal/modelview/viewer.html
+ M tools/esc1-poc/internal/querycheck/check.go
+ M tools/esc1-poc/internal/querycheck/check_test.go
+ M tools/esc1-poc/internal/ruleservice/changes.go
+ M tools/esc1-poc/internal/ruleservice/changes_test.go
+ M tools/esc1-poc/internal/ruleservice/http.go
+ M tools/esc1-poc/internal/ruleservice/store.go
+ M tools/esc1-poc/internal/ruleservice/view.go
+ M tools/esc1-poc/internal/runner/calculate.go
+ M tools/esc1-poc/internal/runner/helpers.go
+ M tools/esc1-poc/internal/runner/publish.go
+ M tools/esc1-poc/internal/runner/runner.go
+ M tools/esc1-poc/internal/runner/store.go
+ M tools/esc1-poc/model.html
+ M tools/esc1-poc/postprocessing/gate.go
+ M tools/esc1-poc/postprocessing/service.go
+ M tools/esc1-poc/stack.go
+?? cmd/api/src/api/registration/analysis_editor_working_copies_test.go
+?? cmd/api/src/api/registration/analysis_workspace_test.go
+?? cmd/api/src/api/v2/analysis_editor.go
+?? cmd/api/src/api/v2/analysis_editor_test.go
+?? cmd/api/src/api/v2/analysis_editor_working_copies.go
+?? cmd/api/src/api/v2/analysis_editor_working_copies_test.go
+?? cmd/api/src/api/v2/analysis_workspace.go
+?? cmd/api/src/api/v2/analysis_workspace_management.go
+?? cmd/api/src/api/v2/analysis_workspace_management_test.go
+?? cmd/api/src/api/v2/analysis_workspace_test.go
+?? cmd/ui/node_modules
+?? cmd/ui/src/rendering/utils/sequentialLayout.ts
+?? cmd/ui/src/views/AnalysisWorkspace/
+?? node_modules
+?? packages/go/openapi/src/paths/opengraph.analysis-draft.yaml
+?? packages/go/openapi/src/paths/opengraph.analysis-editor.yaml
+?? packages/go/openapi/src/paths/opengraph.analysis-preview.yaml
+?? packages/go/openapi/src/paths/opengraph.analysis-query.yaml
+?? packages/go/openapi/src/paths/opengraph.analysis-rules.yaml
+?? packages/go/openapi/src/paths/opengraph.analysis-working-copies.yaml
+?? packages/go/openapi/src/paths/opengraph.analysis-workspace.yaml
+?? packages/go/openapi/src/schemas/model.analysis-change.yaml
+?? packages/go/openapi/src/schemas/model.analysis-draft.yaml
+?? packages/go/openapi/src/schemas/model.analysis-editor-action.yaml
+?? packages/go/openapi/src/schemas/model.analysis-editor-plan.yaml
+?? packages/go/openapi/src/schemas/model.analysis-editor-request.yaml
+?? packages/go/openapi/src/schemas/model.analysis-editor-responses.yaml
+?? packages/go/openapi/src/schemas/model.analysis-editor-result.yaml
+?? packages/go/openapi/src/schemas/model.analysis-editor-source.yaml
+?? packages/go/openapi/src/schemas/model.analysis-editor-working-copy-deletion.yaml
+?? packages/go/openapi/src/schemas/model.analysis-editor-working-copy-save.yaml
+?? packages/go/openapi/src/schemas/model.analysis-editor-working-copy-summary.yaml
+?? packages/go/openapi/src/schemas/model.analysis-editor-working-copy.yaml
+?? packages/go/openapi/src/schemas/model.analysis-execution.yaml
+?? packages/go/openapi/src/schemas/model.analysis-preview.yaml
+?? packages/go/openapi/src/schemas/model.analysis-query.yaml
+?? packages/go/openapi/src/schemas/model.analysis-run.yaml
+?? packages/go/openapi/src/schemas/model.analysis-status.yaml
+?? packages/go/openapi/src/schemas/model.analysis-workspace.yaml
+?? packages/javascript/doodle-ui/node_modules
+?? tools/esc1-poc/internal/extension/editor_plan_test.go
+?? tools/esc1-poc/internal/extension/editor_selection.go
+?? tools/esc1-poc/internal/extension/editor_selection_test.go
+?? tools/esc1-poc/internal/extension/workspace_test.go
+?? tools/esc1-poc/internal/graphdb/editor_integration_test.go
+?? tools/esc1-poc/internal/ruleservice/editor_plan.go
+?? tools/esc1-poc/internal/ruleservice/editor_working_copies.go
+?? tools/esc1-poc/internal/ruleservice/editor_working_copies_test.go
+?? tools/esc1-poc/internal/ruleservice/editor_working_copy_client.go
+?? tools/esc1-poc/internal/ruleservice/editor_working_copy_client_test.go
+?? tools/esc1-poc/internal/ruleservice/management_client.go
+?? tools/esc1-poc/internal/ruleservice/management_client_test.go
+?? tools/esc1-poc/internal/ruleservice/workspace.go
+?? tools/esc1-poc/internal/ruleservice/workspace_test.go
+?? tools/esc1-poc/internal/runner/editor_test.go
+?? tools/esc1-poc/internal/runner/retained.go
+?? tools/esc1-poc/internal/runner/retained_test.go
+?? tools/esc1-poc/internal/runner/test_runner.go
+?? tools/esc1-poc/postprocessing/editor.go
+?? tools/esc1-poc/postprocessing/editor_answers.go
+?? tools/esc1-poc/postprocessing/editor_answers_test.go
+?? tools/esc1-poc/postprocessing/editor_results.go
+?? tools/esc1-poc/postprocessing/editor_test.go
+?? tools/esc1-poc/postprocessing/editor_types.go
+?? tools/esc1-poc/postprocessing/editor_working_copies.go
+?? tools/esc1-poc/postprocessing/graph_version.go
+?? tools/esc1-poc/postprocessing/graph_version_test.go
+?? tools/esc1-poc/postprocessing/workspace.go
+?? tools/esc1-poc/postprocessing/workspace_management.go
+?? tools/esc1-poc/postprocessing/workspace_test.go

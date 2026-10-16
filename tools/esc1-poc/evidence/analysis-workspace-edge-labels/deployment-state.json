@@ -1,0 +1,58 @@
+{
+  "before": {
+    "/esc1-workspace-manual-bloodhound-1": [
+      "d1bd76e463fd3949760477ca98446a66e625e789d512f6ed08df904393f3001c",
+      "sha256:ee2893a6019039c958f289c511bb66184992f67a29e71dbde57d928004610470",
+      "esc1-poc-bloodhound-workspace:20261014-graph-details-final",
+      "2026-10-14T18:33:13.567568572Z"
+    ],
+    "/esc1-workspace-manual-rule-service-1": [
+      "48945a7f4b31434b74116b7ef33bbfd2989c2ce4ff9a2dc4131d5e8cb5ef454e",
+      "sha256:026a300961095def8a6b37f963f5567051fe13de09c1884b3e2c19f8473dc6de",
+      "esc1-poc-rules-workspace:20261014-graph-details",
+      "2026-10-14T18:15:59.397111814Z"
+    ],
+    "/esc1-workspace-manual-app-db-1": [
+      "efb6e6aff4b802018aeb2757fd10eaf0e7475a7175251dc52f217f200c8b161c",
+      "sha256:29754c7520f4b9654cf8ff98e19ac73b88e255c3a53f6236ebe9d52249bb6df3",
+      "docker.io/library/postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+      "2026-10-14T14:17:28.158517697Z"
+    ],
+    "/esc1-workspace-manual-graph-db-1": [
+      "3aaccb2437c229014c59fd91abfb15d86472321a0accd5ed66c0d8916f357a06",
+      "sha256:c3d8ad3b006d7822b29e0180bb36e0543b420ed4ed2e0cff62fa5af7a3059ec7",
+      "docker.io/library/neo4j:4.4.42@sha256:73b5a47eb9952f47fcc42fcc80bdd6bd0d6b71eea9a1a345c216675498c790e4",
+      "2026-10-14T14:17:28.153895283Z"
+    ]
+  },
+  "after": {
+    "/esc1-workspace-manual-bloodhound-1": [
+      "89a33cd48485fa945cf1c9f4054f854ce5c665d2378b705188df5dfadb912064",
+      "sha256:d8ea18fdd68882e2574d80f9f19e9f5eaaf254f289e2c36c2afac9a3097852b5",
+      "esc1-poc-bloodhound-workspace:20261014-edge-labels",
+      "2026-10-14T18:42:25.264338028Z"
+    ],
+    "/esc1-workspace-manual-rule-service-1": [
+      "48945a7f4b31434b74116b7ef33bbfd2989c2ce4ff9a2dc4131d5e8cb5ef454e",
+      "sha256:026a300961095def8a6b37f963f5567051fe13de09c1884b3e2c19f8473dc6de",
+      "esc1-poc-rules-workspace:20261014-graph-details",
+      "2026-10-14T18:15:59.397111814Z"
+    ],
+    "/esc1-workspace-manual-app-db-1": [
+      "efb6e6aff4b802018aeb2757fd10eaf0e7475a7175251dc52f217f200c8b161c",
+      "sha256:29754c7520f4b9654cf8ff98e19ac73b88e255c3a53f6236ebe9d52249bb6df3",
+      "docker.io/library/postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+      "2026-10-14T14:17:28.158517697Z"
+    ],
+    "/esc1-workspace-manual-graph-db-1": [
+      "3aaccb2437c229014c59fd91abfb15d86472321a0accd5ed66c0d8916f357a06",
+      "sha256:c3d8ad3b006d7822b29e0180bb36e0543b420ed4ed2e0cff62fa5af7a3059ec7",
+      "docker.io/library/neo4j:4.4.42@sha256:73b5a47eb9952f47fcc42fcc80bdd6bd0d6b71eea9a1a345c216675498c790e4",
+      "2026-10-14T14:17:28.153895283Z"
+    ]
+  },
+  "only_app_replaced": true,
+  "active_rules_sha256": "16ed733e9ed4458cda9cf455aa372d59394d2ef03e89422b0c68e6fdf678c8b7",
+  "active_rules_match_previous_deployment": true,
+  "whole_rules_directory_checksum": "Differed; includes runtime status.json and draft.json. Active rules independently match the prior deployment checksum."
+}

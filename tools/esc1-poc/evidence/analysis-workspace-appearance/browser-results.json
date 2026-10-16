@@ -1,0 +1,28 @@
+{
+  "checks": [
+    {
+      "theme": "light",
+      "status_colors": true,
+      "focus_blue": true,
+      "version_labels": true,
+      "default_edge_gray": true,
+      "real_node_and_edge_clicks": true,
+      "unrelated_nodes_faded": true,
+      "camera_preserved": true,
+      "clear_and_escape_restore_colors": true
+    },
+    {
+      "theme": "dark",
+      "status_colors": true,
+      "focus_blue": true,
+      "version_labels": true,
+      "default_edge_gray": true,
+      "real_node_and_edge_clicks": true,
+      "unrelated_nodes_faded": true,
+      "camera_preserved": true,
+      "clear_and_escape_restore_colors": true
+    }
+  ],
+  "errors": [],
+  "data": "Shipped example snapshots with synthetic disabled and blocked states; no database changes."
+}

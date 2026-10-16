@@ -17,6 +17,7 @@
 package runner
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -100,6 +101,11 @@ func hasAllowedKind(value any, allowed []string) bool {
 	return false
 }
 
+// ErrUnsupportedAnswerValue marks an answer containing something other than
+// plain values, such as a whole graph node, relationship, or path. The editor
+// recognizes it to explain the problem without repeating the answer itself.
+var ErrUnsupportedAnswerValue = errors.New("return plain values instead of graph nodes or paths")
+
 // Query answers may contain ordinary values and nested tables. A graph node or
 // path is deliberately rejected: authors must return its objectid or explicit
 // properties instead. That makes the handoff between files easy to inspect.
@@ -107,7 +113,7 @@ func validateRows(rows Rows) error {
 	for index, row := range rows {
 		for column, value := range row {
 			if err := validateValue(value); err != nil {
-				return fmt.Errorf("row %d, column %s: %w", index+1, column, err)
+				return &AnswerValueError{Row: int64(index + 1), Column: column, Cause: err}
 			}
 		}
 	}
@@ -144,13 +150,21 @@ func validateValue(value any) error {
 		}
 		return nil
 	}
-	return fmt.Errorf("unsupported answer value %T; return plain values instead of graph nodes or paths", value)
+	return fmt.Errorf("unsupported answer value %T; %w", value, ErrUnsupportedAnswerValue)
 }
 
+// ErrEmptyPropertyValue marks a helper property whose value is empty (null),
+// for example a name that some objects do not have. Graph objects cannot store
+// empty properties, so the query must supply a fallback value or leave out
+// those rows. The status report and the editor recognize it to say so plainly.
+var ErrEmptyPropertyValue = errors.New("a property value is empty (null)")
+
 // Neo4j properties are simpler than query answers: a stored property cannot be
-// a nested map or a list containing different kinds of values.
+// empty, a nested map, or a list containing different kinds of values.
 func validateProperty(value any) error {
 	switch value := value.(type) {
+	case nil:
+		return ErrEmptyPropertyValue
 	case string, bool, int, int64, float64:
 		return validateValue(value)
 	case []string:

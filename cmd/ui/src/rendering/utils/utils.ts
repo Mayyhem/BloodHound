@@ -16,6 +16,9 @@
 
 import { NodeDisplayData, PartialButFor } from 'sigma/types';
 
+// Both collected graphs and analysis dependencies use BloodHound's edge gray.
+export const defaultEdgeColor = (darkMode: boolean) => (darkMode ? '#6c6c6c' : '#55595C');
+
 /** Threshold of graph zoom before labels fade out */
 export const STARTING_ZOOM_FADE_RATIO = 0.4;
 export const ENDING_ZOOM_FADE_RATIO = 0.3;
@@ -30,6 +33,10 @@ export const NODE_PADDING = 2;
 export const LABEL_NODE_MARGIN = 4;
 
 /** Dimming values for fading the non highlighted nodes */
+// Explore and analysis use the same normal node size and arrow thickness.
+export const DEFAULT_GRAPH_NODE_SIZE = 25;
+export const DEFAULT_GRAPH_EDGE_SIZE = 4;
+
 export const DIM_FACTOR = 0.1;
 export const NO_DIM_FACTOR = 1.0;
 export const DEFAULT_BG_COLOR = '#ffffff';

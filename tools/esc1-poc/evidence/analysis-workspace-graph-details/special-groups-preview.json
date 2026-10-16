@@ -1,0 +1,29 @@
+{
+  "requested": [
+    "PoC/special_groups.cypher"
+  ],
+  "removed": [
+    "PoC/ca_auth_reach.cypher",
+    "PoC/ca_root_reach.cypher",
+    "PoC/eligible_templates.cypher",
+    "PoC/enabled_cas.cypher",
+    "PoC/enrollment_principals.cypher",
+    "PoC/esc1.cypher",
+    "PoC/forest_reach.cypher",
+    "PoC/membership.cypher",
+    "PoC/membership_reach.cypher",
+    "PoC/special_groups.cypher",
+    "PoC/trusted_cas.cypher",
+    "PoC/usable_cas.cypher"
+  ],
+  "remaining": [
+    "PoC/domain_helpers.cypher",
+    "PoC_AD/ad_users.cypher",
+    "PoC_CyberArk/cyberark_accounts.cypher",
+    "PoC_CyberArk/cyberark_links.cypher"
+  ],
+  "retired_relationships": [
+    "PoC_ADCSESC1"
+  ],
+  "activation_performed": false
+}

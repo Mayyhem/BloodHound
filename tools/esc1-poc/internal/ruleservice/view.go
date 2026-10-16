@@ -19,6 +19,7 @@ SPDX-License-Identifier: Apache-2.0
 package ruleservice
 
 import (
+	"encoding/json"
 	"sort"
 	"time"
 
@@ -38,9 +39,10 @@ type PlanView struct {
 }
 
 type ExtensionView struct {
-	Namespace   string `json:"namespace"`
-	Name        string `json:"name"`
-	DisplayName string `json:"display_name"`
+	Namespace       string `json:"namespace"`
+	Name            string `json:"name"`
+	DisplayName     string `json:"display_name"`
+	EnvironmentKind string `json:"environment_kind,omitempty"`
 }
 
 type ThreadView struct {
@@ -76,26 +78,29 @@ type ProcessingView struct {
 }
 
 type QueryView struct {
-	Namespace         string             `json:"namespace"`
-	Version           string             `json:"version"`
-	SchemaVersion     string             `json:"schema_version"`
-	ExtensionVersions string             `json:"extension_versions,omitempty"`
-	InputWarning      string             `json:"input_warning,omitempty"`
-	Name              string             `json:"name"`
-	Extension         string             `json:"extension"`
-	ExtensionName     string             `json:"extension_name"`
-	AddedAt           string             `json:"added_at"`
-	DisabledReason    string             `json:"disabled_reason"`
-	Enabled           bool               `json:"enabled"`
-	Order             int                `json:"order"`
-	Stage             int                `json:"stage"`
-	Parameter         string             `json:"parameter"`
-	Text              string             `json:"text"`
-	Inputs            []InputView        `json:"inputs"`
-	Prerequisites     []PrerequisiteView `json:"prerequisites"`
-	Dependents        []string           `json:"dependents"`
-	Outputs           []OutputView       `json:"outputs"`
-	Processing        ProcessingView     `json:"processing"`
+	Namespace         string `json:"namespace"`
+	Version           string `json:"version"`
+	SchemaVersion     string `json:"schema_version"`
+	ExtensionVersions string `json:"extension_versions,omitempty"`
+	InputWarning      string `json:"input_warning,omitempty"`
+	Name              string `json:"name"`
+	Extension         string `json:"extension"`
+	ExtensionName     string `json:"extension_name"`
+	AddedAt           string `json:"added_at"`
+	DisabledReason    string `json:"disabled_reason"`
+	Enabled           bool   `json:"enabled"`
+	// AuthorEnabled is the saved choice. Enabled above also accounts for
+	// missing prerequisites and stays unchanged for the existing rules page.
+	AuthorEnabled bool               `json:"author_enabled"`
+	Order         int                `json:"order"`
+	Stage         int                `json:"stage"`
+	Parameter     string             `json:"parameter"`
+	Text          string             `json:"text"`
+	Inputs        []InputView        `json:"inputs"`
+	Prerequisites []PrerequisiteView `json:"prerequisites"`
+	Dependents    []string           `json:"dependents"`
+	Outputs       []OutputView       `json:"outputs"`
+	Processing    ProcessingView     `json:"processing"`
 }
 
 // ValidationView describes checks already performed, not an execution preview.
@@ -118,13 +123,17 @@ func BuildView(bundle Bundle, plan extension.Plan) PlanView {
 		outputs       = make(map[string][]OutputView)
 		producers     = make(map[string][]string)
 		threadIndexes = make(map[int]int)
+		disabled      = make(map[string]bool)
 	)
+	for _, name := range bundle.Disabled {
+		disabled[name] = true
+	}
 	view.Validation = ValidationView{Files: "passed", Language: "passed shared language checks for Neo4j and PostgreSQL", DatabaseExecution: "not run"}
 	if len(plan.Definitions) == 0 && len(plan.Queries) == 0 {
 		view.Validation.Files, view.Validation.Language = "not checked", "not checked"
 	}
 	for _, definition := range plan.Definitions {
-		view.Extensions = append(view.Extensions, ExtensionView{Namespace: definition.Schema.Namespace, Name: definition.Schema.Name, DisplayName: definition.Schema.DisplayName})
+		view.Extensions = append(view.Extensions, ExtensionView{Namespace: definition.Schema.Namespace, Name: definition.Schema.Name, DisplayName: definition.Schema.DisplayName, EnvironmentKind: extensionEnvironmentKind(definition)})
 	}
 	sort.Slice(view.Extensions, func(first, second int) bool { return view.Extensions[first].Name < view.Extensions[second].Name })
 	for _, binding := range plan.Schema.Nodes {
@@ -153,6 +162,7 @@ func BuildView(bundle Bundle, plan extension.Plan) PlanView {
 		parents[index] = index
 		indexes[query.Name] = index
 		queries[index] = QueryView{Namespace: query.Namespace, Version: query.Version, SchemaVersion: query.SchemaVersion, ExtensionVersions: query.ExtensionVersions, Name: query.Name, Extension: query.Extension, ExtensionName: query.ExtensionName, DisabledReason: query.DisabledReason, Enabled: query.DisabledReason == "", Order: index + 1, Stage: 1, Parameter: query.Parameter, Text: query.Text, Inputs: []InputView{}, Prerequisites: []PrerequisiteView{}, Dependents: []string{}, Outputs: outputs[query.Name], Processing: ProcessingView{Reachability: query.Reach, GroupOverlap: query.Overlap, BatchDependency: query.BatchDependency}}
+		queries[index].AuthorEnabled = !disabled[query.Name]
 		if query.BroadRead {
 			queries[index].InputWarning = "This query has graph reads without explicit kinds. It is recalculated conservatively because its declarations may not describe every input."
 		}
@@ -264,4 +274,29 @@ func joinGroups(parents []int, first, second int) {
 	} else {
 		parents[firstRoot] = secondRoot
 	}
+}
+
+// An extension may define several environments. Use an environment icon only
+// when there is one distinct kind; otherwise the UI uses its analysis icon.
+// This is display metadata and does not change schema or query requirements.
+func extensionEnvironmentKind(definition extension.Definition) string {
+	var (
+		environments []struct {
+			Kind string `json:"environment_kind"`
+		}
+		kind string
+	)
+	if json.Unmarshal(definition.Environments, &environments) != nil {
+		return ""
+	}
+	for _, environment := range environments {
+		if environment.Kind == "" {
+			continue
+		}
+		if kind != "" && kind != environment.Kind {
+			return ""
+		}
+		kind = environment.Kind
+	}
+	return kind
 }

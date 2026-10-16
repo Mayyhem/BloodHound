@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
 )
@@ -29,9 +30,23 @@ import (
 // We never delete helpers that no longer appear in the desired file, because
 // another calculation may still need them.
 func publishHelperAnswers(ctx context.Context, transaction Transaction, binding extension.NodeBinding, desired *answerFile, report *Report) error {
+	return checkHelperAnswers(ctx, transaction, binding, desired, report, true)
+}
+
+// validateHelperAnswers applies every helper row and identity check without
+// creating or changing a node. Editor tests use it for their final result: the
+// result must be valid even though the test must leave no graph output behind.
+func validateHelperAnswers(ctx context.Context, transaction Transaction, binding extension.NodeBinding, desired *answerFile, report *Report) error {
+	return checkHelperAnswers(ctx, transaction, binding, desired, report, false)
+}
+
+func checkHelperAnswers(ctx context.Context, transaction Transaction, binding extension.NodeBinding, desired *answerFile, report *Report, writeToGraph bool) error {
 	if desired.rows == 0 {
 		// Even an empty answer must pass its completeness/fingerprint checks.
 		return desired.each(ctx, func(map[string]any) error { return nil })
+	}
+	if err := checkHelperProperties(ctx, desired); err != nil {
+		return err
 	}
 	writer, err := desired.space.create()
 	if err != nil {
@@ -96,7 +111,7 @@ func publishHelperAnswers(ctx context.Context, transaction Transaction, binding 
 		if current != nil && current["id"] == identifier {
 			matching = current
 		}
-		changed, err := publishHelper(ctx, transaction, binding, row, matching, desired.space.limits.ParameterBytes)
+		changed, err := publishHelper(ctx, transaction, binding, row, matching, desired.space.limits.ParameterBytes, writeToGraph)
 		if err != nil {
 			return err
 		}
@@ -121,4 +136,40 @@ func publishHelperAnswers(ctx context.Context, transaction Transaction, binding 
 		}
 	}
 	return existing.remove()
+}
+
+// checkHelperProperties reads every helper row once before anything is
+// published. A property that cannot be stored is then reported with how many
+// helper objects it affects and a few of their helper IDs, instead of
+// stopping at the first bad object.
+func checkHelperProperties(ctx context.Context, desired *answerFile) error {
+	problems := map[string]*HelperPropertyError{}
+	err := desired.each(ctx, func(row map[string]any) error {
+		identifier, _ := row["id"].(string)
+		properties, _ := row["properties"].(map[string]any)
+		for key, value := range properties {
+			if err := validateProperty(value); err != nil {
+				problem := problems[key]
+				if problem == nil {
+					problem = &HelperPropertyError{Property: key, Cause: err}
+					problems[key] = problem
+				}
+				problem.Count++
+				if len(problem.Examples) < 3 {
+					problem.Examples = append(problem.Examples, identifier)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil || len(problems) == 0 {
+		return err
+	}
+	// Report one property, chosen by name so the message is the same every run.
+	names := make([]string, 0, len(problems))
+	for name := range problems {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return problems[names[0]]
 }

@@ -333,6 +333,8 @@ The table links to each complete file. Expand the comparisons below to see every
 | `esc1.cypher` | [Open](extension/esc1.cypher) | [Open](examples/esc1-cypher/esc1.cypher) | Replaces group selection with the four Cypher steps and omits batching. The separate batching comparison below removes only its instruction. |
 | `trusted_cas.cypher` | [Open](extension/trusted_cas.cypher) | [Open](examples/esc1-cypher/trusted_cas.cypher) | Changes one explanatory comment. The executable query is identical. |
 
+The comparisons below are snapshots from when they were made. On 15 October 2026 the Apache license header was removed from every `.cypher` file; the linked files no longer have those lines, and the query text is otherwise unchanged.
+
 ### Reachability: four files
 
 The advanced queries return starting objects and let the reachability instruction build the complete answers. The ordinary queries perform that work themselves: follow the permitted links, collect distinct objects, and return the same columns for later queries. Membership and certificate queries also check for loops. Forest trust permits loops and restricts the route to domains.

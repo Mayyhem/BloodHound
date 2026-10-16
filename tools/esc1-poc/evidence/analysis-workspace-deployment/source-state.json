@@ -1,0 +1,31 @@
+{
+  "captured_at": "2026-10-14T14:15:29.747909+00:00",
+  "source_commit": "27bf6a0edc7dcfc7cc181b0870f46672c30ed95e",
+  "dawgs_commit": "6d92ee1ed0605f6a08d614c4564a548b29d192b7",
+  "original_containers": [
+    {
+      "name": "/esc1-poc-persistent-bloodhound-1",
+      "image": "sha256:3fa524d373483060c45454e1051ef5c9028220315fe8b52fa16bcdc1924877f0",
+      "state": "exited"
+    },
+    {
+      "name": "/esc1-poc-persistent-app-db-1",
+      "image": "sha256:29754c7520f4b9654cf8ff98e19ac73b88e255c3a53f6236ebe9d52249bb6df3",
+      "state": "exited"
+    },
+    {
+      "name": "/esc1-poc-persistent-graph-db-1",
+      "image": "sha256:c3d8ad3b006d7822b29e0180bb36e0543b420ed4ed2e0cff62fa5af7a3059ec7",
+      "state": "exited"
+    },
+    {
+      "name": "/bloodhound-rules-rule-service-1",
+      "image": "sha256:0b20cd18a07f641757b95876a8ad6dcdc76849f667f26ac13852fe0948f0024b",
+      "state": "running"
+    }
+  ],
+  "original_rule_files": {
+    "active.json": "77be0a9dd14605fa2bcc47cc41a6606815778145a150d9addf37df9c5b51a56d",
+    "status.json": "57e6eac0ece68abef65ad8bfec14c46c48c96e3e58d492bf74a5ebf4ff65be93"
+  }
+}

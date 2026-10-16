@@ -1,0 +1,76 @@
+{
+  "recorded_at": "2026-10-14T13:53:50.334528+00:00",
+  "bloodhound_base_commit": "27bf6a0edc7dcfc7cc181b0870f46672c30ed95e",
+  "dawgs_commit": "6d92ee1ed0605f6a08d614c4564a548b29d192b7",
+  "database_state": "No graph database used or changed. Tests use temporary rule directories, synthetic HTTP replies, and shipped example files. No running application was redeployed.",
+  "scope": "Read-only MVP of _plans/opengraph-analysis-workspace.md; later roadmap phases remain open.",
+  "checks": [
+    {
+      "command": "cd tools/esc1-poc && go test ./...",
+      "result": "passed",
+      "log": "tool-all.log"
+    },
+    {
+      "command": "cd tools/esc1-poc && go test -race ./internal/extension ./internal/ruleservice ./postprocessing",
+      "result": "passed",
+      "log": "step1-complete.log"
+    },
+    {
+      "command": "go test ./cmd/api/src/api/registration ./cmd/api/src/api/v2",
+      "result": "passed",
+      "log": "native-packages.log"
+    },
+    {
+      "command": "yarn workspace bloodhound-ui test --run src/views/AnalysisWorkspace src/views/Explore/utils.test.ts src/components/SigmaChart/utils.test.tsx src/views/Administration/Administration.test.tsx",
+      "result": "passed",
+      "files": 5,
+      "tests": 31,
+      "log": "ui-last.log"
+    },
+    {
+      "command": "tsc --noEmit --project cmd/ui/tsconfig.json; targeted ESLint",
+      "result": "passed",
+      "logs": [
+        "ui-types-complete.log",
+        "ui-lint-complete.log"
+      ]
+    },
+    {
+      "command": "just test",
+      "result": "failed",
+      "detail": "Shared UI: 2 failed, 183 passed, 1 skipped files; 12 failed, 1258 passed, 5 skipped tests; 3 unhandled errors. Doodle UI: 134 passed. Failed shared tests are in unchanged EdgeFilteringDialog and ObjectSelect files. No separate baseline reproduction; later dependent workspaces/native suite were not reached.",
+      "log": "just-test.log"
+    },
+    {
+      "command": "just prepare-for-codereview",
+      "result": "incomplete",
+      "detail": "Ran in isolated checkout. Dependencies, module tidy, Go generation, formatting, and license scan passed. Analysis stopped while building custom golangci-lint: dependencies unavailable with GOPROXY=off. This command does not run the test suite. Unrelated generated/formatting changes remain only in the isolated checkout.",
+      "log": "prepare.log"
+    },
+    {
+      "command": "just gen-spec (offline)",
+      "result": "failed",
+      "detail": "Redocly CLI missing from local package cache (ENOTCACHED). A local source-to-bundle update added only the two paths and five schemas; every reference resolved and both real example workspace responses validated against the new schema.",
+      "log": "gen-spec.log"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "example_plans": {
+    "esc1": {
+      "rule_revision": "e16c848c3ba0b2c2535d7682194cae8f426e714039558bbd0cc5c5bc1a4516ee",
+      "schema_revision": "cda9f2454f3503c41798ca76a60176cda6fb9656f6119f0bfdb64700f97665f1",
+      "queries": 13,
+      "dependencies": 15
+    },
+    "cross": {
+      "rule_revision": "cfd73b4717b42ef0204b55763c341a7e71e936a6b6462d8e19b3eab2f83714bd",
+      "schema_revision": "8e659337bb0264a0871a0de44175366493660d5d1650d6ac67ddb80345493e83",
+      "queries": 3,
+      "dependencies": 1
+    }
+  },
+  "artifacts_directory": "tools/esc1-poc/work/analysis-workspace"
+}

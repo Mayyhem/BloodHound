@@ -1,0 +1,41 @@
+# Copyright 2026 Specter Ops, Inc.
+#
+# Licensed under the Apache License, Version 2.0
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+planResponses:
+  '200': {description: Validated editor plan preview, content: {application/json: {schema: {type: object, properties: {data: {$ref: ./model.analysis-editor-plan.yaml}}, required: [data]}}}}
+  '400': {description: Invalid editor file or declarations.}
+  '403': {$ref: ../responses/forbidden.yaml}
+  '409': {description: The displayed rules or schema revision changed.}
+  '413': {description: Request exceeds the 4 MiB limit.}
+  '502': {description: Current analysis inputs are unavailable.}
+  '503': {description: Analysis editor is unavailable.}
+testResponses:
+  '200': {description: Discarded editor test result, content: {application/json: {schema: {type: object, properties: {data: {$ref: ./model.analysis-editor-result.yaml}}, required: [data]}}}}
+  '400': {description: Invalid request, failed test, or unavailable required declarations.}
+  '403': {$ref: ../responses/forbidden.yaml}
+  '409': {description: 'The displayed rules, schema, or graph changed.'}
+  '413': {description: Request exceeds the 4 MiB limit.}
+  '408': {description: The test was canceled or its request timed out; no successful test was recorded.}
+  '503': {description: Test discard or editor availability could not be confirmed.}
+reviewResponses:
+  '200': {description: Existing analysis change review, content: {application/json: {schema: {type: object, properties: {data: {$ref: ./model.analysis-preview.yaml}}, required: [data]}}}}
+  '400': {description: Tested file cannot be activated with current declarations.}
+  '403': {$ref: ../responses/forbidden.yaml}
+  '409': {description: Successful test or review is stale.}
+activateResponses:
+  '200': {description: Activated revision, content: {application/json: {schema: {type: object, properties: {data: {type: object, additionalProperties: false, properties: {revision: {type: string}}, required: [revision]}}, required: [data]}}}}
+  '403': {$ref: ../responses/forbidden.yaml}
+  '409': {description: Successful test or review confirmation is stale.}

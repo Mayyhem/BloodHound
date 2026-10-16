@@ -69,6 +69,8 @@ type Service struct {
 	clock         func() time.Time
 	changes       changeTracker
 	execute       func(context.Context, extension.Plan, runner.Options) (runner.Report, error)
+	executeTest   func(context.Context, extension.Plan, runner.Options) (runner.Report, error)
+	editor        *analysisEditor
 }
 
 func New(configuration Configuration, database *graph.DatabaseSwitch) (*Service, error) {
@@ -92,11 +94,14 @@ func New(configuration Configuration, database *graph.DatabaseSwitch) (*Service,
 		return nil, err
 	}
 	var service = &Service{
-		gate: NewGate(), configuration: configuration, clock: time.Now,
+		gate: NewGate(), configuration: configuration, clock: time.Now, editor: newAnalysisEditor(),
 		client: ruleservice.Client{BaseURL: configuration.URL, Token: configuration.Token, HTTP: &http.Client{Timeout: 10 * time.Second}},
 	}
 	service.execute = func(ctx context.Context, plan extension.Plan, options runner.Options) (runner.Report, error) {
 		return graphdb.RunNative(ctx, database, configuration.Backend, plan, options)
+	}
+	service.executeTest = func(ctx context.Context, plan extension.Plan, options runner.Options) (runner.Report, error) {
+		return graphdb.TestNative(ctx, database, configuration.Backend, plan, options)
 	}
 	database.SetWriteGate(service.gate.EnterWrite)
 	database.SetWriteObserver(graph.WriteObserver{Transaction: service.changes.WrapTransaction, Batch: service.changes.WrapBatch, Unknown: service.changes.Unknown})
@@ -113,6 +118,7 @@ func (s *Service) WithAnalysis(ctx context.Context, action func(context.Context)
 		// extension retry; partially changed native data is not a fresh result.
 		s.gate.mutex.Lock()
 		s.gate.changeNumber++
+		s.gate.advanceVersion()
 		s.gate.mutex.Unlock()
 		return action(turnContext)
 	})
@@ -206,10 +212,18 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 		}
 		var runError error
 		report, runError = s.execute(turnContext, plan, runner.Options{
-			BatchID: pending.event, IngestionComplete: true, WritersPaused: true,
-			Changes:            changes,
+			BatchID: pending.event, IngestionComplete: true, WritersPaused: true, Changes: changes,
 			TemporaryDirectory: s.configuration.Directory, Limits: runner.DefaultLimits(),
 		})
+		// PostgreSQL publication borrows a transaction directly from its driver.
+		// It is already inside this exclusive turn, but does not pass through the
+		// ordinary writer hook. Record confirmed or uncertain publication here
+		// before admitting another writer.
+		if report.Committed || errors.Is(runError, runner.ErrCommitUncertain) {
+			s.gate.mutex.Lock()
+			s.gate.advanceVersion()
+			s.gate.mutex.Unlock()
+		}
 		if errors.Is(runError, runner.ErrCommitUncertain) {
 			// Do this before releasing the turn: no other writer may race a
 			// transaction whose actual commit result is still unknown.

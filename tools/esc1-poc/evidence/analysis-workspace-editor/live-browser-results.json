@@ -1,0 +1,22 @@
+{
+  "mocked_responses": false,
+  "errors": [],
+  "checks": [
+    "create dialog",
+    "ordinary Cypher results",
+    "standalone intermediate review before consumer",
+    "activation offered only after test/review",
+    "schema management link",
+    "private working copy saved and resumed",
+    "returned object identifiers resolve to graph nodes without unrelated connections",
+    "dark mode creation dialog"
+  ],
+  "active_rules_changed": false,
+  "query_count": 29,
+  "rule_revision": "93be3af449c5905810606e2084f202d2c361788d33047f2433a24fa5a4d64939",
+  "returned_nodes": 2,
+  "working_copy": {
+    "name": "PoC/editor_browser_check.cypher",
+    "revision": "e9e1f2d8cc4d4342ab51d5cb004518993dd2a2d850a444dec1a493a8a9cf66e1"
+  }
+}

@@ -114,8 +114,6 @@ func TestFilenameDoesNotAssignPublishedKind(t *testing.T) {
 
 func TestLoadRejectsInvalidExtensions(t *testing.T) {
 	var cases = []struct{ name, query, want string }{
-		{"missing declaration", "RETURN 1", "missing"},
-		{"empty declaration", "// depends-on:\nRETURN 1", "empty"},
 		{"malformed dependency", "// depends-on: node\nRETURN 1", "malformed"},
 		{"malformed continuation", "// depends-on: node:Domain\n// query missing.cypher\nRETURN 1", "malformed"},
 		{"unknown dependency", "// depends-on: property:Name\nRETURN 1", "unknown"},
@@ -136,14 +134,30 @@ func TestLoadRejectsInvalidExtensions(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsCycleAndUnusedQueries(t *testing.T) {
+func TestLoadTreatsAMissingDependsOnLineAsNone(t *testing.T) {
+	for _, query := range []string{"RETURN 1", "// depends-on:\nRETURN 1", "// depends-on: none\nRETURN 1"} {
+		plan, err := extension.Load(writeExtension(t, schemaFor("PoC/result.cypher"), map[string]string{"PoC/result.cypher": query}))
+		if err != nil {
+			t.Fatalf("%q: %v", query, err)
+		}
+		if len(plan.Queries) != 1 || len(plan.Queries[0].Dependencies) != 0 {
+			t.Fatalf("%q: expected one query with no dependencies, got %+v", query, plan.Queries)
+		}
+	}
+	// Leaving the line out does not hide a read: it is still reported missing.
+	_, err := extension.Load(writeExtension(t, schemaFor("PoC/result.cypher"), map[string]string{"PoC/result.cypher": "MATCH (domain:Domain) RETURN domain.objectid AS id"}))
+	if err == nil || !strings.Contains(err.Error(), "add node:Domain") {
+		t.Fatalf("error %v; expected the undeclared Domain read", err)
+	}
+}
+
+func TestLoadRejectsCycles(t *testing.T) {
 	var cases = []struct {
 		name    string
 		queries map[string]string
 		want    string
 	}{
 		{"cycle", map[string]string{"PoC/result.cypher": "// depends-on: query:intermediate\nRETURN 1", "PoC/intermediate.cypher": "// depends-on: query:result\nRETURN 1"}, "cycle"},
-		{"unused", map[string]string{"PoC/result.cypher": "// depends-on: none\nRETURN 1", "PoC/unused.cypher": "// depends-on: none\nRETURN 1"}, "unused query"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -244,5 +258,19 @@ func TestAffectedEvidenceAndPrerequisites(t *testing.T) {
 				t.Fatalf("affected %v; expected %v", actual, testCase.expected)
 			}
 		})
+	}
+}
+
+func TestLoadKeepsIndependentIntermediateQueries(t *testing.T) {
+	queries := map[string]string{"PoC/result.cypher": "// depends-on: none\nRETURN 1", "PoC/intermediate.cypher": "// depends-on: none\nRETURN 2 AS value"}
+	plan, err := extension.Load(writeExtension(t, schemaFor("PoC/result.cypher"), queries))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Queries) != 2 {
+		t.Fatalf("expected both independent files, got %d", len(plan.Queries))
+	}
+	if plan.Queries[0].Name != "PoC/intermediate.cypher" {
+		t.Fatal("independent files should retain deterministic filename order")
 	}
 }

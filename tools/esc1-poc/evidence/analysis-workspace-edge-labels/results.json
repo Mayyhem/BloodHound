@@ -1,0 +1,53 @@
+{
+  "focused_workspace": {
+    "outcome": "passed",
+    "files": 4,
+    "tests": 31,
+    "log": "tools/esc1-poc/work/workspace-edge-labels/focused-tests.log"
+  },
+  "types": {
+    "outcome": "passed",
+    "log": "tools/esc1-poc/work/workspace-edge-labels/types.log"
+  },
+  "style_format": {
+    "outcome": "passed",
+    "log": "tools/esc1-poc/work/workspace-edge-labels/style.log"
+  },
+  "production_ui": {
+    "outcome": "passed",
+    "log": "tools/esc1-poc/work/workspace-edge-labels/ui-build-final.log"
+  },
+  "native_build": {
+    "outcome": "passed",
+    "log": "tools/esc1-poc/work/workspace-edge-labels/native-build.log"
+  },
+  "docker_build": {
+    "outcome": "passed",
+    "image": "esc1-poc-bloodhound-workspace:20261014-edge-labels",
+    "log": "tools/esc1-poc/work/workspace-edge-labels/docker-build.log"
+  },
+  "browser": {
+    "outcome": "passed",
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "measurement": "actual canvas fillText font"
+  },
+  "deployed_browser": {
+    "outcome": "passed",
+    "mocked_responses": false
+  },
+  "full_just_test": {
+    "outcome": "failed",
+    "log": "tools/esc1-poc/work/workspace-edge-labels/just-test.log",
+    "elapsed": "12m19s",
+    "failed_workspace": "bh-shared-ui",
+    "individual_failures": "not included by captured wrapper",
+    "go_phase": "not reached"
+  },
+  "prepare_for_codereview": {
+    "outcome": "not rerun; required before manual commit"
+  },
+  "staged_or_committed": false
+}

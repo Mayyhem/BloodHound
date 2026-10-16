@@ -1,0 +1,105 @@
+{
+  "checks": [
+    {
+      "example": "cross",
+      "theme": "light",
+      "nodes": 3,
+      "arrows": 1,
+      "graph_click": true,
+      "dependency_navigation": true,
+      "camera_preserved": true,
+      "keyboard_pan": true,
+      "zoom_fit": true,
+      "original_download": true,
+      "filters": true
+    },
+    {
+      "example": "cross",
+      "theme": "dark",
+      "nodes": 3,
+      "arrows": 1,
+      "graph_click": true,
+      "dependency_navigation": true,
+      "camera_preserved": true,
+      "keyboard_pan": true,
+      "zoom_fit": true,
+      "original_download": true,
+      "filters": true
+    },
+    {
+      "example": "esc1",
+      "theme": "light",
+      "nodes": 13,
+      "arrows": 15,
+      "graph_click": true,
+      "dependency_navigation": true,
+      "camera_preserved": true,
+      "keyboard_pan": true,
+      "zoom_fit": true,
+      "original_download": true,
+      "filters": true
+    },
+    {
+      "example": "esc1",
+      "theme": "dark",
+      "nodes": 13,
+      "arrows": 15,
+      "graph_click": true,
+      "dependency_navigation": true,
+      "camera_preserved": true,
+      "keyboard_pan": true,
+      "zoom_fit": true,
+      "original_download": true,
+      "filters": true
+    },
+    {
+      "narrow_viewport": 390,
+      "no_horizontal_page_overflow": true
+    }
+  ],
+  "errors": [],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/v2/analysis-workspace"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v2/analysis-workspace/query"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v2/analysis-workspace"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v2/analysis-workspace/query"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v2/analysis-workspace"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v2/analysis-workspace/query"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v2/analysis-workspace"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v2/analysis-workspace/query"
+    }
+  ],
+  "database_state": "No database. Current plans loaded from shipped files in isolated rule stores; HTTP responses supplied by the test.",
+  "recorded_at": "2026-10-14T13:55:13.204008+00:00",
+  "runtime": {
+    "browser": "Playwright Chromium headless shell 1208",
+    "local_libraries": [
+      "libnspr4 2:4.35-0ubuntu0.22.04.1",
+      "libnss3 2:3.98-0ubuntu0.22.04.4"
+    ],
+    "system_installation_changed": false
+  }
+}

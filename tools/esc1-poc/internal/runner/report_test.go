@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -185,5 +186,13 @@ func TestPreparationTimesOnIdentityFailureAndSkip(t *testing.T) {
 		if sum > report.PreparationElapsed {
 			t.Fatalf("overlapping preparation times: %s > %s", sum, report.PreparationElapsed)
 		}
+	}
+}
+
+func TestFailureMessageExplainsAnEmptyHelperProperty(t *testing.T) {
+	failure := fmt.Errorf("helper answers from PoC/domain_helpers.cypher: helper property name: %w", runner.ErrEmptyPropertyValue)
+	message := runner.FailureMessage(failure)
+	if !strings.Contains(message, "empty (null)") || strings.Contains(message, "domain_helpers") {
+		t.Fatalf("unexpected explanation: %s", message)
 	}
 }

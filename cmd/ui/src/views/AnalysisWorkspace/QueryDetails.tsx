@@ -1,0 +1,293 @@
+// Copyright 2026 Specter Ops, Inc.
+//
+// Licensed under the Apache License, Version 2.0
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
+
+import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { Alert, Box, Button, IconButton, Link, Stack, Tab, Tabs, Tooltip, Typography } from '@mui/material';
+import { ReactNode, useState } from 'react';
+import {
+    availability,
+    completedState,
+    dependencyDepth,
+    dependencyKey,
+    dependencyReason,
+    duration,
+    latestCompleted,
+    observedTime,
+    queryColor,
+} from './model';
+import { Dependency, Query, QueryOutcome, Workspace } from './types';
+
+interface Props {
+    query: Query;
+    workspace: Workspace;
+    outcome?: QueryOutcome;
+    onFocus: (name: string) => void;
+    onDownload: () => void;
+    downloading: boolean;
+    canEdit: boolean;
+    onEdit: () => void;
+    // Enable, Disable, and Delete, shown in the header's action row.
+    actions?: ReactNode;
+}
+
+type Section = 'overview' | 'cypher' | 'run';
+
+// The details panel shows each fact once. Anything written in the file's
+// header lines (namespace, version, allowed schema versions, depends-on, and
+// optional instructions) appears only in the Cypher tab. Overview keeps what
+// the file cannot tell you: status, installed schema, order, connections to
+// other files, and outputs. Last run shows the latest matching outcome.
+export default function QueryDetails({
+    query,
+    workspace,
+    outcome,
+    onFocus,
+    onDownload,
+    downloading,
+    canEdit,
+    onEdit,
+    actions,
+}: Props) {
+    const [section, setSection] = useState<Section>('overview');
+    const prerequisites = workspace.dependencies.filter((connection) => connection.consumer === query.name);
+    const consumers = workspace.dependencies.filter((connection) => connection.prerequisite === query.name);
+    const peerNames = [...new Set(query.outputs.flatMap((output) => output.producers ?? []))].filter(
+        (name) => name !== query.name
+    );
+    const ownInput = query.inputs.filter(
+        (input) => input.type === 'relationship' && query.outputs.some((output) => output.kind === input.name)
+    );
+    const queryLink = (name: string) =>
+        workspace.plan.queries.some((entry) => entry.name === name) ? (
+            <Link component='button' onClick={() => onFocus(name)} className='text-left [overflow-wrap:anywhere]'>
+                {name}
+            </Link>
+        ) : (
+            <Typography component='span'>{name} (not in current rules)</Typography>
+        );
+    // One connection per line: an arrow, the other file, and what it passes
+    // along. Clicking the explanation focuses that arrow in the graph.
+    const connection = (dependency: Dependency, other: string, arrow: string, index: number) => (
+        <Box key={index} className='flex flex-wrap gap-x-2 items-baseline'>
+            <span aria-hidden>{arrow}</span>
+            {queryLink(other)}
+            <Link
+                component='button'
+                onClick={() => onFocus(dependencyKey(dependency))}
+                aria-label={`Focus dependency path from ${dependency.prerequisite} to ${dependency.consumer}`}
+                className='text-left [overflow-wrap:anywhere]'>
+                {dependencyReason(dependency)}
+            </Link>
+        </Box>
+    );
+    return (
+        <Box
+            component='section'
+            aria-label='Query details'
+            className='p-4 border border-neutral-300 dark:border-neutral-600 [overflow-wrap:anywhere]'>
+            <Stack spacing={1}>
+                <Typography variant='h6' component='h2'>
+                    {query.name}
+                </Typography>
+                <Stack direction='row' spacing={1} alignItems='center'>
+                    <Box
+                        component='span'
+                        aria-hidden
+                        className='inline-block w-3 h-3 rounded-full shrink-0'
+                        style={{ backgroundColor: queryColor(query, outcome?.state) }}
+                    />
+                    <Typography variant='body2'>
+                        {availability(query)}
+                        {query.disabled_reason ? ` — ${query.disabled_reason}` : ''} ·{' '}
+                        {query.extension_name || query.extension || query.namespace}
+                    </Typography>
+                </Stack>
+                <Stack direction='row' flexWrap='wrap' useFlexGap spacing={1} alignItems='center'>
+                    <Button className='text-link' onClick={onEdit} disabled={!canEdit}>
+                        Edit analysis file
+                    </Button>
+                    <Button className='text-link' onClick={onDownload} disabled={downloading}>
+                        {downloading ? 'Downloading…' : 'Download query'}
+                    </Button>
+                    {actions}
+                </Stack>
+                <Tabs
+                    value={section}
+                    onChange={(_, value: Section) => setSection(value)}
+                    aria-label='Query details sections'
+                    variant='fullWidth'>
+                    <Tab value='overview' label='Overview' />
+                    <Tab value='cypher' label='Cypher' />
+                    <Tab value='run' label='Last run' />
+                </Tabs>
+                {section === 'overview' && (
+                    <Stack spacing={1.5} className='pt-1'>
+                        <Box>
+                            <Typography>
+                                <strong>Order:</strong> {query.order}
+                            </Typography>
+                            <Typography>
+                                <strong>Dependency depth:</strong> {dependencyDepth(query)}
+                                <Tooltip title='Dependency depth counts arrows along the longest prerequisite chain, starting at 0. It does not indicate simultaneous execution.'>
+                                    <IconButton size='small' aria-label='About dependency depth'>
+                                        <FontAwesomeIcon icon={faCircleInfo} />
+                                    </IconButton>
+                                </Tooltip>
+                            </Typography>
+                            <Typography>
+                                <strong>Installed schema:</strong> {query.schema_version || 'Unavailable'}
+                            </Typography>
+                            <Typography>
+                                <strong>Added:</strong> {observedTime(query.added_at)}
+                            </Typography>
+                        </Box>
+                        {query.input_warning && (
+                            <Alert severity='info'>
+                                This query reads graph data without naming every object or connection type. It runs
+                                again whenever graph data changes to avoid keeping outdated results.
+                            </Alert>
+                        )}
+                        <Box>
+                            <Typography component='h3' variant='subtitle1'>
+                                Needs
+                            </Typography>
+                            {!prerequisites.length && <Typography>No earlier query.</Typography>}
+                            {prerequisites.map((dependency, index) =>
+                                connection(dependency, dependency.prerequisite, '←', index)
+                            )}
+                        </Box>
+                        <Box>
+                            <Typography component='h3' variant='subtitle1'>
+                                Used by
+                            </Typography>
+                            {!consumers.length && <Typography>No later query.</Typography>}
+                            {consumers.map((dependency, index) =>
+                                connection(dependency, dependency.consumer, '→', index)
+                            )}
+                        </Box>
+                        {!!peerNames.length && (
+                            <Box>
+                                <Typography component='h3' variant='subtitle1'>
+                                    Other producers of this relationship
+                                </Typography>
+                                <Typography variant='body2'>
+                                    Their complete answers are combined. A paused producer can block the shared result;
+                                    this does not create an execution arrow.
+                                </Typography>
+                                {peerNames.map((name) => (
+                                    <Box key={name}>{queryLink(name)}</Box>
+                                ))}
+                            </Box>
+                        )}
+                        {ownInput.map((input) => (
+                            <Typography key={input.name} variant='body2'>
+                                Reading {input.name} uses previously saved graph data. This query does not wait for
+                                itself or its fellow producers.
+                            </Typography>
+                        ))}
+                        <Box>
+                            <Typography component='h3' variant='subtitle1'>
+                                Produces
+                            </Typography>
+                            {!query.outputs.length && <Typography>Answer rows for the queries that use it.</Typography>}
+                            {query.outputs.map((output, index) => (
+                                <Box key={index}>
+                                    <Typography>
+                                        <strong>{output.type}:</strong> {output.kind}
+                                    </Typography>
+                                    {output.id_prefix && (
+                                        <Typography variant='body2'>
+                                            Helper IDs start with {output.id_prefix}
+                                        </Typography>
+                                    )}
+                                    {output.endpoints?.map((endpoint) => (
+                                        <Typography
+                                            variant='body2'
+                                            key={`${endpoint.source_kind}:${endpoint.target_kind}`}>
+                                            Allowed: {endpoint.source_kind} → {endpoint.target_kind}
+                                        </Typography>
+                                    ))}
+                                </Box>
+                            ))}
+                        </Box>
+                    </Stack>
+                )}
+                {section === 'cypher' && (
+                    <Stack spacing={1} className='pt-1'>
+                        <Typography variant='body2'>
+                            The comment lines at the top hold the namespace, version, declarations, and any optional
+                            instructions.
+                        </Typography>
+                        <Box
+                            component='pre'
+                            tabIndex={0}
+                            aria-label='Original Cypher file'
+                            className='m-0 overflow-auto max-h-[600px] text-xs whitespace-pre bg-neutral-2 p-2'>
+                            {query.text}
+                        </Box>
+                    </Stack>
+                )}
+                {section === 'run' && <LastRun query={query} workspace={workspace} outcome={outcome} />}
+            </Stack>
+        </Box>
+    );
+}
+
+function LastRun({ query, workspace, outcome }: { query: Query; workspace: Workspace; outcome?: QueryOutcome }) {
+    if (!outcome)
+        return <Typography className='pt-1'>No matching completed outcome is available for this query.</Typography>;
+    const saveState = latestCompleted(workspace)?.execution?.save;
+    const savedCount =
+        outcome.saved_outputs ??
+        (saveState === 'uncertain'
+            ? 'Save unconfirmed'
+            : ['not-started', 'failed', 'unchanged'].includes(saveState ?? '')
+              ? 'No save in this attempt'
+              : 'Not reported');
+    return (
+        <Box className='pt-1'>
+            <Typography>
+                <strong>Outcome:</strong> {completedState(outcome.state)} — {outcome.reason}
+            </Typography>
+            <Typography>
+                <strong>Time:</strong> {duration(outcome.elapsed_nanoseconds)}
+            </Typography>
+            <Typography>
+                <strong>Rows:</strong> {outcome.rows ?? 'Unavailable'}
+            </Typography>
+            {query.outputs.length ? (
+                <>
+                    <Typography>
+                        <strong>Proposed graph output rows:</strong> {outcome.proposed_outputs ?? 'Not reported'}
+                    </Typography>
+                    <Typography>
+                        <strong>Confirmed graph output rows:</strong> {savedCount}
+                        <Tooltip title='This counts the output rows represented by this query after a successful save, including connections already present or shared with other queries. It is not the number of newly added connections.'>
+                            <IconButton size='small' aria-label='About confirmed graph output rows'>
+                                <FontAwesomeIcon icon={faCircleInfo} />
+                            </IconButton>
+                        </Tooltip>
+                    </Typography>
+                </>
+            ) : (
+                <Typography>
+                    <strong>Graph outputs:</strong> Not applicable — this query returns rows for other queries.
+                </Typography>
+            )}
+        </Box>
+    );
+}

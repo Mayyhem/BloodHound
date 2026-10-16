@@ -186,6 +186,7 @@ func Entrypoint(ctx context.Context, cfg config.Configuration, connections boots
 			authenticator          = api.NewAuthenticator(cfg, connections.RDMS, api.NewAuthExtensions(cfg, connections.RDMS))
 			openGraphSchemaService = opengraphschema.NewOpenGraphSchemaService(connections.RDMS, connections.Graph, connections.RDMS)
 			alertPublisher         = alerts.NewAlertEventPublisher()
+			extensions             *postprocessing.Service
 		)
 
 		registration.RegisterFossGlobalMiddleware(&routerInst, cfg, auth.NewIdentityResolver(), authenticator, connections.RDMS)
@@ -194,7 +195,7 @@ func Entrypoint(ctx context.Context, cfg config.Configuration, connections boots
 			if err != nil {
 				return nil, err
 			}
-			extensions, err := postprocessing.New(postprocessing.Configuration{
+			extensions, err = postprocessing.New(postprocessing.Configuration{
 				URL: cfg.PostProcessing.URL, Token: cfg.PostProcessing.Token,
 				Directory: filepath.Join(cfg.WorkDir, "postprocessing"), Backend: driverName,
 				ReadSchemas: func(schemaContext context.Context) ([]byte, error) {
@@ -216,7 +217,7 @@ func Entrypoint(ctx context.Context, cfg config.Configuration, connections boots
 			pipeline.ExtensionAnalysis = extensions
 			openGraphSchemaService.SetAnalysisCoordinator(extensions.WithSchemaChange)
 		}
-		registration.RegisterFossRoutes(&routerInst, cfg, connections.RDMS, connections.Graph, graphQuery, apiCache, collectorManifests, authenticator, authorizer, ingestSchema, dependencies.FileServiceResolver, dogtagsService, openGraphSchemaService, alertPublisher)
+		registration.RegisterFossRoutes(&routerInst, cfg, connections.RDMS, connections.Graph, graphQuery, apiCache, collectorManifests, authenticator, authorizer, ingestSchema, dependencies.FileServiceResolver, dogtagsService, openGraphSchemaService, alertPublisher, extensions)
 
 		modules.Register(modules.Deps{
 			Router: &routerInst,

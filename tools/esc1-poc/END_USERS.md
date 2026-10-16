@@ -7,19 +7,21 @@ Use this guide for extensions someone else has written. It assumes an administra
 | File | What it provides | Where to upload it |
 | --- | --- | --- |
 | Schema (`schema.json` or `name.schema.json`) | Object and connection types, and how they appear. | BloodHound’s OpenGraph Management page. |
-| Ruleset (`.cypher` files) | Instructions for finding connections in collected data. | The current rule page. |
+| Ruleset (`.cypher` files, or a `.zip` of them) | Instructions for finding connections in collected data. | Administration → OpenGraph Analysis → Upload button in the graph's bottom-left corner. |
 | Collection payload (supported JSON or ZIP) | Facts gathered from your environment. | BloodHound's normal data upload page. |
 
-The lab's rule page is at <http://127.0.0.1:18081/>. You do not need to understand the files' code.
+The native workspace is **Administration → OpenGraph Analysis**. The older lab rules page remains available at <http://127.0.0.1:18081/>. You do not need to understand the files' code.
 
 ## How do I start using an extension?
 
-1. Upload its schema through **OpenGraph Management**. On the rule page, select its `.cypher` files and click **Save upload and review**.
+1. Upload its schema through **OpenGraph Management**. Click the **Upload** button in the bottom-left corner of the workspace graph, select its `.cypher` files or a `.zip` containing them, and click **Save upload and review**.
 2. Check the proposed additions and replacements. Then click **Activate reviewed revision**. A revision identifies one saved version of the rules.
 3. Upload collection data to BloodHound, or click **Run Analysis** to use data already stored.
-4. Click **Refresh rules and status** and check **Latest analysis report** before exploring the connections in BloodHound.
+4. Open **Administration → OpenGraph Analysis** and click **Refresh rules and status** to inspect current rules. **Latest status report** opens the completed report in the bottom panel. Check the report before exploring calculated connections in BloodHound.
 
 **Activation saves the instructions; successful analysis updates the results.** This gives you a chance to review changes before they affect the graph.
+
+The [workspace instructions](USAGE.md#inspect-the-analysis-workspace) explain query selection, filters, downloads, and the difference between calculation success and confirmed saving.
 
 ## Can I install three extensions at different times?
 
@@ -49,7 +51,7 @@ This requires rules describing those connections and matching facts in the data.
 
 No. Authors' instructions tell the engine which calculations must finish before others can use their answers. Shared calculations run once per analysis; unrelated work can run together.
 
-**Order** and **Stage** describe this plan. Sorting or filtering only changes your view. If no workable order exists, activation is blocked; ask the supplier for corrected files.
+**Order** and **Dependency depth** describe this plan in the analysis workspace. Depth is the number of arrows in the longest prerequisite chain leading to a query, starting at 0. The older rules page uses **Stage**, starting at 1. Sorting or filtering only changes your view. If no workable order exists, activation is blocked; ask the supplier for corrected files.
 
 ## Why did some rules run while others were skipped?
 
@@ -153,4 +155,26 @@ The analysis files remain available on the rule page. Affected calculations and 
 
 After correcting or reinstalling the schema, review **Enable** for the retained paused files. Changing the schema version does not require new Cypher files when the author’s compatibility conditions and the other checks still hold. Each report records the query and schema versions used.
 
-For now, deleting an extension does not delete its analysis files. A future deletion option will offer that choice. The later TODO 3 workspace will take over analysis management; schema uploads stay in OpenGraph Management.
+For now, deleting an extension does not delete its analysis files. A future deletion option will offer that choice. The OpenGraph Analysis workspace manages analysis files; schema uploads stay in OpenGraph Management.
+
+## How do I work with the graph, table, and entity panel?
+
+Drag the handle at the top of the bottom table to resize it. Click a node or row to open its entity panel on the right; the table makes room. Close the panel to regain that space. **Rules** and **Analysis report** switch the bottom panel's contents.
+
+For one rule, its entity panel offers **Disable** if the rule is enabled or **Enable** if it is disabled, plus **Delete**. For multiple rules, check their table boxes and use the selected action. Focused paths are for inspection and do not add checked rules. The count includes any checked rules hidden by filters. Every change opens a review listing all affected rules before activation. A review may include extra dependent files when deleting a prerequisite. Existing graph results change only after successful analysis.
+
+Use the Upload button in the graph's bottom-left corner to add `.cypher` files or a `.zip` of them; its window keeps inactive draft downloads and checking advice. The top-left panel can be collapsed. If rules changed elsewhere or a response was lost, refresh and review again before activating. You need OpenGraph write permission to change rules; Run Analysis uses BloodHound's existing application-configuration permission.
+
+## Graph styling and interpreting query details
+
+Query nodes use Explore's normal node renderer, size, border, and camera reset. Dependency arrows use its normal thickness and gray. Arrows carry no labels on the graph, to keep it readable; click an arrow, or open a query's **Overview**, to see what it passes along (**As $name**, or the helper-object or calculated-relationship kind being waited for). The entity panel's left handle changes its width by dragging; keyboard users can focus it and use Left/Right. The bottom panel makes room as the width changes. The dependency-depth explanation is a tooltip next to the value.
+
+Extensions are numbered in the filter dropdown, and each query node shows its extension's number inside the circle. Numbers follow namespace order across the complete plan; filtering, selecting, or refreshing an unchanged plan does not renumber them. Environment kinds no longer choose graph icons. Node and edge text colors update when switching between light and dark mode. These display choices add no author requirement and do not change calculations.
+
+The broad-read notice means some graph reads do not name an object or connection type. The engine cannot narrow which changes affect them, so it repeats them after graph changes rather than keep outdated results. It is not a validation failure. An intermediate query returns rows for later queries; graph-output counts are not applicable. For a publishing query, proposed output rows describe its checked answer before saving. Confirmed output rows require successful saving and may include existing connections or overlap other producers; they are not counts of newly added connections. Missing counts are labeled unreported, unsaved, or unconfirmed rather than zero.
+
+Deleting `special_groups.cypher` removes `membership.cypher`, then `esc1.cypher`, because they require its answer rows. The existing deletion cleanup then removes supporting queries that no longer feed any remaining graph output. In the current advanced lab, 12 ESC1 files are listed for removal; `domain_helpers.cypher` remains because it has its own helper output. The review now distinguishes requested deletions from additional files and explains this behavior. Disable keeps the files. The UI does not change the existing deletion policy.
+
+Reachability is optional, not removed. The active lab contains the advanced example in `extension/`. `examples/esc1-cypher/` calculates the same result using ordinary Cypher without reachability, group-overlap, or batch-on directives. Removing a directive from an advanced seed query would remove part of its calculation; switching examples requires replacing the complete reviewed bundle, not deleting comments.
+
+Every editor test recalculates the needed prerequisite chain against the current graph; saved answers are never reused, so a test cannot show stale results or refer to objects that no longer exist. The file being tested also runs fresh; its rows are read while temporary data exists, then displayed as a table after it is discarded. Run Analysis still calculates its inputs and publishes graph results normally.

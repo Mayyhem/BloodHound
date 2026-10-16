@@ -1,0 +1,42 @@
+{
+  "checks": [
+    {
+      "theme": "light",
+      "node_size_25": true,
+      "native_border_program": true,
+      "edge_thickness_4": true,
+      "parameter_label_shortened": true,
+      "environment_and_fallback_icons": true,
+      "stable_icon_urls_after_refresh": true,
+      "camera_preserved_after_panel_resize": true,
+      "native_fit_defaults": true,
+      "pointer_panel_width": true,
+      "keyboard_panel_width": true,
+      "tooltip": true,
+      "edge_focus": true,
+      "unknown_environment_fallback": true
+    },
+    {
+      "theme": "dark",
+      "node_size_25": true,
+      "native_border_program": true,
+      "edge_thickness_4": true,
+      "parameter_label_shortened": true,
+      "environment_and_fallback_icons": true,
+      "stable_icon_urls_after_refresh": true,
+      "camera_preserved_after_panel_resize": true,
+      "native_fit_defaults": true,
+      "pointer_panel_width": true,
+      "keyboard_panel_width": true,
+      "tooltip": true,
+      "edge_focus": true,
+      "unknown_environment_fallback": true
+    },
+    {
+      "narrow_no_page_overflow": true
+    }
+  ],
+  "errors": [],
+  "data": "Example snapshot, including a synthetic Domain environment kind; no live rule changes.",
+  "unknown_environment_case": "constructor"
+}

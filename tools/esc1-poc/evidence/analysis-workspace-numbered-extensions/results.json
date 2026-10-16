@@ -1,0 +1,93 @@
+{
+  "scope": "Dark-mode graph text contrast and stable extension numbering in the analysis workspace UI.",
+  "source_snapshot": {
+    "base_commit": "27bf6a0ed",
+    "application_image": "esc1-poc-bloodhound-workspace:20261014-numbered-extensions",
+    "editor_code_included": false,
+    "files_and_hashes": "build-source-files.json"
+  },
+  "focused_ui_tests": {
+    "status": "passed",
+    "test_files": 4,
+    "tests": 33,
+    "log": "tools/esc1-poc/work/workspace-numbered-extensions/focused-tests-final.log"
+  },
+  "type_check": {
+    "final_handoff_status": "passed",
+    "final_log": "tools/esc1-poc/work/workspace-numbered-extensions/types-final.log",
+    "final_log_diagnostics": 0,
+    "earlier_log": "tools/esc1-poc/work/workspace-numbered-extensions/types.log",
+    "earlier_log_note": "Contains a setSettings diagnostic from before correction to setSetting; not the final source."
+  },
+  "format": {
+    "prettier": "passed",
+    "style": "passed",
+    "prettier_log": "tools/esc1-poc/work/workspace-numbered-extensions/format-test.log",
+    "style_log": "tools/esc1-poc/work/workspace-numbered-extensions/style-final.log"
+  },
+  "production_ui_build": {
+    "status": "passed",
+    "log": "tools/esc1-poc/work/workspace-numbered-extensions/ui-build.log"
+  },
+  "synthetic_browser": {
+    "status": "passed",
+    "themes": ["light", "dark"],
+    "checks": [
+      "graph label contrast",
+      "zoom scaling",
+      "filter numbers match node icons",
+      "icon URLs remain stable after refresh",
+      "switching back to light mode"
+    ],
+    "errors": 0,
+    "results": "browser-results.json",
+    "screenshots": "tools/esc1-poc/work/workspace-numbered-extensions/{light,dark}-zoom-*.png"
+  },
+  "live_browser": {
+    "status": "passed",
+    "mocked_responses": false,
+    "queries_seen": 29,
+    "errors": 0,
+    "analysis_requested": false,
+    "rules_changed": false,
+    "checks": [
+      "numbered extension filter",
+      "matching node numbers",
+      "theme switching contrast",
+      "zoom behavior"
+    ],
+    "results": "live-browser-results.json",
+    "screenshots": "tools/esc1-poc/work/workspace-numbered-extensions/live-theme-*.png"
+  },
+  "live_api_snapshot": {
+    "workspace_status": 200,
+    "draft_status": 200,
+    "analysis_state": "failed",
+    "save_state": "not-started",
+    "note": "The retained manual lab report shows an answer-check failure. The UI browser check did not request analysis; no cause is inferred.",
+    "results": "live-api-results.json"
+  },
+  "deployment": {
+    "status": "deployed",
+    "only_application_container_replaced": true,
+    "rule_service_restarted": false,
+    "database_containers_restarted": false,
+    "active_and_draft_files_preserved": true,
+    "results": "deployment-state.json"
+  },
+  "full_just_test": {
+    "status": "failed",
+    "workspace": "bh-shared-ui",
+    "exit_code": 1,
+    "reported_duration": "5m 53s",
+    "individual_failure_details": "not present in command log",
+    "go_tests_reached": false,
+    "log": "tools/esc1-poc/work/workspace-numbered-extensions/just-test.log"
+  },
+  "native_build": {
+    "status": "not_evidenced",
+    "log": "tools/esc1-poc/work/workspace-numbered-extensions/native-build.log",
+    "note": "The retained log is empty."
+  },
+  "prepare_for_codereview": "not_run_for_this_follow_up"
+}

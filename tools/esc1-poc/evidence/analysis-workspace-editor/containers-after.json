@@ -1,0 +1,22 @@
+{
+  "app-db": {
+    "id": "efb6e6aff4b802018aeb2757fd10eaf0e7475a7175251dc52f217f200c8b161c",
+    "image": "sha256:29754c7520f4b9654cf8ff98e19ac73b88e255c3a53f6236ebe9d52249bb6df3",
+    "started": "2026-10-14T14:17:28.158517697Z"
+  },
+  "graph-db": {
+    "id": "3aaccb2437c229014c59fd91abfb15d86472321a0accd5ed66c0d8916f357a06",
+    "image": "sha256:c3d8ad3b006d7822b29e0180bb36e0543b420ed4ed2e0cff62fa5af7a3059ec7",
+    "started": "2026-10-14T14:17:28.153895283Z"
+  },
+  "bloodhound": {
+    "id": "29e72b9f952435e6782956a151ddf7137f7267dca1306de288984ddd1bba0101",
+    "image": "sha256:885975660c24f8bda0d40338230c45ceef9e49887f21a519cd265767a62b0cc9",
+    "started": "2026-10-14T23:06:44.015086014Z"
+  },
+  "rule-service": {
+    "id": "78a9540933bcfb1682547706be7b8b6f839faa799849c78476d6610ace64f4e1",
+    "image": "sha256:bfbc9ab2c60a41f895a14d070db068d3d9981230b628123b08e753b26fd29b68",
+    "started": "2026-10-14T23:06:44.011148926Z"
+  }
+}

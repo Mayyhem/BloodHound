@@ -1,0 +1,31 @@
+{
+  "focused_ui": {
+    "initial_files": 6,
+    "initial_passed": 40,
+    "final_workspace_rerun": 20,
+    "distinct_cases": 42
+  },
+  "rule_service_and_postprocessing": "passed complete packages",
+  "native_api_and_registration": "passed complete packages",
+  "types": "passed",
+  "style": "passed",
+  "formatting": "passed",
+  "ui_build": "passed, including final unknown-kind fallback guard",
+  "native_build": "passed final embedded UI",
+  "rule_build": "passed",
+  "browser_both_themes": "passed, including unknown kind and stable icons/camera on refresh or panel resize",
+  "live_browser_final": "passed normal login; deletion preview discarded; no upload, activation, or run request",
+  "full_just_test": {
+    "status": "passed",
+    "javascript": "passed",
+    "go": "passed",
+    "coverage_reporting": "completed",
+    "go_coverage_percent": 14.2,
+    "yarn_coverage_percent": 68.3,
+    "started_at": "2026-10-14T14:13:54-04:00",
+    "finished_at": "2026-10-14T14:26:03-04:00",
+    "final_guard_scope": "One-line unknown-icon guard checked separately by browser, style, and production build after the full run began.",
+    "log": "tools/esc1-poc/work/workspace-graph-details/just-test.log"
+  },
+  "prepare_for_codereview": "not rerun for this follow-up; required before a manual commit"
+}

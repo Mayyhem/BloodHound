@@ -1,0 +1,150 @@
+# Copyright 2026 Specter Ops, Inc.
+#
+# Licensed under the Apache License, Version 2.0
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+type: object
+properties:
+  schema_revision:
+    type: string
+  cleanup_pending:
+    type: boolean
+  calculation:
+    type: string
+    enum:
+    - not-started
+    - running
+    - succeeded
+    - failed
+    - skipped
+  save:
+    type: string
+    enum:
+    - not-started
+    - saving
+    - succeeded
+    - failed
+    - uncertain
+    - unchanged
+  phase:
+    type: string
+  failure:
+    type: object
+    properties:
+      query:
+        type: string
+      stage:
+        type: integer
+        format: int64
+        minimum: 0
+      phase:
+        type: string
+      message:
+        type: string
+    required:
+    - phase
+    - message
+  queries:
+    type: array
+    items:
+      type: object
+      properties:
+        name:
+          type: string
+        stage:
+          type: integer
+          format: int64
+          minimum: 0
+        state:
+          type: string
+          enum:
+          - waiting
+          - running
+          - succeeded
+          - failed
+          - skipped
+          - disabled
+          - canceled
+        reason:
+          type: string
+        elapsed_nanoseconds:
+          type: integer
+          format: int64
+          minimum: 0
+        rows:
+          type: integer
+          format: int64
+          minimum: 0
+        proposed_outputs:
+          type: integer
+          format: int64
+          minimum: 0
+        saved_outputs:
+          type: integer
+          format: int64
+          minimum: 0
+        version:
+          type: string
+        schema_version:
+          type: string
+        schema_paused:
+          type: boolean
+      required:
+      - name
+      - stage
+      - state
+      - reason
+      - elapsed_nanoseconds
+    maxItems: 32
+  proposed: &id001
+    type: object
+    properties:
+      relationships_added:
+        type: integer
+        format: int64
+        minimum: 0
+      relationships_removed:
+        type: integer
+        format: int64
+        minimum: 0
+      relationships_updated:
+        type: integer
+        format: int64
+        minimum: 0
+      relationships_unchanged:
+        type: integer
+        format: int64
+        minimum: 0
+      helpers_changed:
+        type: integer
+        format: int64
+        minimum: 0
+    required:
+    - relationships_added
+    - relationships_removed
+    - relationships_updated
+    - relationships_unchanged
+    - helpers_changed
+  saved: *id001
+  elapsed_nanoseconds:
+    type: integer
+    format: int64
+    minimum: 0
+required:
+- calculation
+- save
+- phase
+- queries
+- proposed
+- elapsed_nanoseconds

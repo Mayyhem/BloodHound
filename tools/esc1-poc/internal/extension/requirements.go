@@ -71,7 +71,6 @@ func parseDependencies(contents string) ([]Dependency, error) {
 		dependencies []Dependency
 		seen         = map[string]bool{}
 		parameters   = map[string]bool{}
-		declared     bool
 		continuation bool
 		none         bool
 	)
@@ -81,7 +80,7 @@ func parseDependencies(contents string) ([]Dependency, error) {
 	}
 	for _, comment := range leadingComments(contents) {
 		if strings.HasPrefix(comment, "depends-on:") {
-			declared, continuation = true, true
+			continuation = true
 			comment = strings.TrimSpace(strings.TrimPrefix(comment, "depends-on:"))
 		} else if !continuation || !dependencyContinuation(comment) {
 			continuation = false
@@ -139,14 +138,12 @@ func parseDependencies(contents string) ([]Dependency, error) {
 			dependencies = append(dependencies, dependency)
 		}
 	}
-	if !declared {
-		return nil, fmt.Errorf("missing // depends-on declaration")
-	}
+	// A file with no // depends-on line, or with only "none", has no
+	// dependencies. Writing none is still allowed but no longer required:
+	// the reads in the Cypher are checked against these declarations either
+	// way, so a forgotten declaration is still reported as missing.
 	if none && len(dependencies) != 0 {
 		return nil, fmt.Errorf("depends-on: none cannot be combined with dependencies")
-	}
-	if !none && len(dependencies) == 0 {
-		return nil, fmt.Errorf("empty dependency declaration; use none for constants")
 	}
 	return dependencies, nil
 }

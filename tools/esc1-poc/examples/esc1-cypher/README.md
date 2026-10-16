@@ -4,6 +4,8 @@ This example calculates ESC1 without `reachability`, `batch-on`, or `group-overl
 
 Exact-answer checks and repeated comparisons through one million objects pass on Neo4j and PostgreSQL. Ordinary Cypher has a measured cost, particularly for group selection. See the [comparison report](../../CYPHER_COMPARISON.md) for direct feature comparisons, input limits and advice on choosing the advanced options. The generated graph has a small relevant input share; these results do not establish capacity for a million relevant group members.
 
+**Scope note:** this solution does not account for privileged zone rules, findings, exposure or impact analysis, or other BloodHound Enterprise features. It only calculates the ESC1 connections.
+
 ## Follow the calculation
 
 The certificate eligibility, enabled-authority, enrollment-principal, and domain-helper queries are the same as the advanced example. Five files change the calculation, and `trusted_cas.cypher` changes only an explanatory comment. The report includes [complete file differences and the separate batching change](../../CYPHER_COMPARISON.md#actual-cypher-file-differences). The five calculation changes are:

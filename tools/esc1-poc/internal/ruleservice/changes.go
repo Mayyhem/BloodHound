@@ -32,6 +32,7 @@ var ErrConflict = errors.New("the rules changed or the replacement has not been 
 // Change describes a user's choice. The two revisions prevent an old browser
 // tab from replacing newer work or activating something different from its preview.
 type Change struct {
+	SchemaRevision  string            `json:"schema_revision,omitempty"`
 	BaseRevision    string            `json:"base_revision"`
 	DraftRevision   string            `json:"draft_revision,omitempty"`
 	ConfirmRevision string            `json:"confirm_revision,omitempty"`
@@ -43,16 +44,17 @@ type Change struct {
 }
 
 type Preview struct {
-	BaseRevision              string   `json:"base_revision"`
-	Revision                  string   `json:"revision"`
-	Removed                   []string `json:"removed"`
-	Overwritten               []string `json:"overwritten"`
-	RetiredRelationships      []string `json:"retired_relationships"`
-	RecalculatedRelationships []string `json:"recalculated_relationships"`
-	Paused                    []string `json:"paused"`
-	Plan                      PlanView `json:"plan"`
-	Disabled                  []string `json:"disabled"`
-	Enabled                   []string `json:"enabled"`
+	Dependencies              []extension.ExecutionDependency `json:"dependencies"`
+	BaseRevision              string                          `json:"base_revision"`
+	Revision                  string                          `json:"revision"`
+	Removed                   []string                        `json:"removed"`
+	Overwritten               []string                        `json:"overwritten"`
+	RetiredRelationships      []string                        `json:"retired_relationships"`
+	RecalculatedRelationships []string                        `json:"recalculated_relationships"`
+	Paused                    []string                        `json:"paused"`
+	Plan                      PlanView                        `json:"plan"`
+	Disabled                  []string                        `json:"disabled"`
+	Enabled                   []string                        `json:"enabled"`
 }
 
 func (s *Store) View() PlanView {
@@ -103,7 +105,7 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 		change.Files = s.draft.Files
 		change.Overwrite = s.draft.Overwrite
 	}
-	if change.BaseRevision != s.active.Revision {
+	if change.BaseRevision != s.active.Revision || change.SchemaRevision != "" && change.SchemaRevision != s.schemas.revision() {
 		return Bundle{}, extension.Plan{}, preview, ErrConflict
 	}
 	if err := s.checkUploadedAssociations(change.Files, candidate.Schemas); err != nil {
@@ -121,6 +123,16 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 		allowed[name] = true
 	}
 	for name, contents := range change.Files {
+		if previous, exists := candidate.Files[name]; exists {
+			oldKind, _, oldError := extension.QueryOutputKind(previous)
+			newKind, _, newError := extension.QueryOutputKind(contents)
+			if oldError == nil && newError == nil && oldKind != "" && newKind == "" {
+				// Allow new standalone intermediates, while keeping the existing
+				// protection against accidentally dropping a publisher's RETURN
+				// kind and silently retiring all of its calculated connections.
+				return Bundle{}, extension.Plan{}, preview, fmt.Errorf("the existing output declaration is missing; keep its kind or explicitly remove this producer before adding an intermediate file")
+			}
+		}
 		if previous, exists := candidate.Files[name]; exists && previous != contents {
 			if !allowed[name] {
 				return Bundle{}, extension.Plan{}, preview, fmt.Errorf("%w: choose whether to overwrite %s, including its input declarations", ErrConflict, name)
@@ -183,6 +195,13 @@ func (s *Store) candidate(change Change) (Bundle, extension.Plan, Preview, error
 	preview.Revision = candidate.Revision
 	preview.RetiredRelationships = append([]string(nil), candidate.RetiredRelationships...)
 	preview.Plan = BuildView(candidate, plan)
+	preview.Dependencies = []extension.ExecutionDependency{}
+	for index := range preview.Plan.Queries {
+		preview.Plan.Queries[index].Text = candidate.Files[preview.Plan.Queries[index].Name]
+	}
+	for _, query := range plan.Queries {
+		preview.Dependencies = append(preview.Dependencies, plan.ExecutionDependencies(query)...)
+	}
 	preview.Paused = []string{}
 	for _, query := range plan.Queries {
 		if query.DisabledReason != "" {
@@ -206,6 +225,7 @@ func removeUnusedRules(files map[string]string, requested []string, schemas []In
 		outputs      = map[string]bool{}
 		removed      = map[string]bool{}
 		needed       = map[string]bool{}
+		independent  = map[string]bool{}
 		names        = []string{}
 	)
 	for _, schema := range schemas {
@@ -244,6 +264,30 @@ func removeUnusedRules(files map[string]string, requested []string, schemas []In
 			outputs[name] = true
 		}
 	}
+	// A developer may activate row-only intermediate files before they have a
+	// consumer. Preserve those independent files when deleting another branch.
+	// Scratch prerequisites that belonged to a removed output still prune as
+	// before, so the review does not leave a broken calculation behind.
+	originalInputs := map[string]bool{}
+	for name := range outputs {
+		originalInputs[name] = true
+	}
+	for changed := true; changed; {
+		changed = false
+		for name := range originalInputs {
+			for _, input := range dependencies[name] {
+				if input.Type == "query" && !originalInputs[input.Name] {
+					originalInputs[input.Name] = true
+					changed = true
+				}
+			}
+		}
+	}
+	for name := range dependencies {
+		if !originalInputs[name] {
+			independent[name] = true
+		}
+	}
 	for _, name := range requested {
 		if _, exists := dependencies[name]; !exists {
 			return nil, fmt.Errorf("cannot remove unknown rule %q", name)
@@ -266,6 +310,11 @@ func removeUnusedRules(files map[string]string, requested []string, schemas []In
 					removed[name], changed = true, true
 				}
 			}
+		}
+	}
+	for name := range independent {
+		if !removed[name] {
+			needed[name] = true
 		}
 	}
 	for name := range outputs {

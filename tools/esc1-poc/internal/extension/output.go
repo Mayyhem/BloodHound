@@ -204,7 +204,7 @@ func outputLiteral(tokens []antlr.Token) (string, error) {
 	return text, nil
 }
 
-func bindQueryOutput(definitions []Definition, query *Query, output *queryOutput) error {
+func bindQueryOutput(definitions []Definition, query *Query, output *queryOutput, allowUndeclared bool) error {
 	if output == nil {
 		return nil
 	}
@@ -254,7 +254,32 @@ func bindQueryOutput(definitions []Definition, query *Query, output *queryOutput
 			}
 		}
 	}
+	if allowUndeclared && !declaresOutputKind(definitions, output.kind) {
+		// This is an editor-only preview value. It is deliberately not a
+		// Definition or Schema binding, so the ordinary runner cannot publish it.
+		query.OutputKind = output.kind
+		return nil
+	}
 	return fmt.Errorf("output kind %s must be declared in a schema's %s", output.kind, map[bool]string{true: "node_kinds", false: "relationship_kinds"}[output.node])
+}
+
+// declaresOutputKind also checks the other output type. An existing node kind
+// cannot be treated as an undeclared relationship kind (or the reverse) in an
+// editor test; that remains an ordinary schema error.
+func declaresOutputKind(definitions []Definition, outputKind string) bool {
+	for _, definition := range definitions {
+		for _, kind := range definition.NodeKinds {
+			if kind.Name == outputKind {
+				return true
+			}
+		}
+		for _, kind := range definition.RelationshipKinds {
+			if kind.Name == outputKind {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // QueryOutputKind identifies a query's declared output without executing it.

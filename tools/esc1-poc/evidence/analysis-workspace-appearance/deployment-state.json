@@ -1,0 +1,34 @@
+{
+  "checked_at": "2026-10-14T15:45:26.645263+00:00",
+  "url": "http://127.0.0.1:28080/ui/administration/opengraph-analysis",
+  "image_tag": "esc1-poc-bloodhound-workspace:20261014-appearance-final",
+  "binary_sha256": "6ca191e4479add46f16dff4e7bea6a723be4964378ae217d0b919efca003be8b",
+  "active_rules_unchanged": true,
+  "supporting_services_not_restarted": true,
+  "containers": [
+    {
+      "name": "/esc1-workspace-manual-bloodhound-1",
+      "image": "sha256:7ede45dfd4d4a143a5aca543e90eea65b25df13f6dcc1c19627f290f713f71a1",
+      "state": "running",
+      "health": null
+    },
+    {
+      "name": "/esc1-workspace-manual-rule-service-1",
+      "image": "sha256:e9bf40688883dcd9218784f891eead5be8ca0fb8e3d21e03a0015fa4c67b7ae9",
+      "state": "running",
+      "health": null
+    },
+    {
+      "name": "/esc1-workspace-manual-app-db-1",
+      "image": "sha256:29754c7520f4b9654cf8ff98e19ac73b88e255c3a53f6236ebe9d52249bb6df3",
+      "state": "running",
+      "health": "healthy"
+    },
+    {
+      "name": "/esc1-workspace-manual-graph-db-1",
+      "image": "sha256:c3d8ad3b006d7822b29e0180bb36e0543b420ed4ed2e0cff62fa5af7a3059ec7",
+      "state": "running",
+      "health": "healthy"
+    }
+  ]
+}

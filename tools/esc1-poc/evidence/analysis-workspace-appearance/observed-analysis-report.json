@@ -1,0 +1,8 @@
+{
+  "message": "This step failed. Check its query and inputs; private application logs contain the database details.",
+  "phase": "check-answers",
+  "query": "PoC/domain_helpers.cypher",
+  "save": "not-started",
+  "state": "failed",
+  "updated_at": "2026-10-14T15:50:10.142661638Z"
+}

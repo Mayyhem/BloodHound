@@ -31,8 +31,10 @@ import { random } from 'graphology-layout';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import { GraphData, GraphEdge, GraphEdges, GraphNode, GraphNodes } from 'js-client-library';
 import { Glyph, GlyphLocation } from 'src/rendering/programs/node.glyphs';
-import { RankDirection, setDagreLayout } from 'src/rendering/utils/dagre';
+import { sequentialLayout } from 'src/rendering/utils/sequentialLayout';
+import { DEFAULT_GRAPH_EDGE_SIZE, DEFAULT_GRAPH_NODE_SIZE, defaultEdgeColor } from 'src/rendering/utils/utils';
 import { EdgeDirection, EdgeParams, NodeParams, ThemedOptions } from 'src/utils';
+export { sequentialLayout } from 'src/rendering/utils/sequentialLayout';
 
 export const standardLayout = (graph: MultiDirectedGraph) => {
     forceAtlas2.assign(graph, {
@@ -42,20 +44,6 @@ export const standardLayout = (graph: MultiDirectedGraph) => {
             barnesHutOptimize: true,
         },
     });
-};
-
-export const sequentialLayout = (graph: MultiDirectedGraph) => {
-    const { assign: assignDagre } = setDagreLayout(
-        {
-            graph: {
-                rankdir: RankDirection.LEFT_RIGHT,
-                ranksep: 500,
-            },
-        },
-        graph
-    );
-
-    assignDagre();
 };
 
 type GraphOptions = {
@@ -192,7 +180,7 @@ const initGraphNodes = (
         }
 
         graph.addNode(key, {
-            size: 25,
+            size: DEFAULT_GRAPH_NODE_SIZE,
             borderColor: themedOptions.nodeBorderColor,
             ...nodeParams,
         });
@@ -234,8 +222,8 @@ const initGraphEdges = (
 
             // Set default values for single edges
             const edgeParams: Partial<EdgeParams> = {
-                size: 4,
-                color: options.darkMode ? '#6c6c6c' : '#55595C',
+                size: DEFAULT_GRAPH_EDGE_SIZE,
+                color: defaultEdgeColor(options.darkMode),
                 type: 'arrow',
                 label: edge.label,
                 groupPosition: 0,

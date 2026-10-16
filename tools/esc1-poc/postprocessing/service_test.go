@@ -29,6 +29,7 @@ import (
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/ruleservice"
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/runner"
+	"github.com/specterops/dawgs/graph"
 )
 
 type serviceTestClient struct {
@@ -385,5 +386,46 @@ func TestSchemaDeletionWaitsForRunningCalculationAndPreventsOldRetry(t *testing.
 	}
 	if service.changes.Snapshot().CoverageKnown {
 		t.Fatal("schema change did not require fresh calculation")
+	}
+}
+
+// Setup installs the editor, the ordinary analysis executor, and writer
+// coordination. No database connection is needed: this test checks setup and
+// the existing service execution path, while real database behavior is
+// covered separately.
+func TestNewServiceInstallsEditorAndOrdinaryAnalysis(t *testing.T) {
+	var (
+		database      = graph.NewDatabaseSwitch(t.Context(), nil)
+		configuration = Configuration{URL: "http://127.0.0.1:18081", Token: strings.Repeat("x", 32), Directory: t.TempDir(), Backend: "neo4j"}
+	)
+	service, err := New(configuration, database)
+	if err != nil || service == nil {
+		t.Fatalf("ordinary setup failed: %v", err)
+	}
+	if service.editor == nil || service.execute == nil || service.executeTest == nil {
+		t.Fatal("expected configured editor, ordinary executor, and editor test executor")
+	}
+	before := service.gate.Version()
+	_, release, err := graph.EnterWriteAccess(t.Context(), database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release()
+	if service.gate.Version() == before {
+		t.Fatal("ordinary writer coordination was not installed")
+	}
+	ordinary, client, _, _ := newServiceTest(t)
+	service.client = client
+	service.configuration.ReadSchemas = ordinary.configuration.ReadSchemas
+	called := false
+	service.execute = func(_ context.Context, _ extension.Plan, _ runner.Options) (runner.Report, error) {
+		called = true
+		return runner.Report{Committed: true}, nil
+	}
+	if _, err := service.AfterAnalysis(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("ordinary analysis did not execute")
 	}
 }

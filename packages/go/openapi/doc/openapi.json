@@ -8130,6 +8130,837 @@
         }
       }
     },
+    "/api/v2/analysis-workspace": {
+      "get": {
+        "summary": "Inspect the current OpenGraph analysis plan and reports",
+        "operationId": "GetAnalysisWorkspace",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Requires OpenGraph read permission and the extension-management feature flag. Returns a consistent copy of current activated files, complete execution dependencies, and received reports. Reads never calculate rules or write graph objects. The server keeps the rule-service token private and contacts only its configured destination. Outcomes belong on the current diagram only when BOTH rule and schema revisions match. Overall running status is not per-query live progress. Responses have a size and time limit and are not cached.",
+        "responses": {
+          "200": {
+            "description": "Current plan, including an explicit empty plan when no rules are active.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/model.analysis-workspace"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "502": {
+            "description": "The configured rule service or its schema read is unavailable, or its response is invalid or oversized."
+          },
+          "503": {
+            "description": "OpenGraph analysis is not configured."
+          }
+        }
+      }
+    },
+    "/api/v2/analysis-workspace/working-copies": {
+      "get": {
+        "summary": "List or resume private unfinished analysis working copies",
+        "operationId": "GetAnalysisEditorWorkingCopies",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Requires the extension-management feature flag and OpenGraph read permission. The server derives the working-copy owner from the authenticated user; clients cannot send an owner. Without name, returns summaries without unfinished text. With one name, returns that user's complete saved copy. Unknown or repeated query parameters are rejected. Responses are not cached.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "description": "Namespace and filename to resume. Omit to list saved working copies.",
+            "schema": {
+              "type": "string",
+              "maxLength": 256,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*/[a-z][a-z0-9]*(?:_[a-z0-9]+)*\\.cypher$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One resumed working copy, or summaries for the authenticated user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/model.analysis-editor-working-copy"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/model.analysis-editor-working-copy-summary"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Query parameters are missing, repeated, unknown, malformed, or invalid."
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "404": {
+            "description": "The named private working copy does not exist."
+          },
+          "502": {
+            "description": "The configured rule service is unavailable or returned an invalid response."
+          },
+          "503": {
+            "description": "OpenGraph analysis is not configured."
+          }
+        }
+      },
+      "put": {
+        "summary": "Save one private unfinished analysis working copy",
+        "operationId": "SaveAnalysisEditorWorkingCopy",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Requires the extension-management feature flag plus OpenGraph read and write permissions. Saves unfinished text without activating a rule, changing active rules, or changing the separate upload draft. The server derives the owner from the authenticated user. A later save must include the exact prior revision. Responses are not cached.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/model.analysis-editor-working-copy-save"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved working copy with its new revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/model.analysis-editor-working-copy"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid or ambiguous. Unknown fields, including owner, and repeated JSON keys are rejected."
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "409": {
+            "description": "The saved working copy changed. Resume it and try again."
+          },
+          "413": {
+            "description": "Request exceeds 4 MiB. Individual unfinished text is limited to 1 MiB."
+          },
+          "502": {
+            "description": "The configured rule service is unavailable or did not confirm the save."
+          },
+          "503": {
+            "description": "OpenGraph analysis is not configured."
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete one private unfinished analysis working copy",
+        "operationId": "DeleteAnalysisEditorWorkingCopy",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Requires the extension-management feature flag plus OpenGraph read and write permissions. Deletes only the authenticated user's copy when its exact revision matches. It does not change active rules or the separate upload draft. Responses are not cached.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/model.analysis-editor-working-copy-deletion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Working copy deleted."
+          },
+          "400": {
+            "description": "The request is invalid or ambiguous. Unknown fields, including owner, and repeated JSON keys are rejected."
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "404": {
+            "description": "The named private working copy does not exist."
+          },
+          "409": {
+            "description": "The saved working copy changed. Resume it and try again."
+          },
+          "413": {
+            "description": "Request exceeds 4 MiB."
+          },
+          "502": {
+            "description": "The configured rule service is unavailable or did not confirm deletion."
+          },
+          "503": {
+            "description": "OpenGraph analysis is not configured."
+          }
+        }
+      }
+    },
+    "/api/v2/analysis-workspace/draft": {
+      "get": {
+        "summary": "Get analysis draft",
+        "operationId": "Getanalysisdraft",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Read the saved inactive upload, including files that cannot yet be activated. Requires the extension-management feature flag and OpenGraph read permission. Responses are not cached. The browser cannot supply a service destination or credentials.",
+        "responses": {
+          "200": {
+            "description": "Requested draft, review, or activated revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/model.analysis-draft"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "502": {
+            "description": "Service unavailable, invalid reply, or unconfirmed result. Refresh before another write."
+          },
+          "503": {
+            "description": "OpenGraph analysis is not configured."
+          }
+        }
+      },
+      "put": {
+        "summary": "Save analysis draft",
+        "operationId": "Saveanalysisdraft",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Save uploaded .cypher files without changing active rules. Checks exact active and draft revisions and explicit overwrite choices. Missing schemas or prerequisites may leave a saved invalid draft. Requires the extension-management feature flag and OpenGraph read permission. Also requires OpenGraph write permission. Responses are not cached. The browser cannot supply a service destination or credentials.",
+        "responses": {
+          "200": {
+            "description": "Requested draft, review, or activated revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/model.analysis-draft"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or ambiguous request; unknown fields and repeated JSON keys are rejected."
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "409": {
+            "description": "Rule, schema, or draft revision changed, or overwrite confirmation is missing. Refresh and review again."
+          },
+          "413": {
+            "description": "Request exceeds 4 MiB."
+          },
+          "502": {
+            "description": "Service unavailable, invalid reply, or unconfirmed result. Refresh before another write."
+          },
+          "503": {
+            "description": "OpenGraph analysis is not configured."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/model.analysis-change"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Discard analysis draft",
+        "operationId": "Discardanalysisdraft",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Discard only the draft named by draft_revision. Does not change active rules or graph results. Requires the extension-management feature flag and OpenGraph read permission. Also requires OpenGraph write permission. Responses are not cached. The browser cannot supply a service destination or credentials.",
+        "responses": {
+          "204": {
+            "description": "Saved inactive draft discarded."
+          },
+          "400": {
+            "description": "Invalid or ambiguous request; unknown fields and repeated JSON keys are rejected."
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "409": {
+            "description": "Rule, schema, or draft revision changed, or overwrite confirmation is missing. Refresh and review again."
+          },
+          "413": {
+            "description": "Request exceeds 4 MiB."
+          },
+          "502": {
+            "description": "Service unavailable, invalid reply, or unconfirmed result. Refresh before another write."
+          },
+          "503": {
+            "description": "OpenGraph analysis is not configured."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/model.analysis-change"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/analysis-workspace/preview": {
+      "post": {
+        "summary": "Review analysis change",
+        "operationId": "Reviewanalysischange",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Review a saved draft or individual/bulk enable, disable, or removal choices. Does not save changes. Returns the complete proposed plan and every affected file and relationship kind. Removal may cascade to dependent and unused supporting files. Requires the extension-management feature flag and OpenGraph read permission. Also requires OpenGraph write permission. Responses are not cached. The browser cannot supply a service destination or credentials.",
+        "responses": {
+          "200": {
+            "description": "Requested draft, review, or activated revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/model.analysis-preview"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or ambiguous request; unknown fields and repeated JSON keys are rejected."
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "409": {
+            "description": "Rule, schema, or draft revision changed, or overwrite confirmation is missing. Refresh and review again."
+          },
+          "413": {
+            "description": "Request exceeds 4 MiB."
+          },
+          "502": {
+            "description": "Service unavailable, invalid reply, or unconfirmed result. Refresh before another write."
+          },
+          "503": {
+            "description": "OpenGraph analysis is not configured."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/model.analysis-change"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/analysis-workspace/rules": {
+      "put": {
+        "summary": "Activate analysis change",
+        "operationId": "Activateanalysischange",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Revalidate and activate exactly confirm_revision. Repeat the reviewed change with its base, schema, and optional draft revisions. Schema changes invalidate prior review. This does not start analysis or directly change graph results; relationship cleanup occurs after the next successful analysis. A saved draft is discarded separately. Requires the extension-management feature flag and OpenGraph read permission. Also requires OpenGraph write permission. Responses are not cached. The browser cannot supply a service destination or credentials.",
+        "responses": {
+          "200": {
+            "description": "Requested draft, review, or activated revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "revision"
+                      ],
+                      "properties": {
+                        "revision": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or ambiguous request; unknown fields and repeated JSON keys are rejected."
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "409": {
+            "description": "Rule, schema, or draft revision changed, or overwrite confirmation is missing. Refresh and review again."
+          },
+          "413": {
+            "description": "Request exceeds 4 MiB."
+          },
+          "502": {
+            "description": "Service unavailable, invalid reply, or unconfirmed result. Refresh before another write."
+          },
+          "503": {
+            "description": "OpenGraph analysis is not configured."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/model.analysis-change"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/analysis-workspace/query": {
+      "get": {
+        "summary": "Download one original analysis file at the displayed revision",
+        "operationId": "DownloadAnalysisQuery",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Requires OpenGraph read permission and the extension-management feature flag. Reads a fresh workspace copy and checks BOTH revisions. Returns the exact original file, or a conflict asking the author to refresh. No historical files are retained by this endpoint. Responses are not cached.",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "description": "Namespace and filename, for example PoC_AD/users.cypher.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*/[a-z][a-z0-9]*(?:_[a-z0-9]+)*\\.cypher$"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": true,
+            "description": "Displayed rule revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          {
+            "name": "schema_revision",
+            "in": "query",
+            "required": true,
+            "description": "Displayed schema revision.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original Cypher file.",
+            "headers": {
+              "Content-Disposition": {
+                "description": "Attachment with the original base filename.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing, repeated, or invalid query parameters."
+          },
+          "401": {
+            "$ref": "#/components/responses/unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/not-found"
+          },
+          "409": {
+            "description": "Rules or schemas changed; refresh before downloading."
+          },
+          "502": {
+            "description": "The configured rule service or its schema read is unavailable, or its response is invalid or oversized."
+          },
+          "503": {
+            "description": "OpenGraph analysis is not configured."
+          }
+        }
+      }
+    },
+    "/api/v2/analysis-workspace/editor/plan": {
+      "post": {
+        "summary": "Preview an analysis editor plan",
+        "operationId": "PreviewAnalysisEditorPlan",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Requires OpenGraph read and write permission. Validates the proposed file and shows its complete selected prerequisite plan without calculating or writing graph data.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/model.analysis-editor-request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validated editor plan preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/model.analysis-editor-plan"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid editor file or declarations."
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "409": {
+            "description": "The displayed rules or schema revision changed."
+          },
+          "413": {
+            "description": "Request exceeds the 4 MiB limit."
+          },
+          "502": {
+            "description": "Current analysis inputs are unavailable."
+          },
+          "503": {
+            "description": "Analysis editor is unavailable."
+          }
+        }
+      }
+    },
+    "/api/v2/analysis-workspace/editor/test": {
+      "post": {
+        "summary": "Test an analysis editor file without publishing it",
+        "operationId": "TestAnalysisEditorFile",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Requires OpenGraph read, write, and graph read permission, plus access to all environments. Every test recalculates the edited file and its complete needed prerequisite chain inside temporary graph changes that are discarded. Cancellation also discards the test. At most 500 rows and 1 MiB are displayed; total_rows remains the complete result count and truncated reports the limited display. A successful test is required only for this editor activation workflow; ordinary uploads are unchanged.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/model.analysis-editor-request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Discarded editor test result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/model.analysis-editor-result"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "failed test": null,
+            "or unavailable required declarations.": null
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "408": {
+            "description": "The test was canceled or its request timed out; no successful test was recorded."
+          },
+          "409": {
+            "description": "The displayed rules, schema, or graph changed."
+          },
+          "413": {
+            "description": "Request exceeds the 4 MiB limit."
+          },
+          "503": {
+            "description": "Test discard or editor availability could not be confirmed."
+          }
+        }
+      }
+    },
+    "/api/v2/analysis-workspace/editor/review": {
+      "post": {
+        "summary": "Review a successfully tested analysis editor file",
+        "operationId": "ReviewAnalysisEditorFile",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Requires OpenGraph read and write permission. Creates the existing analysis-change review for the exact successful editor test. A stale test or changed rule/schema revision returns conflict.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/model.analysis-editor-action"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing analysis change review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/model.analysis-preview"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tested file cannot be activated with current declarations."
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "409": {
+            "description": "Successful test or review is stale."
+          }
+        }
+      }
+    },
+    "/api/v2/analysis-workspace/editor/activate": {
+      "put": {
+        "summary": "Activate a reviewed analysis editor file",
+        "operationId": "ActivateAnalysisEditorFile",
+        "tags": [
+          "OpenGraph (Experimental)",
+          "Community"
+        ],
+        "description": "Requires OpenGraph read and write permission. Activates only the tested editor file after the existing review confirmation. It requires a successful exact test and current revisions; stale confirmation returns conflict. A newly activated standalone intermediate file may return rows before a consumer is activated. The successful-test requirement applies only to editor activation; ordinary uploads are unchanged.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/model.analysis-editor-action"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Activated revision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "revision": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "revision"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/forbidden"
+          },
+          "409": {
+            "description": "Successful test or review confirmation is stale."
+          }
+        }
+      }
+    },
     "/api/v2/extensions/definitions": {
       "get": {
         "description": "**Experimental** - Reads the accepted definitions of installed, non-built-in extensions for analysis validation. Requires OpenGraph read permission and the extension-management feature flag. This does not activate analyses or install schemas.\n\nA null definition identifies an extension installed before definitions were preserved; upload its schema again through OpenGraph Management to associate analysis files. The declaration includes saved-query and privilege-zone components supplied with the upload. Their execution and availability still follow their existing feature controls.\n",
@@ -26443,6 +27274,1231 @@
                 }
               }
             }
+          }
+        }
+      },
+      "model.analysis-query": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "string"
+          },
+          "extension_versions": {
+            "type": "string"
+          },
+          "input_warning": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "extension": {
+            "type": "string"
+          },
+          "extension_name": {
+            "type": "string"
+          },
+          "added_at": {
+            "type": "string",
+            "description": "UTC timestamp, or an empty string when unavailable."
+          },
+          "disabled_reason": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "author_enabled": {
+            "type": "boolean",
+            "description": "Saved author choice. An author-enabled query can still be blocked; enabled describes current availability."
+          },
+          "order": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "stage": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "parameter": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "description": "The original uploaded Cypher file, including comments and declarations."
+          },
+          "inputs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "node",
+                    "relationship"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "name"
+              ]
+            }
+          },
+          "prerequisites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "conditions": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "parameter": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "parameter"
+              ]
+            },
+            "description": "Direct answer parameters only. Use workspace dependencies for complete execution connections."
+          },
+          "dependents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Direct answer consumers only; use workspace dependencies for complete connections."
+          },
+          "outputs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "node",
+                    "relationship"
+                  ]
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "producers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "id_prefix": {
+                  "type": "string"
+                },
+                "endpoints": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "source_kind": {
+                        "type": "string"
+                      },
+                      "target_kind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "source_kind",
+                      "target_kind"
+                    ]
+                  }
+                },
+                "existing_edge_policy": {
+                  "type": "string",
+                  "enum": [
+                    "replace-existing",
+                    "merge-properties",
+                    "keep-existing"
+                  ]
+                }
+              },
+              "required": [
+                "type",
+                "kind"
+              ]
+            }
+          },
+          "processing": {
+            "type": "object",
+            "properties": {
+              "reachability": {
+                "type": "object",
+                "properties": {
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "incoming",
+                      "outgoing"
+                    ]
+                  },
+                  "relationships": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "include_start": {
+                    "type": "boolean"
+                  },
+                  "expand_results": {
+                    "type": "boolean"
+                  },
+                  "reject_cycles": {
+                    "type": "boolean"
+                  },
+                  "node_kinds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "direction",
+                  "relationships",
+                  "include_start",
+                  "expand_results",
+                  "reject_cycles"
+                ]
+              },
+              "group_overlap": {
+                "type": "object",
+                "properties": {
+                  "memberships": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "memberships"
+                ]
+              },
+              "batch_dependency": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "namespace",
+          "version",
+          "schema_version",
+          "name",
+          "extension",
+          "extension_name",
+          "added_at",
+          "disabled_reason",
+          "enabled",
+          "author_enabled",
+          "order",
+          "stage",
+          "parameter",
+          "text",
+          "inputs",
+          "prerequisites",
+          "dependents",
+          "outputs",
+          "processing"
+        ]
+      },
+      "model.analysis-execution": {
+        "type": "object",
+        "properties": {
+          "schema_revision": {
+            "type": "string"
+          },
+          "cleanup_pending": {
+            "type": "boolean"
+          },
+          "calculation": {
+            "type": "string",
+            "enum": [
+              "not-started",
+              "running",
+              "succeeded",
+              "failed",
+              "skipped"
+            ]
+          },
+          "save": {
+            "type": "string",
+            "enum": [
+              "not-started",
+              "saving",
+              "succeeded",
+              "failed",
+              "uncertain",
+              "unchanged"
+            ]
+          },
+          "phase": {
+            "type": "string"
+          },
+          "failure": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              },
+              "stage": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "phase": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "phase",
+              "message"
+            ]
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "stage": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "waiting",
+                    "running",
+                    "succeeded",
+                    "failed",
+                    "skipped",
+                    "disabled",
+                    "canceled"
+                  ]
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "elapsed_nanoseconds": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "rows": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "proposed_outputs": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "saved_outputs": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "version": {
+                  "type": "string"
+                },
+                "schema_version": {
+                  "type": "string"
+                },
+                "schema_paused": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "stage",
+                "state",
+                "reason",
+                "elapsed_nanoseconds"
+              ]
+            },
+            "maxItems": 32
+          },
+          "proposed": {
+            "type": "object",
+            "properties": {
+              "relationships_added": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "relationships_removed": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "relationships_updated": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "relationships_unchanged": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "helpers_changed": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "relationships_added",
+              "relationships_removed",
+              "relationships_updated",
+              "relationships_unchanged",
+              "helpers_changed"
+            ]
+          },
+          "saved": {
+            "type": "object",
+            "properties": {
+              "relationships_added": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "relationships_removed": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "relationships_updated": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "relationships_unchanged": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "helpers_changed": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "relationships_added",
+              "relationships_removed",
+              "relationships_updated",
+              "relationships_unchanged",
+              "helpers_changed"
+            ]
+          },
+          "elapsed_nanoseconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "calculation",
+          "save",
+          "phase",
+          "queries",
+          "proposed",
+          "elapsed_nanoseconds"
+        ]
+      },
+      "model.analysis-run": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed",
+              "running",
+              "no-rules",
+              "uncertain",
+              "unavailable"
+            ]
+          },
+          "event": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "backend": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/model.analysis-execution"
+          }
+        },
+        "required": [
+          "state",
+          "event",
+          "revision",
+          "message",
+          "updated_at"
+        ]
+      },
+      "model.analysis-status": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/model.analysis-run"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "saved_revision": {
+                "type": "string",
+                "description": "Last confirmed saved rule revision, retained independently of the latest attempt."
+              },
+              "results_uncertain": {
+                "type": "boolean"
+              },
+              "results_stale": {
+                "type": "boolean"
+              },
+              "history": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/model.analysis-run"
+                },
+                "maxItems": 20
+              }
+            },
+            "required": [
+              "results_uncertain",
+              "results_stale"
+            ]
+          }
+        ]
+      },
+      "model.analysis-workspace": {
+        "type": "object",
+        "properties": {
+          "installed_extensions": {
+            "type": "array",
+            "description": "Every currently installed extension, including extensions with no active analysis files. This list excludes retained associations for deleted schemas and is separate from plan.extensions, which describes only extensions represented in the active execution plan.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "namespace",
+                "name",
+                "display_name",
+                "version"
+              ],
+              "properties": {
+                "namespace": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "display_name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "plan": {
+            "type": "object",
+            "properties": {
+              "schema_revision": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "string",
+                "description": "Empty when no analyses are activated."
+              },
+              "name": {
+                "type": "string"
+              },
+              "validation": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "string"
+                  },
+                  "language": {
+                    "type": "string"
+                  },
+                  "database_execution": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "files",
+                  "language",
+                  "database_execution"
+                ]
+              },
+              "threads": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {}
+                },
+                "maxItems": 0,
+                "description": "Empty in the workspace; the legacy plan groups are not execution dependencies."
+              },
+              "queries": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/model.analysis-query"
+                },
+                "maxItems": 32
+              },
+              "extensions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "namespace": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "display_name": {
+                      "type": "string"
+                    },
+                    "environment_kind": {
+                      "type": "string",
+                      "description": "Optional icon source when the extension defines exactly one distinct environment kind."
+                    }
+                  },
+                  "required": [
+                    "namespace",
+                    "name",
+                    "display_name"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "revision",
+              "name",
+              "validation",
+              "threads",
+              "queries",
+              "extensions"
+            ]
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "prerequisite": {
+                  "type": "string"
+                },
+                "consumer": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "query",
+                    "node",
+                    "relationship"
+                  ]
+                },
+                "name": {
+                  "type": "string",
+                  "description": "The prerequisite query name or the graph kind that causes the wait."
+                },
+                "parameter": {
+                  "type": "string"
+                },
+                "conditions": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "prerequisite",
+                "consumer",
+                "type",
+                "name"
+              ]
+            },
+            "description": "Complete runner-derived waits. Multiple reasons may connect the same queries. Shared outputs alone do not imply ordering."
+          },
+          "status": {
+            "$ref": "#/components/schemas/model.analysis-status"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "installed_extensions",
+          "plan",
+          "dependencies",
+          "status",
+          "observed_at"
+        ]
+      },
+      "model.analysis-editor-working-copy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "text",
+          "base_revision",
+          "revision"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 256,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*/[a-z][a-z0-9]*(?:_[a-z0-9]+)*\\.cypher$",
+            "description": "Namespace and filename for the unfinished analysis."
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 1048576,
+            "description": "Unfinished UTF-8 Cypher text. It may be empty or incomplete because this action does not activate a rule."
+          },
+          "base_revision": {
+            "type": "string",
+            "pattern": "^$|^[a-f0-9]{64}$",
+            "description": "Active rule revision visible when the author began editing, if known."
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Saved working-copy revision."
+          }
+        }
+      },
+      "model.analysis-editor-working-copy-summary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "base_revision",
+          "revision"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 256,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*/[a-z][a-z0-9]*(?:_[a-z0-9]+)*\\.cypher$"
+          },
+          "base_revision": {
+            "type": "string",
+            "pattern": "^$|^[a-f0-9]{64}$"
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "model.analysis-editor-working-copy-save": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 256,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*/[a-z][a-z0-9]*(?:_[a-z0-9]+)*\\.cypher$",
+            "description": "Namespace and filename for the unfinished analysis."
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 1048576,
+            "description": "Unfinished UTF-8 Cypher text. It may be empty or incomplete because this action does not activate a rule."
+          },
+          "base_revision": {
+            "type": "string",
+            "pattern": "^$|^[a-f0-9]{64}$",
+            "description": "Active rule revision visible when the author began editing, if known."
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^$|^[a-f0-9]{64}$",
+            "description": "Exact prior working-copy revision. Omit it only when creating a new working copy."
+          }
+        }
+      },
+      "model.analysis-editor-working-copy-deletion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "revision"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 256,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*/[a-z][a-z0-9]*(?:_[a-z0-9]+)*\\.cypher$"
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "model.analysis-draft": {
+        "type": "object",
+        "required": [
+          "base_revision",
+          "revision",
+          "files",
+          "ready"
+        ],
+        "properties": {
+          "base_revision": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string",
+            "description": "Empty if no draft is saved."
+          },
+          "files": {
+            "type": "object",
+            "maxProperties": 32,
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Namespaced .cypher filenames mapped to original text. At most 1 MiB per file; the complete request is at most 4 MiB."
+          },
+          "overwrite": {
+            "type": "array",
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "validation_error": {
+            "type": "string",
+            "description": "Fixed guidance without parser excerpts or query literals. Invalid drafts remain downloadable and inactive."
+          }
+        }
+      },
+      "model.analysis-change": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "base_revision"
+        ],
+        "properties": {
+          "base_revision": {
+            "type": "string",
+            "description": "Displayed active rule revision; empty only when no rules are active."
+          },
+          "schema_revision": {
+            "type": "string",
+            "description": "Displayed installed schema revision. Required for native preview and activation; optional for saving an inactive draft."
+          },
+          "draft_revision": {
+            "type": "string",
+            "description": "Exact saved draft revision. Required when reviewing, updating, or discarding that draft."
+          },
+          "confirm_revision": {
+            "type": "string",
+            "description": "Exact proposed revision returned by review. Required for activation."
+          },
+          "files": {
+            "type": "object",
+            "maxProperties": 32,
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Namespaced .cypher filenames mapped to original text. At most 1 MiB per file; the complete request is at most 4 MiB."
+          },
+          "overwrite": {
+            "type": "array",
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "remove": {
+            "type": "array",
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "disable": {
+            "type": "array",
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "enable": {
+            "type": "array",
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "plan": {
+        "type": "object",
+        "properties": {
+          "schema_revision": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string",
+            "description": "Empty when no analyses are activated."
+          },
+          "name": {
+            "type": "string"
+          },
+          "validation": {
+            "type": "object",
+            "properties": {
+              "files": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "database_execution": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "files",
+              "language",
+              "database_execution"
+            ]
+          },
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {}
+            },
+            "maxItems": 0,
+            "description": "Empty in the workspace; the legacy plan groups are not execution dependencies."
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/model.analysis-query"
+            },
+            "maxItems": 32
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "namespace": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "display_name": {
+                  "type": "string"
+                },
+                "environment_kind": {
+                  "type": "string",
+                  "description": "Optional icon source when the extension defines exactly one distinct environment kind."
+                }
+              },
+              "required": [
+                "namespace",
+                "name",
+                "display_name"
+              ]
+            }
+          }
+        },
+        "required": [
+          "revision",
+          "name",
+          "validation",
+          "threads",
+          "queries",
+          "extensions"
+        ]
+      },
+      "dependencies": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "prerequisite": {
+              "type": "string"
+            },
+            "consumer": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "query",
+                "node",
+                "relationship"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "description": "The prerequisite query name or the graph kind that causes the wait."
+            },
+            "parameter": {
+              "type": "string"
+            },
+            "conditions": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "prerequisite",
+            "consumer",
+            "type",
+            "name"
+          ]
+        },
+        "description": "Complete runner-derived waits. Multiple reasons may connect the same queries. Shared outputs alone do not imply ordering."
+      },
+      "model.analysis-preview": {
+        "type": "object",
+        "required": [
+          "base_revision",
+          "revision",
+          "plan",
+          "dependencies"
+        ],
+        "properties": {
+          "base_revision": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/plan"
+          },
+          "dependencies": {
+            "$ref": "#/components/schemas/dependencies"
+          },
+          "removed": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "overwritten": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "retired_relationships": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "recalculated_relationships": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "paused": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "disabled": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "model.analysis-editor-request": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "text",
+          "base_revision",
+          "schema_revision"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*/[a-z][a-z0-9]*(?:_[a-z0-9]+)*\\.cypher$"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1048576,
+            "description": "Proposed UTF-8 Cypher file text. The complete JSON request is limited to 4 MiB."
+          },
+          "base_revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "schema_revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "model.analysis-editor-plan": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/plan"
+          },
+          "dependencies": {
+            "$ref": "#/components/schemas/dependencies"
+          },
+          "unused": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Declarations in the edited file's depends-on lines that the file never uses, written as an author types them (for example node:Domain or query:PoC/users). Advice only; unused declarations are still accepted."
+          }
+        },
+        "required": [
+          "plan",
+          "dependencies",
+          "unused"
+        ]
+      },
+      "model.analysis-editor-result": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "test_id",
+          "rows",
+          "total_rows",
+          "truncated",
+          "execution"
+        ],
+        "properties": {
+          "test_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "rows": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Limited table preview",
+            "at most 500 rows and 1 MiB.": null
+          },
+          "total_rows": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "execution": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "model.analysis-editor-action": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "test_id"
+        ],
+        "properties": {
+          "test_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "confirm_revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           }
         }
       },

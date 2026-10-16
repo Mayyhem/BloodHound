@@ -1,0 +1,64 @@
+{
+  "checks": [
+    {
+      "theme": "light",
+      "zoom_in_out_and_return": [
+        {
+          "camera_ratio": 1,
+          "rendered_font_px": [
+            12.0
+          ]
+        },
+        {
+          "camera_ratio": 2,
+          "rendered_font_px": [
+            8.48528
+          ]
+        },
+        {
+          "camera_ratio": 0.5,
+          "rendered_font_px": [
+            16.9706
+          ]
+        },
+        {
+          "camera_ratio": 1,
+          "rendered_font_px": [
+            12.0
+          ]
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "zoom_in_out_and_return": [
+        {
+          "camera_ratio": 1,
+          "rendered_font_px": [
+            12.0
+          ]
+        },
+        {
+          "camera_ratio": 2,
+          "rendered_font_px": [
+            8.48528
+          ]
+        },
+        {
+          "camera_ratio": 0.5,
+          "rendered_font_px": [
+            16.9706
+          ]
+        },
+        {
+          "camera_ratio": 1,
+          "rendered_font_px": [
+            12.0
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "data": "Synthetic example responses; actual canvas text drawing."
+}

@@ -1,0 +1,131 @@
+# Copyright 2026 Specter Ops, Inc.
+#
+# Licensed under the Apache License, Version 2.0
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+get:
+  summary: List or resume private unfinished analysis working copies
+  operationId: GetAnalysisEditorWorkingCopies
+  tags:
+  - OpenGraph (Experimental)
+  - Community
+  description: Requires the extension-management feature flag and OpenGraph read permission. The server derives the working-copy owner from the authenticated user; clients cannot send an owner. Without name, returns summaries without unfinished text. With one name, returns that user's complete saved copy. Unknown or repeated query parameters are rejected. Responses are not cached.
+  parameters:
+  - name: name
+    in: query
+    required: false
+    description: Namespace and filename to resume. Omit to list saved working copies.
+    schema:
+      type: string
+      maxLength: 256
+      pattern: ^[A-Za-z_][A-Za-z0-9_]*/[a-z][a-z0-9]*(?:_[a-z0-9]+)*\.cypher$
+  responses:
+    200:
+      description: One resumed working copy, or summaries for the authenticated user.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - data
+            properties:
+              data:
+                oneOf:
+                - $ref: ../schemas/model.analysis-editor-working-copy.yaml
+                - type: array
+                  items:
+                    $ref: ../schemas/model.analysis-editor-working-copy-summary.yaml
+    400:
+      description: Query parameters are missing, repeated, unknown, malformed, or invalid.
+    401:
+      $ref: ../responses/unauthorized.yaml
+    403:
+      $ref: ../responses/forbidden.yaml
+    404:
+      description: The named private working copy does not exist.
+    502:
+      description: The configured rule service is unavailable or returned an invalid response.
+    503:
+      description: OpenGraph analysis is not configured.
+put:
+  summary: Save one private unfinished analysis working copy
+  operationId: SaveAnalysisEditorWorkingCopy
+  tags:
+  - OpenGraph (Experimental)
+  - Community
+  description: Requires the extension-management feature flag plus OpenGraph read and write permissions. Saves unfinished text without activating a rule, changing active rules, or changing the separate upload draft. The server derives the owner from the authenticated user. A later save must include the exact prior revision. Responses are not cached.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../schemas/model.analysis-editor-working-copy-save.yaml
+  responses:
+    200:
+      description: Saved working copy with its new revision.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - data
+            properties:
+              data:
+                $ref: ../schemas/model.analysis-editor-working-copy.yaml
+    400:
+      description: The request is invalid or ambiguous. Unknown fields, including owner, and repeated JSON keys are rejected.
+    401:
+      $ref: ../responses/unauthorized.yaml
+    403:
+      $ref: ../responses/forbidden.yaml
+    409:
+      description: The saved working copy changed. Resume it and try again.
+    413:
+      description: Request exceeds 4 MiB. Individual unfinished text is limited to 1 MiB.
+    502:
+      description: The configured rule service is unavailable or did not confirm the save.
+    503:
+      description: OpenGraph analysis is not configured.
+delete:
+  summary: Delete one private unfinished analysis working copy
+  operationId: DeleteAnalysisEditorWorkingCopy
+  tags:
+  - OpenGraph (Experimental)
+  - Community
+  description: Requires the extension-management feature flag plus OpenGraph read and write permissions. Deletes only the authenticated user's copy when its exact revision matches. It does not change active rules or the separate upload draft. Responses are not cached.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../schemas/model.analysis-editor-working-copy-deletion.yaml
+  responses:
+    204:
+      description: Working copy deleted.
+    400:
+      description: The request is invalid or ambiguous. Unknown fields, including owner, and repeated JSON keys are rejected.
+    401:
+      $ref: ../responses/unauthorized.yaml
+    403:
+      $ref: ../responses/forbidden.yaml
+    404:
+      description: The named private working copy does not exist.
+    409:
+      description: The saved working copy changed. Resume it and try again.
+    413:
+      description: Request exceeds 4 MiB.
+    502:
+      description: The configured rule service is unavailable or did not confirm deletion.
+    503:
+      description: OpenGraph analysis is not configured.

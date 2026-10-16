@@ -1,0 +1,29 @@
+{
+  "url": "http://127.0.0.1:28080/ui/administration/opengraph-analysis",
+  "namespace": "PoC_Cypher",
+  "queries_added": 13,
+  "total_queries": 29,
+  "ordinary_cypher_only": true,
+  "all_added_queries_enabled": true,
+  "existing_query_text_and_choices_preserved": true,
+  "existing_draft_preserved": true,
+  "rule_revision": "93be3af449c5905810606e2084f202d2c361788d33047f2433a24fa5a4d64939",
+  "schema_revision": "ac5c48e6a3033ece2c46b0da33ca82c41d195cdb13703854b7f2912232bc6b86",
+  "manual_analysis_requested": false,
+  "schema_install_may_queue_normal_analysis": true,
+  "source_hashes": {
+    "PoC_Cypher/ca_auth_reach.cypher": "08648a989c1fdfac450e72d9f3b07b9d4e25242634ead6eae2aee9cf7761a5ff",
+    "PoC_Cypher/ca_root_reach.cypher": "408b368791d263e897dd843afab599c70d0f0487414659a1425ff3c6ea63a963",
+    "PoC_Cypher/domain_helpers.cypher": "5e1c4506c24f0edca8388ff8318b401fa21ec8c6ccd0d1269ebe85db7cfa4ea7",
+    "PoC_Cypher/eligible_templates.cypher": "cb3578bba8cd40e043e9efb2a8b07d68c898982b46dd19d8699aac0bd6759ae8",
+    "PoC_Cypher/enabled_cas.cypher": "6fc0bfe9868660a8e11462caca8e709244d9437f018c5328305103f8bec0c5ab",
+    "PoC_Cypher/enrollment_principals.cypher": "c98608e1e1a810941f26827e60cd81666b0d0e463b589e2dd52eade3cace47c4",
+    "PoC_Cypher/esc1.cypher": "35d6707c193f25acb7c3b89a7fde39eb1a99095adc2dd26a1e5691f773386ba7",
+    "PoC_Cypher/forest_reach.cypher": "c40ed3e6b2fcdf3853e3bbc8491688e11005f82155b3c6bfd65f7c7e9b920405",
+    "PoC_Cypher/membership.cypher": "ee4ccec5207a7dc934e367f43d6652b071d3b7f3cf08cbcf589993500d9932dc",
+    "PoC_Cypher/membership_reach.cypher": "66096b20956236434d2b3c110003a2fac72964a923bd5469b2c24f90ecf97e55",
+    "PoC_Cypher/special_groups.cypher": "09e902ae6384173da0035ef2ea90e84c9f31f48ee5b9e227cebfeb7473156c05",
+    "PoC_Cypher/trusted_cas.cypher": "4b8dba6c1bd91edd9ff0cdebbbd16899db5348add90f1156e221e248be7f5afc",
+    "PoC_Cypher/usable_cas.cypher": "5f57a09eb77c8f20cef38b748a107a5c9f8ea1148188d2c8abf392824394269c"
+  }
+}

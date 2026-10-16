@@ -1,0 +1,9 @@
+{
+  "normal_login": true,
+  "total_queries": 29,
+  "filtered_ordinary_queries": 13,
+  "entity_details": true,
+  "download_matches_prepared_file": true,
+  "page_errors": [],
+  "analysis_requested": false
+}

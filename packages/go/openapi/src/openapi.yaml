@@ -394,6 +394,26 @@ paths:
   # opengraph extensions
   /api/v2/extensions:
     $ref: './paths/opengraph.extensions.yaml'
+  /api/v2/analysis-workspace:
+    $ref: './paths/opengraph.analysis-workspace.yaml'
+  /api/v2/analysis-workspace/working-copies:
+    $ref: './paths/opengraph.analysis-working-copies.yaml'
+  /api/v2/analysis-workspace/draft:
+    $ref: './paths/opengraph.analysis-draft.yaml'
+  /api/v2/analysis-workspace/preview:
+    $ref: './paths/opengraph.analysis-preview.yaml'
+  /api/v2/analysis-workspace/rules:
+    $ref: './paths/opengraph.analysis-rules.yaml'
+  /api/v2/analysis-workspace/query:
+    $ref: './paths/opengraph.analysis-query.yaml'
+  /api/v2/analysis-workspace/editor/plan:
+    $ref: './paths/opengraph.analysis-editor.yaml#/plan'
+  /api/v2/analysis-workspace/editor/test:
+    $ref: './paths/opengraph.analysis-editor.yaml#/test'
+  /api/v2/analysis-workspace/editor/review:
+    $ref: './paths/opengraph.analysis-editor.yaml#/review'
+  /api/v2/analysis-workspace/editor/activate:
+    $ref: './paths/opengraph.analysis-editor.yaml#/activate'
   /api/v2/extensions/definitions:
     $ref: './paths/opengraph.extension-definitions.yaml'
   /api/v2/extensions/{extension_id}:

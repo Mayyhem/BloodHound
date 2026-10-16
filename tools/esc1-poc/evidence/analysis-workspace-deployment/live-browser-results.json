@@ -1,0 +1,24 @@
+{
+  "mocked_responses": false,
+  "checks": [
+    "Normal UI login and live workspace show all 16 example queries",
+    "Selected query details and downloaded original match the shipped file",
+    "Dependency navigation and search filters work against live data",
+    "Refresh, workspace reads, and download return HTTP 200 without page errors"
+  ],
+  "page_errors": [],
+  "workspace_responses": [
+    {
+      "path": "/api/v2/analysis-workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/v2/analysis-workspace/query",
+      "status": 200
+    },
+    {
+      "path": "/api/v2/analysis-workspace",
+      "status": 200
+    }
+  ]
+}

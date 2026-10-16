@@ -4,6 +4,14 @@ This is a proof of concept for one modified BloodHound Community Edition process
 
 Start with [README.md](README.md) for the proposal, [USAGE.md](USAGE.md) for operating instructions, and [DESIGN.md](DESIGN.md) for the rules the code follows and its failure behavior. [HANDOFF.md](HANDOFF.md) retains the dated work history, full historical commands, private log locations, and local running state.
 
+## Read-only analysis workspace — 14 October 2026
+
+The first part of TODO 3 is implemented. Review [the evidence and remaining checks](evidence/analysis-workspace/README.md), then `internal/extension/workspace_test.go`, `internal/ruleservice/workspace.go`, and `postprocessing/workspace.go`. The dependency reasons come from the same plan logic as scheduling. A single service read keeps current files, both revisions, and reports together; downloads check the displayed rule and schema revisions.
+
+The native routes and access tests are in `cmd/api/src/api/v2/analysis_workspace*` and `cmd/api/src/api/registration/analysis_workspace_test.go`. The interface is in `cmd/ui/src/views/AnalysisWorkspace/`; its layout is shared through `cmd/ui/src/rendering/utils/sequentialLayout.ts` without changing Explore's settings. OpenAPI source files and the corresponding bundled entries accompany the routes. No database connection or graph writer is passed to the workspace reader.
+
+Management, collapsing, retained diagrams, live progress, and interactive testing remain open. The implementation does not change extension author requirements or DAWGS. Full repository checks and a real browser drawing check must be assessed separately from the passing feature tests.
+
 ## Extension associations and shared queries — 14 October 2026
 
 The approved TODO 6 implementation is ready for review in the working tree. Start with [the plan](../../_plans/opengraph-analysis-extension-integration.md), [author declarations](DEVELOPERS.md#file-association-and-compatible-versions), and [fresh verification](evidence/extension-integration/README.md). Schemas use OpenGraph Management; the experimental parser and analysis controls stay in this tool. The new nullable definition column and authenticated read preserve the information analyses need without changing existing list responses or ordinary upload requirements.
@@ -669,6 +677,12 @@ synthetic data and clearly scoped current or historical checks; private identifi
 
 ### Persistent service and additional maintained files
 
+## 14 October 2026 — analysis file editor review state
+
+The editor adds private per-user working copies, fixed authenticated native endpoints, temporary test execution, retained complete answers for safe reuse, exact tested-file review, and single-file activation. A standalone row-only file is valid after a successful test and review. Editor tests never publish their temporary graph changes. All database writes stay in the BloodHound process, which is the single-writer boundary for this experiment.
+
+Focused verification completed: `go test ./...` for the PoC, 48 workspace UI tests across seven files, three native packages, and both database editor checks matching `^TestNativeEditor` (6.401 seconds). Type and style checks passed. Production build, deployment, full `just test`, and `just prepare-for-codereview` remain pending; this note does not claim deployment. Planned evidence will be recorded in [analysis workspace editor evidence](evidence/analysis-workspace-editor/README.md).
+
 | File | Purpose |
 | --- | --- |
 | [Dockerfile.extensions](Dockerfile.extensions) | Packages the separate native image with optional extension processing and its embedded UI. |
@@ -716,3 +730,23 @@ synthetic data and clearly scoped current or historical checks; private identifi
 | [internal/ruleservice/view.go](internal/ruleservice/view.go) | Describes the complete ordered plan, per-query extension, stage, activation date, enabled state, dependency details, and shared groups for the table and API. |
 | [internal/ruleservice/view_test.go](internal/ruleservice/view_test.go) | Checks independent groups, shared inputs, branching order, endpoint inputs, and complete query details. |
 | [internal/graphdb/removal_integration_test.go](internal/graphdb/removal_integration_test.go) | Checks removal, late rollback, mixed-origin edges, and last-rule removal against both real graph databases. |
+
+## 14 October 2026 — editor deployed and browser checked
+
+> Superseded 15 October 2026: editor test results are now rows only; the result graph described here was removed at the user's request.
+
+Both app and rule service now use the `20261014-editor` images at <http://127.0.0.1:28080/ui/administration/opengraph-analysis>. Production interface/native/image builds passed. The real normal-login browser check passed creating/testing a standalone query, review before a consumer exists, private save/resume, identifier-to-object graph preview, and dark mode, with no page errors. The check did not activate its file. It removed only its private working copy afterward. Active rules (29), installed-schema revision, pending-upload checksum, and both database container identities/start times are unchanged. Full `just test` and preparation are still being verified; this entry does not claim they passed.
+
+Fresh [editor evidence](evidence/analysis-workspace-editor/README.md) includes the focused checks, both-database tests, production hashes, deployed browser results and preservation checks. The existing separate `domain_helpers` normal-analysis failure remains outside this editor change. Nothing was staged or committed.
+
+## 14 October 2026 — final editor checks
+
+> Superseded 15 October 2026: editor test results are now rows only; the result graph described here was removed at the user's request.
+
+The final server includes the optional-storage startup safeguard. Its dedicated regression passed, and the complete postprocessing service package passed in 28.636 seconds afterward. The final production app was rebuilt and deployed; its authenticated test/review check and full normal-login browser workflow passed. The graph display contained exactly the two returned objects and no added connections. The temporary private copy was removed. Rules, schemas, pending uploads and original database containers remain unchanged.
+
+The broad checks did not pass completely. `just test` failed in `bh-shared-ui` after 7m49s when a temporary coverage file disappeared; dependent UI packages, Go tests and coverage were not reached. `just prepare-for-codereview` completed dependency setup, module synchronization, generation/formatting and license checks, then failed building custom golangci-lint because its dependency chain needed an uncached module while offline. Later analysis/show steps were not completed. Do not describe either command as a pass or generation as proof of tests. An initial separate Redocly attempt failed, but standard OpenAPI generation later completed during preparation. Its generated bundle was reviewed, all editor routes/internal references verified, and the bundle adopted.
+
+[Final editor evidence](evidence/analysis-workspace-editor/README.md) records source/binary hashes, actual logs, changed files, deployment preservation, limitations and suggested review/commit commands. No files were staged or committed. Temporary editor database containers are stopped with storage preserved. The more precise internal-ID reuse work and standalone historical-answer viewer remain follow-ups, as does diagnosis of the broad interface test failure.
+
+Final release note: standard generated OpenAPI and the eight reviewed import/header fixes are now included in the deployed app build. The authenticated test/review check and state-preservation check passed once more. All verification processes have ended. The only remaining issues are the documented coverage-file failure and unavailable offline checker dependency, plus the explicitly deferred features. No staging or commits.

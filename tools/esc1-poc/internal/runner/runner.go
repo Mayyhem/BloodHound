@@ -40,6 +40,10 @@ var ErrCommitUncertain = errors.New("graph commit result is uncertain")
 // Existing graph data remains unchanged and other writers may continue.
 var ErrCommitRolledBack = errors.New("graph commit was rolled back")
 
+// ErrTestDiscardUncertain means a test transaction did not confirm closing.
+// Callers must stop graph writes rather than issue a successful-test receipt.
+var ErrTestDiscardUncertain = errors.New("test discard is uncertain")
+
 // Rows is a query's table of answers. Each map is one row, with column names as
 // keys. For example, a relationship row has "source" and "target" keys.
 type Rows = []map[string]any
@@ -74,10 +78,17 @@ type Options struct {
 	Changes            Changes
 	Limits             Limits
 	TemporaryDirectory string
+	// TestTarget is the exact query name being inspected by Test. Test
+	// calculates it but does not publish any of its final output bindings. When
+	// omitted, Test uses Plan.EditorTarget. Run deliberately ignores this field.
+	TestTarget string
 	// ObserveAnswer is for separate correctness checks. It receives complete
 	// query answers, including Go calculations, before later queries use them.
 	// Leave it nil during timing runs; copying evidence is extra work.
 	ObserveAnswer func(query string, row map[string]any) error
+	// InspectTestAnswer resolves the final editor results while temporary
+	// prerequisite objects still exist. Normal analysis never calls it.
+	InspectTestAnswer func(context.Context, Transaction, string, CompleteAnswer) error
 }
 
 // Report describes committed work. On an error, Committed remains false and
@@ -87,6 +98,8 @@ type Report struct {
 	ContainerImages     map[string]string `json:"container_images,omitempty"`
 	BatchID             string            `json:"batch_id"`
 	Committed           bool              `json:"committed"`
+	Tested              bool              `json:"tested"`
+	Discarded           bool              `json:"discarded"`
 	Skipped             bool              `json:"skipped"`
 	Queries             []string          `json:"queries"`
 	QueryRows           map[string]int    `json:"query_rows"`
@@ -259,7 +272,7 @@ func run(ctx context.Context, database Database, plan extension.Plan, options Op
 	report.Execution.Phase, report.Execution.Calculation = "calculation", "running"
 	*phaseElapsed += time.Since(phaseStarted)
 	phaseStarted, phaseElapsed = time.Now(), &report.CalculationElapsed
-	desiredByKind, err := calculate(ctx, database, transaction, plan, space, report, stage)
+	desiredByKind, err := calculate(ctx, database, transaction, plan, space, report, stage, nil, nil)
 	if err != nil {
 		return err
 	}

@@ -30,11 +30,15 @@ import (
 
 type nativeTestDatabase struct {
 	graph.Database
+	closeError  error
+	closeCalls  int
 	commitError error
 	queryError  error
 	commits     int
 	rollbacks   int
 	reads       int
+	runs        int
+	runsAtWrite int
 	timeout     time.Duration
 }
 type nativeTestTransaction struct {
@@ -64,8 +68,9 @@ func (s *nativeTestResult) Values() []any {
 	}
 	return values
 }
-func (s *nativeTestResult) Error() error { return s.failure }
-func (s *nativeTestResult) Close()       {}
+func (s *nativeTestResult) Error() error      { return s.failure }
+func (s *nativeTestResult) Close()            {}
+func (s *nativeTestTransaction) Close() error { s.database.closeCalls++; return s.database.closeError }
 func (s *nativeTestTransaction) Raw(source string, parameters map[string]any) graph.Result {
 	if strings.HasPrefix(source, "MERGE") {
 		return &nativeTestResult{rows: runner.Rows{{"id": int64(1)}}, keys: []string{"id"}}
@@ -76,6 +81,7 @@ func (s *nativeTestTransaction) Raw(source string, parameters map[string]any) gr
 	return &nativeTestResult{}
 }
 func (s *nativeTestDatabase) WriteTransaction(ctx context.Context, callback graph.TransactionDelegate, options ...graph.TransactionOption) error {
+	s.runsAtWrite = s.runs
 	var configuration graph.TransactionConfig
 	for _, option := range options {
 		option(&configuration)
@@ -92,7 +98,10 @@ func (s *nativeTestDatabase) ReadTransaction(ctx context.Context, callback graph
 	s.reads++
 	return callback(&nativeTestTransaction{database: s})
 }
-func (s *nativeTestDatabase) Run(context.Context, string, map[string]any) error { return nil }
+func (s *nativeTestDatabase) Run(context.Context, string, map[string]any) error {
+	s.runs++
+	return nil
+}
 
 func nativeTestOptions(t *testing.T) runner.Options {
 	return runner.Options{BatchID: "native-test", IngestionComplete: true, WritersPaused: true, TemporaryDirectory: t.TempDir()}
@@ -172,11 +181,58 @@ func TestNativeCalculationFailureRollsBackCallback(t *testing.T) {
 	}
 }
 
+func TestNativeEditorTestReturnsTheDiscardSentinelToNeo4j(t *testing.T) {
+	var database = &nativeTestDatabase{}
+	report, err := TestNative(t.Context(), database, "neo4j", nativeTestPlan(), nativeTestOptions(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Committed || !report.Tested || !report.Discarded || database.commits != 0 || database.rollbacks != 1 {
+		t.Fatalf("report=%+v commits=%d rollbacks=%d", report, database.commits, database.rollbacks)
+	}
+}
+
+func TestNativeEditorTestPreparesEndpointsBeforeOpeningRollbackTransaction(t *testing.T) {
+	var (
+		database = &nativeTestDatabase{}
+		plan     = nativeTestPlan()
+	)
+	plan.Schema.Relationships = []extension.RelationshipBinding{{Kind: "PoC_Test", Query: "result.cypher", Endpoints: []extension.Endpoint{{SourceKind: "User", TargetKind: "Domain"}}}}
+	report, err := TestNative(t.Context(), database, "neo4j", plan, nativeTestOptions(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if database.runs < 2 || database.runsAtWrite != database.runs || report.Preparation.Database <= 0 || !report.Discarded {
+		t.Fatalf("preparation runs=%d before write=%d report=%+v", database.runs, database.runsAtWrite, report)
+	}
+}
+
+func TestNativeEditorTestCalculationFailureRollsBackCallback(t *testing.T) {
+	var (
+		failure  = errors.New("late calculation failure")
+		database = &nativeTestDatabase{queryError: failure}
+		plan     = nativeTestPlan()
+	)
+	plan.Queries = []extension.Query{{Name: "result.cypher", Text: "RETURN 1 AS value"}}
+	report, err := TestNative(t.Context(), database, "neo4j", plan, nativeTestOptions(t))
+	if !errors.Is(err, failure) || report.Tested || report.Discarded || database.commits != 0 || database.rollbacks != 1 {
+		t.Fatalf("report=%+v error=%v commits=%d rollbacks=%d", report, err, database.commits, database.rollbacks)
+	}
+}
+
 func TestNativeCancelledCommitIsKnownRollback(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	transaction := &nativeNeo4jTransaction{}
 	if err := transaction.Commit(ctx); !errors.Is(err, runner.ErrCommitRolledBack) || transaction.commitRequested {
 		t.Fatalf("cancelled intent %v, requested %v", err, transaction.commitRequested)
+	}
+}
+
+func TestNativeEditorDiscardFailureIsUncertain(t *testing.T) {
+	database := &nativeTestDatabase{closeError: errors.New("close failed")}
+	report, err := TestNative(t.Context(), database, "neo4j", nativeTestPlan(), nativeTestOptions(t))
+	if !errors.Is(err, runner.ErrTestDiscardUncertain) || report.Tested || report.Discarded || database.commits != 0 || database.closeCalls != 1 {
+		t.Fatalf("report=%+v error=%v", report, err)
 	}
 }

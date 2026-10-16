@@ -99,6 +99,10 @@ type Query struct {
 type Plan struct {
 	CleanupPending bool `json:"cleanup_pending,omitempty"`
 	SchemaRevision string
+	// EditorTarget is calculated for a preview only. The editor execution path
+	// must inspect its answer without publishing its node or relationship output.
+	// Ordinary loaded plans leave this blank.
+	EditorTarget string `json:"editor_target,omitempty"`
 	// Removed rules still need their old connections cleared on the next
 	// successful run. This list comes from the saved rule history, not Cypher.
 	RetiredRelationships []string              `json:"retired_relationships,omitempty"`
@@ -165,11 +169,42 @@ func LoadFiles(definitions []Definition, files map[string]string) (Plan, error) 
 // Disabled consumers can stay installed while a reviewed provider update no
 // longer satisfies their version condition. They cannot execute until fixed.
 func LoadFilesWithDisabled(definitions []Definition, files map[string]string, disabled []string) (Plan, error) {
+	return loadFiles(definitions, files, disabled, "", true)
+}
+
+// LoadEditorFilesWithDisabled prepares one existing or new file for an editor
+// test. The target is treated as enabled even if its saved counterpart is
+// disabled, so an author can repair and test it. Other disabled files retain
+// their state. Its literal output kind may be absent from the installed schema
+// so an author can test a proposed kind before declaring it. That exception is
+// limited to this one target: every prerequisite still receives the ordinary
+// validation checks.
+//
+// The returned target keeps OutputKind for result preview, but the kind is not
+// added to Schema. A caller must never use this editor plan to publish changes.
+func LoadEditorFilesWithDisabled(definitions []Definition, files map[string]string, disabled []string, target string) (Plan, error) {
+	if target == "" {
+		return Plan{}, fmt.Errorf("choose an analysis file to test")
+	}
+	var editorDisabled []string
+	for _, disabledName := range disabled {
+		if disabledName != target {
+			editorDisabled = append(editorDisabled, disabledName)
+		}
+	}
+	// Ordinary loading relaxes a few checks for paused saved rules so they stay
+	// visible. Editor plans keep their paused state, but still require a complete
+	// valid prerequisite chain, including version and column checks.
+	return loadFiles(definitions, files, editorDisabled, target, false)
+}
+
+func loadFiles(definitions []Definition, files map[string]string, disabled []string, editorTarget string, relaxDisabledChecks bool) (Plan, error) {
 	var (
-		plan      Plan
-		schemas   []Schema
-		queries   = map[string]Query{}
-		filenames []string
+		plan        = Plan{EditorTarget: editorTarget}
+		schemas     []Schema
+		queries     = map[string]Query{}
+		filenames   []string
+		targetFound bool
 	)
 	if err := ValidateDefinitions(definitions); err != nil {
 		return Plan{}, err
@@ -218,6 +253,9 @@ func LoadFilesWithDisabled(definitions []Definition, files map[string]string, di
 		if _, exists := queries[name]; exists {
 			return Plan{}, fmt.Errorf("duplicate query %s", name)
 		}
+		if name == editorTarget {
+			targetFound = true
+		}
 		metadata, err := ReadQueryMetadata(contents)
 		if err != nil {
 			return Plan{}, fmt.Errorf("%s: %w", name, err)
@@ -236,7 +274,7 @@ func LoadFilesWithDisabled(definitions []Definition, files map[string]string, di
 			paused = paused || disabledName == name
 		}
 		compatible, err := SchemaVersionMatches(owner.Schema.Version, metadata.ExtensionVersions)
-		if !paused && (err != nil || !compatible) {
+		if (!paused || !relaxDisabledChecks) && (err != nil || !compatible) {
 			return Plan{}, fmt.Errorf("%s: installed schema version %s does not satisfy extension-versions %s", name, owner.Schema.Version, metadata.ExtensionVersions)
 		}
 		dependencies, err := parseDependencies(string(contents))
@@ -296,10 +334,13 @@ func LoadFilesWithDisabled(definitions []Definition, files map[string]string, di
 		if err != nil {
 			return Plan{}, fmt.Errorf("%s: line %d: output: %w", query.Name, finalReturnLine(query.Text), err)
 		}
-		if err := bindQueryOutput(plan.Definitions, &query, output); err != nil {
+		if err := bindQueryOutput(plan.Definitions, &query, output, name == editorTarget); err != nil {
 			return Plan{}, fmt.Errorf("%s: line %d: %w", query.Name, finalReturnLine(query.Text), err)
 		}
 		queries[query.Name] = query
+	}
+	if editorTarget != "" && !targetFound {
+		return Plan{}, fmt.Errorf("analysis file %q is not available for testing", editorTarget)
 	}
 	plan.Definition = plan.Definitions[0]
 	for _, definition := range plan.Definitions {
@@ -351,7 +392,7 @@ func LoadFilesWithDisabled(definitions []Definition, files map[string]string, di
 	if err := validateSchema(plan.Schema, queries); err != nil {
 		return Plan{}, err
 	}
-	ordered, err := orderQueries(queries, plan.Schema)
+	ordered, err := orderQueries(queries, plan.Schema, editorTarget, relaxDisabledChecks)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -446,16 +487,36 @@ func validateSchema(schema Schema, queries map[string]Query) error {
 	return nil
 }
 
-func orderQueries(queries map[string]Query, schema Schema) ([]Query, error) {
+func orderQueries(queries map[string]Query, schema Schema, editorTarget string, relaxDisabledChecks bool) ([]Query, error) {
 	var (
 		names   []string
 		ordered []Query
 		state   = make(map[string]int)
-		used    = make(map[string]bool)
 		plan    = Plan{Schema: schema}
 		path    []string
 	)
+	// Editing a producer may intentionally change columns that its current
+	// consumers use. Test only the needed chain; ordinary activation still
+	// validates the complete set and catches those downstream changes.
+	var selected map[string]bool
+	if editorTarget != "" {
+		selectionPlan := plan
+		for _, query := range queries {
+			selectionPlan.Queries = append(selectionPlan.Queries, query)
+		}
+		selection, err := selectionPlan.SelectPrerequisites([]string{editorTarget})
+		if err != nil {
+			return nil, err
+		}
+		selected = map[string]bool{}
+		for _, name := range selection {
+			selected[name] = true
+		}
+	}
 	for name, query := range queries {
+		if selected != nil && !selected[name] {
+			continue
+		}
 		names = append(names, name)
 		if err := checkReadOnlyText(query.Text); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
@@ -468,14 +529,13 @@ func orderQueries(queries map[string]Query, schema Schema) ([]Query, error) {
 			if _, exists := queries[dependency.Name]; !exists {
 				return nil, fmt.Errorf("%s: line %d: missing prerequisite %s; upload that file with this draft", name, textLine(query.Text, dependency.Name), dependency.Name)
 			}
-			used[dependency.Name] = true
 			compatible, err := VersionMatches(queries[dependency.Name].Version, dependency.Conditions)
-			if query.DisabledReason == "" && (err != nil || !compatible) {
+			if (query.DisabledReason == "" || !relaxDisabledChecks) && (err != nil || !compatible) {
 				return nil, fmt.Errorf("%s: prerequisite %s at %s does not satisfy %s", name, dependency.Name, queries[dependency.Name].Version, dependency.Conditions)
 			}
 			declaredParameters[dependency.AnswerParameter()] = true
 			producer := queries[dependency.Name]
-			if producer.ColumnsKnown && query.DisabledReason == "" {
+			if producer.ColumnsKnown && (query.DisabledReason == "" || !relaxDisabledChecks) {
 				for _, field := range query.SharedFields {
 					if field.Parameter != dependency.AnswerParameter() {
 						continue
@@ -490,21 +550,14 @@ func orderQueries(queries map[string]Query, schema Schema) ([]Query, error) {
 				}
 			}
 		}
-		for _, prerequisite := range plan.Prerequisites(query) {
-			used[prerequisite] = true
-		}
 		for _, match := range queryParameter.FindAllStringSubmatch(parameterText(query.Text), -1) {
 			if !declaredParameters[match[1]] {
 				return nil, fmt.Errorf("%s: parameter $%s needs a declared query prerequisite", name, match[1])
 			}
 		}
 	}
-	for _, binding := range schema.Nodes {
-		used[binding.Query] = true
-	}
-	for _, binding := range schema.Relationships {
-		used[binding.Query] = true
-	}
+	// Files that only return rows are valid intermediate steps. Their answers
+	// can be inspected and reused while the developer builds later consumers.
 	sort.Strings(names)
 	var visit func(string) error
 	visit = func(name string) error {
@@ -527,9 +580,6 @@ func orderQueries(queries map[string]Query, schema Schema) ([]Query, error) {
 		return nil
 	}
 	for _, name := range names {
-		if !used[name] {
-			return nil, fmt.Errorf("unused query %s has no output binding or dependent", name)
-		}
 		if err := visit(name); err != nil {
 			return nil, err
 		}
@@ -621,8 +671,35 @@ func (s Plan) Affected(changedNodes, changedRelationships []string, coverageKnow
 // not wait for itself or its peers: their combined new answer needs this rule too.
 func (s Plan) Prerequisites(query Query) []string {
 	var (
-		result                []string
-		seen                  = make(map[string]bool)
+		result []string
+		seen   = make(map[string]bool)
+	)
+	for _, dependency := range s.ExecutionDependencies(query) {
+		if !seen[dependency.Prerequisite] {
+			seen[dependency.Prerequisite] = true
+			result = append(result, dependency.Prerequisite)
+		}
+	}
+	sort.Strings(result)
+	return result
+}
+
+// ExecutionDependency explains why one query waits for another. The runner and
+// workspace use this same list, so the picture cannot invent a different order.
+// Several reasons can connect the same two queries.
+type ExecutionDependency struct {
+	Prerequisite string `json:"prerequisite"`
+	Consumer     string `json:"consumer"`
+	Type         string `json:"type"`
+	Name         string `json:"name"`
+	Parameter    string `json:"parameter,omitempty"`
+	Conditions   string `json:"conditions,omitempty"`
+}
+
+func (s Plan) ExecutionDependencies(query Query) []ExecutionDependency {
+	var (
+		result                = []ExecutionDependency{}
+		seen                  = make(map[ExecutionDependency]bool)
 		producedRelationships = make(map[string]bool)
 	)
 	for _, binding := range s.Schema.Relationships {
@@ -630,20 +707,24 @@ func (s Plan) Prerequisites(query Query) []string {
 			producedRelationships[binding.Kind] = true
 		}
 	}
-	add := func(name string, graphInput bool) {
-		if !seen[name] && (!graphInput || name != query.Name) {
-			seen[name] = true
-			result = append(result, name)
+	add := func(name string, dependency Dependency) {
+		var connection = ExecutionDependency{Prerequisite: name, Consumer: query.Name, Type: dependency.Type, Name: dependency.Name}
+		if dependency.Type == "query" {
+			connection.Parameter, connection.Conditions = dependency.AnswerParameter(), dependency.Conditions
+		}
+		if !seen[connection] && (dependency.Type == "query" || name != query.Name) {
+			seen[connection] = true
+			result = append(result, connection)
 		}
 	}
 	for _, dependency := range query.Dependencies {
 		switch dependency.Type {
 		case "query":
-			add(dependency.Name, false)
+			add(dependency.Name, dependency)
 		case "node":
 			for _, binding := range s.Schema.Nodes {
 				if binding.Kind == dependency.Name {
-					add(binding.Query, true)
+					add(binding.Query, dependency)
 				}
 			}
 		case "relationship":
@@ -652,12 +733,11 @@ func (s Plan) Prerequisites(query Query) []string {
 			}
 			for _, binding := range s.Schema.Relationships {
 				if binding.Kind == dependency.Name {
-					add(binding.Query, true)
+					add(binding.Query, dependency)
 				}
 			}
 		}
 	}
-	sort.Strings(result)
 	return result
 }
 

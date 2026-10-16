@@ -1,0 +1,36 @@
+{
+  "focused_ui": {
+    "files": 7,
+    "passed": 41,
+    "final_notice_rerun": 17
+  },
+  "native_api_and_registration": "passed complete packages",
+  "rule_service_and_postprocessing": "passed complete packages, including real temporary-store HTTP upload/review/activate/discard",
+  "types": "passed",
+  "lint": "passed, including final notice correction",
+  "ui_build": "passed, including final correction",
+  "native_build": "passed, including final correction",
+  "rule_build": "passed",
+  "both_theme_browser": "passed",
+  "live_browser_final": "passed normal login and discarded preview; no live activation, upload, or analysis start",
+  "full_just_test": {
+    "status": "failed",
+    "elapsed": "22m 5s",
+    "shared_ui": {
+      "files_failed": 5,
+      "files_passed": 180,
+      "files_skipped": 1,
+      "tests_failed": 17,
+      "tests_passed": 1253,
+      "tests_skipped": 5,
+      "unhandled_errors": 2
+    },
+    "doodle_ui": {
+      "files_passed": 12,
+      "tests_passed": 134
+    },
+    "affected_cases": "Existing ExploreTable, CypherSearch, EdgeFilter/EdgeFilteringDialog, RuleForm cases; timeouts and missing expected elements. No base-checkout reproduction performed.",
+    "log": "tools/esc1-poc/work/workspace-management/just-test.log"
+  },
+  "prepare_for_codereview": "not rerun successfully for this follow-up; earlier unavailable custom lint/generation limits remain"
+}

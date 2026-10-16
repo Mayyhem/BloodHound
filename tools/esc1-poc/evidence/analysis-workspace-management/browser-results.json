@@ -1,0 +1,75 @@
+{
+  "checks": [
+    {
+      "theme": "light",
+      "canvas_full_area": true,
+      "table_narrows": true,
+      "pointer_resize": true,
+      "report_in_bottom_panel": true,
+      "bulk_review": true,
+      "stale_activation_rejected": true,
+      "invalid_draft_available": true,
+      "run_explicit": true,
+      "actual_edge_click": true
+    },
+    {
+      "theme": "dark",
+      "canvas_full_area": true,
+      "table_narrows": true,
+      "pointer_resize": true,
+      "report_in_bottom_panel": true,
+      "bulk_review": true,
+      "stale_activation_rejected": true,
+      "invalid_draft_available": true,
+      "run_explicit": true,
+      "actual_edge_click": true
+    },
+    {
+      "narrow_no_page_overflow": true
+    }
+  ],
+  "errors": [],
+  "data": "Example snapshots and simulated management replies; no live graph or rule changes.",
+  "writes": [
+    {
+      "method": "POST",
+      "path": "/api/v2/analysis-workspace/preview"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v2/analysis-workspace/rules"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v2/analysis"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v2/analysis-workspace/draft"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v2/analysis-workspace/draft"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/analysis-workspace/preview"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v2/analysis-workspace/rules"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v2/analysis"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v2/analysis-workspace/draft"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v2/analysis-workspace/draft"
+    }
+  ]
+}

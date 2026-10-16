@@ -37,9 +37,9 @@ type queryAnswer struct {
 // calculate starts ready queries whenever a place is free. A slow query does
 // not hold up the next step of an unrelated chain. Shared prerequisites run once
 // and their files stay available until every consumer has finished reading.
-func calculate(ctx context.Context, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report, stage func(extension.RelationshipBinding, *answerFile) error) (map[string]*answerFile, error) {
+func calculate(ctx context.Context, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report, stage func(extension.RelationshipBinding, *answerFile) error, validateOnlyNodes, withheldRelationships map[string]bool) (map[string]*answerFile, error) {
 	var currentQuery string
-	result, err := calculateQueries(ctx, database, transaction, plan, space, report, stage, &currentQuery)
+	result, err := calculateQueries(ctx, database, transaction, plan, space, report, stage, &currentQuery, validateOnlyNodes, withheldRelationships)
 	if err != nil {
 		var failure *queryFailure
 		if errors.As(err, &failure) {
@@ -72,7 +72,7 @@ func recordRead(report *Report, answer queryAnswer) {
 	}
 }
 
-func calculateQueries(ctx context.Context, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report, stage func(extension.RelationshipBinding, *answerFile) error, currentQuery *string) (map[string]*answerFile, error) {
+func calculateQueries(ctx context.Context, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report, stage func(extension.RelationshipBinding, *answerFile) error, currentQuery *string, validateOnlyNodes, withheldRelationships map[string]bool) (map[string]*answerFile, error) {
 	var (
 		answers            = map[string]*answerFile{}
 		remaining          = map[string]int{}
@@ -157,12 +157,14 @@ func calculateQueries(ctx context.Context, database Database, transaction Transa
 					return nil, err
 				}
 				desired[binding.Kind] = file
-				if err := stage(binding, file); err != nil {
-					return nil, err
+				if !withheldRelationships[binding.Kind] {
+					if err := stage(binding, file); err != nil {
+						return nil, err
+					}
+					graphChangesStaged = true
+					workers = 1
 				}
 				staged[binding.Kind] = true
-				graphChangesStaged = true
-				workers = 1
 			}
 		}
 		for running < workers {
@@ -234,8 +236,14 @@ func calculateQueries(ctx context.Context, database Database, transaction Transa
 			if err != nil {
 				return nil, err
 			}
-			if err := publishHelperAnswers(ctx, transaction, binding, sorted, report); err != nil {
-				return nil, fmt.Errorf("helper answers from %s: %w", query.Name, err)
+			var publishErr error
+			if validateOnlyNodes[binding.Kind] {
+				publishErr = validateHelperAnswers(ctx, transaction, binding, sorted, report)
+			} else {
+				publishErr = publishHelperAnswers(ctx, transaction, binding, sorted, report)
+			}
+			if publishErr != nil {
+				return nil, fmt.Errorf("helper answers from %s: %w", query.Name, publishErr)
 			}
 			if err := sorted.remove(); err != nil {
 				return nil, err
@@ -270,6 +278,14 @@ func calculateQueries(ctx context.Context, database Database, transaction Transa
 		}
 		completed[query.Name] = true
 		report.Execution.query(query.Name).State = "succeeded"
+		if space.inspectTestAnswer != nil && query.Name == space.testTarget {
+			if running != 0 {
+				return nil, fmt.Errorf("editor results require all prerequisite readers to finish")
+			}
+			if err := space.inspectTestAnswer(ctx, transaction, query.Name, CompleteAnswer{file: file}); err != nil {
+				return nil, fmt.Errorf("inspect editor results: %w", err)
+			}
+		}
 		*currentQuery = ""
 		report.Execution.Phase = "calculation"
 		for _, dependency := range query.Dependencies {

@@ -10,6 +10,8 @@ Start with a query that returns `source` and `target` object IDs and a literal e
 
 This guide covers the current experimental architecture in `tools/esc1-poc`. It requires the modified BloodHound application and rule service described in [USAGE.md](USAGE.md). The schema additions described here are a proposal, not features supplied by an unmodified BloodHound installation.
 
+Inspect activated files in **Administration → OpenGraph Analysis**: follow dependencies, read the original Cypher, download the displayed revision, and inspect matching completed outcomes. See [workspace instructions](USAGE.md#inspect-the-analysis-workspace). This view requires no new declarations. You can also upload, review, and activate files there, using the Upload button in the graph's bottom-left corner.
+
 ## Find what you need
 
 | I want to… | Go to… |
@@ -200,7 +202,7 @@ If the account arrives before the directory user, a later run can connect them w
 
 Upload the schema through **OpenGraph Management** and the `snake_case.cypher` files through the current **rules page**. Keep the schema beside the queries for offline `plan` checks. Its filename does not identify the installed extension; `schema.name` does.
 
-**Different extensions may use the same query filename.** `PoC_AD/users` and `PoC_Vault/users` are separate analyses. Each query declares its own namespace and version, even if it only supplies shared answers. Each file must produce an output or be needed by another query; unused files are rejected.
+**Different extensions may use the same query filename.** `PoC_AD/users` and `PoC_Vault/users` are separate analyses. Each query declares its own namespace and version, even if it only supplies shared answers. A file may return intermediate rows before another file consumes them. This supports building an extension one step at a time; editor activation still requires a successful current test and review.
 
 | Field or rule | What you need to know |
 | --- | --- |
@@ -226,7 +228,7 @@ Keep `schema.name` stable when updating an installed extension. You can add prod
 
 ## File association and compatible versions
 
-Put these declarations in the leading comments, after an optional license block:
+Put these declarations at the top of the file, before the Cypher (analysis files need no license header):
 
 ```cypher
 // namespace: PoC_CyberArk
@@ -263,7 +265,7 @@ Every query starts with a `depends-on` comment. Declare the node and relationshi
 // depends-on: query:getting_started_enabled_users
 ```
 
-These declarations do two jobs: order queries and decide which rules need to run after data changes. Include kinds used in filters and traversals, not just those in the final output. If a query has no inputs, write `// depends-on: none`.
+These declarations do two jobs: order queries and decide which rules need to run after data changes. Include kinds used in filters and traversals, not just those in the final output. If a query reads nothing that needs declaring, leave the `// depends-on:` line out; `// depends-on: none` is still accepted but no longer required. Leaving the line out never hides a read: the checker still reports any kind or `$parameter` the Cypher uses without a declaration.
 
 Visible labels such as `(person:User)`, relationship types such as `[:MemberOf]`, and parameters such as `$enabled_users` are checked against the declared inputs. Comments and quoted text do not count as graph reads. These reliable inputs could be supplied automatically in a future authoring format, but this change keeps the existing explicit declarations. They remain needed for reads that cannot be fully inferred and for special processing instructions.
 
@@ -302,7 +304,7 @@ RETURN DISTINCT person.objectid AS source, group.objectid AS target,
 
 The filename without `.cypher` is the default parameter name: `$getting_started_enabled_users` is a list of rows, each with `user_id`. Query parameters currently come from declared query prerequisites; there is no separate arbitrary parameter/configuration file for authors.
 
-Both files must be in the loaded bundle. The final query names its declared edge kind in `RETURN`; the prerequisite has no output declaration. Query dependencies can cross extension boundaries, and a shared prerequisite runs once for its consumers in that run. Answers are not cached between runs. Circular dependencies are rejected.
+Both files must be in the loaded bundle. The final query names its declared edge kind in `RETURN`; the prerequisite has no output declaration. Query dependencies can cross extension boundaries, and a shared prerequisite runs once for its consumers in that run. Normal analysis recalculates answers; the editor can separately reuse complete matching answers based on stable object identifiers. Circular dependencies are rejected.
 
 The plan now lists the enabled-user query with role `intermediate`, before the membership query. After a successful run, users with `enabled: true` keep their direct membership connections. Users with `false` or a missing `enabled` property have none of these calculated connections. Their native `MemberOf` relationships remain unchanged.
 
@@ -564,7 +566,7 @@ The local `plan` command is a useful first check. Use the rule page and a dedica
 
 | Symptom | What to check |
 | --- | --- |
-| File upload rejected | Filenames, size limits, valid schema fields, missing prerequisite files, unused queries, and literal output kinds with matching policies for shared relationship producers. |
+| File upload rejected | Filenames, size limits, valid schema fields, missing prerequisite files, and literal output kinds with matching policies for shared relationship producers. |
 | Output declaration rejected | Use a literal `kind`, declare that kind once in the schema, and give all its producers the same update policy. |
 | Query parameter rejected | Declare `query:filename`; use `$filename` without the extension. |
 | Rule never runs after activation | Activation alone does not execute it. Trigger a later successful native analysis with a collection upload; check disabled prerequisites and report revision. |
@@ -592,3 +594,21 @@ See [USAGE.md — Troubleshooting](USAGE.md#troubleshooting) for container comma
 | [AD/CyberArk example](examples/cross-platform/README.md) | Separate extensions consuming shared query answers. |
 | [ESC1 query notes](extension/QUERY_NOTES.md) | Exact ESC1 calculations and current Go-assisted operations. |
 | [REVIEW.md](REVIEW.md) | Implementation map, recorded evidence, and unproven behavior. |
+
+The native analysis workspace now includes the requested Explore-style canvas, resizable bottom rules/report panel, right entity panel, uploads and draft review, individual/multiple-rule enable/disable/delete, and Run Analysis. See [workspace usage](USAGE.md#inspect-the-analysis-workspace) for permissions and revision checks. Analysis files can be uploaded individually or as a `.zip`; the browser reads the `.cypher` files inside it and the service applies the same checks as for individually selected files. Collapsed graph groups, historical diagrams, live query progress, and isolated tests remain later work. The older rules page remains available.
+
+## Building an analysis file one step at a time
+
+Create/Edit analysis file uses ordinary Cypher and the existing leading declarations. Choosing prerequisites from the filterable dropdown adds their query declarations; aliases are edited in the Cypher text. When the text's `// namespace:` line names another installed extension, the file moves to that extension, so the dropdown and the text cannot disagree; a namespace with no installed schema gets its own plain message. Every prerequisite check (including the one play runs) also lists declarations the file never uses, from `extension.UnusedDependencies`: a declaration counts as used when the Cypher reads its label, relationship type, or `$parameter`, or when `reachability`, `batch-on`, or `group-overlap` names it. The editor shows them as an orange warning only; uploads and runs still accept unused declarations. A helper property that is empty (null), such as `domain.name` on a domain that was referenced but never collected, now fails with `runner.ErrEmptyPropertyValue`, which the status report and editor explain with a `coalesce()` or `WHERE … IS NOT NULL` suggestion. A dependency window, drawn with the main page's left-to-right graph, appears once the file has any prerequisites or existing consumers. It shows the declared prerequisites until the prerequisites are checked, then the complete needed chain; queries that already read this file's answer are added in both cases. Declarations must come before the Cypher statement; later comments do not change the file's inputs. Review prerequisites shows the actual needed chain, including additional shared-output producers. Testing runs that same check automatically first when the text changed. When the check fails, `postprocessing/editor_explanations.go` turns the most common problems (an undeclared graph read, `depends-on: none` combined with other dependencies, an unknown or repeated `$parameter`, more than one statement, graph writes, `CALL`, a disabled prerequisite) into fixed guidance. It fills in only line numbers, file names and validated kind or parameter names, so it never repeats file text. A test that returns a whole node, relationship or path is recognized through `runner.ErrUnsupportedAnswerValue`.
+
+Pressing play (**Test file**) recalculates that chain against the current graph and previews the candidate's rows without saving graph data. Saved answers are never reused (removed 15 October 2026: measured full runs take under 12 seconds even at one million objects, so reuse saved little and added storage, freshness rules, and choices to explain). A limited table is display data, never complete input for another file. Results are rows only, shown between the Cypher box and Dependencies; empty values appear as `null`. Analysis files cannot return whole graph objects, so the editor no longer looks up objects or relationships from returned identifiers; the request and response carry no graph or identifier-column fields.
+
+You may test a proposed output kind before declaring it in the installed extension. Review/activation requires valid schema declarations and a fresh successful test of the exact file. Use the separate schema management page to update definitions, then test again. **Save private copy** (floppy-disk button) keeps unfinished work private to you without activation, and **Revert** (rewind button) returns to the opened, resumed, or last saved copy. **Review tested file**, then **Activate reviewed file**, changes only this file; pending uploads remain separate. Run Analysis is what saves calculated graph results.
+
+All graph writes must use BloodHound, including between tests. Read-only database queries are allowed. Changing stored objects, relationships or properties directly through SQL/Neo4j would bypass freshness tracking and violates this workspace condition. Saving Cypher text is not a graph-data write. Restarting BloodHound requires fresh tests and recalculation of cached inputs. Kind/index metadata may be prepared before first use; temporary test graph data is discarded.
+
+Editor calculation limits are one worker, one million result rows, 512 MiB temporary answers, 100,000 changed objects, two minutes per query and five minutes per chain. The result table shows at most 500 rows/1 MiB and states the complete count. These limits are conservative brakes, not a claimed maximum extension size.
+
+Prerequisite chains that call `id()` or use reachability/group-overlap processing work in the editor without special handling, because every test recalculates them. Prefer `objectid` when another file needs a lasting reference to an object.
+
+If the private editor answer folder cannot be initialized, BloodHound logs a fixed warning and keeps ordinary analysis and writer coordination running. Test/source/review/activation operations report the editor unavailable until storage is repaired and BloodHound restarts. Private working-copy storage is separate. Optional answer retention must not make normal BloodHound startup fail.

@@ -1,0 +1,29 @@
+{
+  "containers": {
+    "/esc1-workspace-manual-bloodhound-1": {
+      "id": "c86b89e6444b3456336b3ad2861e442ccb079f1001b66cb8261cadd2408b0002",
+      "image": "esc1-poc-bloodhound-workspace:20261014-management-final",
+      "state": "running",
+      "started_at": "2026-10-14T16:52:08.842383194Z"
+    },
+    "/esc1-workspace-manual-rule-service-1": {
+      "id": "6b84e9d3be05460a60b8c410221ed2b25b94d5657bc0d4ea468c35ad8d199685",
+      "image": "esc1-poc-rules-workspace:20261014-management",
+      "state": "running",
+      "started_at": "2026-10-14T16:40:54.4366284Z"
+    },
+    "/esc1-workspace-manual-app-db-1": {
+      "id": "efb6e6aff4b802018aeb2757fd10eaf0e7475a7175251dc52f217f200c8b161c",
+      "image": "docker.io/library/postgres:18@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+      "state": "running",
+      "started_at": "2026-10-14T14:17:28.158517697Z"
+    },
+    "/esc1-workspace-manual-graph-db-1": {
+      "id": "3aaccb2437c229014c59fd91abfb15d86472321a0accd5ed66c0d8916f357a06",
+      "image": "docker.io/library/neo4j:4.4.42@sha256:73b5a47eb9952f47fcc42fcc80bdd6bd0d6b71eea9a1a345c216675498c790e4",
+      "state": "running",
+      "started_at": "2026-10-14T14:17:28.153895283Z"
+    }
+  },
+  "active_rules_sha256": "16ed733e9ed4458cda9cf455aa372d59394d2ef03e89422b0c68e6fdf678c8b7"
+}
