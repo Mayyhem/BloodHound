@@ -276,7 +276,7 @@ it('shows revisions and a colored legend in the top panel', async () => {
     await screen.findByRole('table', { name: 'Current analysis rules' });
     expect(screen.getByText('Current rule revision:').parentElement).toHaveTextContent(workspace.plan.revision);
     const legend = screen.getByLabelText('Graph color legend');
-    expect(within(legend).getByText('Blocked').previousElementSibling).toHaveStyle({
+    expect(within(legend).getByText('Blocked or set aside').previousElementSibling).toHaveStyle({
         backgroundColor: '#ed8b00',
     });
     expect(within(legend).getByText('Failed').previousElementSibling).toHaveStyle({ backgroundColor: '#ef5350' });

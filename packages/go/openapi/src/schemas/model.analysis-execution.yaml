@@ -26,6 +26,7 @@ properties:
     - not-started
     - running
     - succeeded
+    - partial
     - failed
     - skipped
   save:
@@ -41,9 +42,13 @@ properties:
     type: string
   failure:
     type: object
+    description: The first failure in the run.
     properties:
       query:
         type: string
+      relationship:
+        type: string
+        description: The connection type being saved when the failure happened, if any.
       stage:
         type: integer
         format: int64
@@ -55,6 +60,30 @@ properties:
     required:
     - phase
     - message
+  failures:
+    type: array
+    description: >-
+      Every failure, when failing steps were set aside and the rest of the run
+      was saved (calculation partial).
+    items:
+      type: object
+      properties:
+        query:
+          type: string
+        relationship:
+          type: string
+        stage:
+          type: integer
+          format: int64
+          minimum: 0
+        phase:
+          type: string
+        message:
+          type: string
+      required:
+      - phase
+      - message
+    maxItems: 32
   queries:
     type: array
     items:
@@ -74,6 +103,7 @@ properties:
           - succeeded
           - failed
           - skipped
+          - set-aside
           - disabled
           - canceled
         reason:

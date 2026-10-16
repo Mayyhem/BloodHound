@@ -141,6 +141,9 @@ func TestSelectivePublicationAndRollbackOnBothDatabases(t *testing.T) {
 	}
 }
 
+// The selected rule copies the user's selection_version onto its connection,
+// so changing that evidence changes the answer and the connection is
+// replaced. An identical connection would be left unchanged.
 func selectionIntegrationPlan(plan extension.Plan) extension.Plan {
 	plan.Schema.CompareNativeESC1 = false
 	plan.Schema.Nodes = []extension.NodeBinding{
@@ -153,7 +156,7 @@ func selectionIntegrationPlan(plan extension.Plan) extension.Plan {
 	}
 	plan.Queries = []extension.Query{
 		{Name: "selected_helper.cypher", Parameter: "selected_helper", Text: "MATCH (source:User {objectid: 'PoC_Test_User'}) RETURN 'PoC_SelectionHelper_example' AS id, ['PoC_SelectionHelper'] AS kinds, {name:source.selection_version} AS properties", Dependencies: []extension.Dependency{{Type: "node", Name: "User"}}},
-		{Name: "selected.cypher", Parameter: "selected", Text: "MATCH (source:User {objectid: 'PoC_Test_User'}) WHERE source.selection_enabled = true RETURN source.objectid AS source, 'PoC_Test_Domain' AS target", Dependencies: []extension.Dependency{{Type: "node", Name: "User"}, {Type: "query", Name: "selected_helper.cypher"}}},
+		{Name: "selected.cypher", Parameter: "selected", Text: "MATCH (source:User {objectid: 'PoC_Test_User'}) WHERE source.selection_enabled = true RETURN source.objectid AS source, 'PoC_Test_Domain' AS target, {version:source.selection_version} AS properties", Dependencies: []extension.Dependency{{Type: "node", Name: "User"}, {Type: "query", Name: "selected_helper.cypher"}}},
 		{Name: "independent_helper.cypher", Parameter: "independent_helper", Text: "MATCH (source:Group {objectid: 'PoC_Test_Group'}) RETURN 'PoC_SelectionIndependentHelper_example' AS id, ['PoC_SelectionIndependentHelper'] AS kinds, {name:'independent'} AS properties", Dependencies: []extension.Dependency{{Type: "node", Name: "Group"}}},
 		{Name: "independent.cypher", Parameter: "independent", Text: "MATCH (source:Group {objectid: 'PoC_Test_Group'}) RETURN source.objectid AS source, 'PoC_Test_Domain' AS target, {name:'independent'} AS properties", Dependencies: []extension.Dependency{{Type: "node", Name: "Group"}, {Type: "query", Name: "independent_helper.cypher"}}},
 	}
@@ -225,7 +228,16 @@ func TestAutomaticObservedSelectionOnBothDatabases(t *testing.T) {
 			}
 			server := httptest.NewServer(handler)
 			defer server.Close()
-			service, err := postprocessing.New(postprocessing.Configuration{URL: server.URL, Token: token, Directory: t.TempDir(), Backend: backend.name}, backend.native)
+			// The service reads the installed schemas before every run, as
+			// BloodHound does. Here they come from the test's own rule store.
+			readSchemas := func(context.Context) ([]byte, error) {
+				active, err := store.Active()
+				if err != nil {
+					return nil, err
+				}
+				return json.Marshal(ruleservice.SchemaSnapshot{Definitions: active.Schemas})
+			}
+			service, err := postprocessing.New(postprocessing.Configuration{URL: server.URL, Token: token, Directory: t.TempDir(), Backend: backend.name, ReadSchemas: readSchemas}, backend.native)
 			if err != nil {
 				t.Fatal(err)
 			}

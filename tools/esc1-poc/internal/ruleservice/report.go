@@ -32,7 +32,8 @@ func validateExecution(execution *runner.Execution) error {
 	if execution == nil {
 		return nil
 	}
-	if !slices.Contains([]string{"not-started", "running", "succeeded", "failed", "skipped"}, execution.Calculation) || !slices.Contains([]string{"not-started", "saving", "succeeded", "failed", "uncertain", "unchanged"}, execution.Save) {
+	// "partial" means failing steps were set aside and the rest was saved.
+	if !slices.Contains([]string{"not-started", "running", "succeeded", "partial", "failed", "skipped"}, execution.Calculation) || !slices.Contains([]string{"not-started", "saving", "succeeded", "failed", "uncertain", "unchanged"}, execution.Save) {
 		return fmt.Errorf("invalid calculation or save state")
 	}
 	if len(execution.Queries) > MaxFiles || len(execution.Phase) > 64 || execution.Elapsed < 0 {
@@ -44,9 +45,15 @@ func validateExecution(execution *runner.Execution) error {
 	if execution.Save != "succeeded" && execution.Saved != nil {
 		return fmt.Errorf("saved counts require a confirmed save")
 	}
+	if len(execution.Failures) > MaxFiles {
+		return fmt.Errorf("invalid failure details")
+	}
+	var failures = append([]runner.Failure(nil), execution.Failures...)
 	if execution.Failure != nil {
-		failure := execution.Failure
-		if (failure.Query != "" && !queryName.MatchString(failure.Query)) || failure.Stage < 0 || failure.Stage > MaxFiles || len(failure.Phase) > 64 || len(failure.Message) > 2048 || !utf8.ValidString(failure.Message) {
+		failures = append(failures, *execution.Failure)
+	}
+	for _, failure := range failures {
+		if (failure.Query != "" && !queryName.MatchString(failure.Query)) || (failure.Relationship != "" && runner.SafeName(failure.Relationship, "") == "") || failure.Stage < 0 || failure.Stage > MaxFiles || len(failure.Phase) > 64 || len(failure.Message) > 2048 || !utf8.ValidString(failure.Message) {
 			return fmt.Errorf("invalid failure details")
 		}
 	}
@@ -69,7 +76,9 @@ func validateExecution(execution *runner.Execution) error {
 			return fmt.Errorf("a schema pause must be reported as disabled")
 		}
 		names[query.Name] = true
-		if !slices.Contains([]string{"waiting", "running", "succeeded", "failed", "skipped", "disabled", "canceled"}, query.State) {
+		// "set-aside" means the step was left out because of a failure and
+		// kept its previous results.
+		if !slices.Contains([]string{"waiting", "running", "succeeded", "failed", "skipped", "set-aside", "disabled", "canceled"}, query.State) {
 			return fmt.Errorf("invalid query state")
 		}
 		for _, count := range []*int64{query.Rows, query.Proposed, query.Saved} {

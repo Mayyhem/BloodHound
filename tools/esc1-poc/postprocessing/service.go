@@ -53,6 +53,8 @@ type ruleClient interface {
 // fails, automatic retries stop: a failure caused by a rule would only repeat,
 // and repeated failures would push useful runs out of the recent history.
 // The next BloodHound analysis (Run Analysis or a data upload) starts again.
+// A run that saved everything except some set-aside steps is retried the same
+// way; the retry calculates only those steps and what they need.
 const maxRunAttempts = 2
 
 // errGraphChangedWhileWaiting means new data arrived before this run could
@@ -223,11 +225,13 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 		if err != nil {
 			return err
 		}
+		// A failing step is set aside with everything tied to it, and the
+		// rest is still calculated and saved (see RunSettingAsideFailures).
 		var runError error
-		report, runError = s.execute(turnContext, plan, runner.Options{
+		report, runError = runner.RunSettingAsideFailures(turnContext, plan, runner.Options{
 			BatchID: pending.event, IngestionComplete: true, WritersPaused: true, Changes: changes,
 			TemporaryDirectory: s.configuration.Directory, Limits: runner.DefaultLimits(),
-		})
+		}, s.execute)
 		// PostgreSQL publication borrows a transaction directly from its driver.
 		// It is already inside this exclusive turn, but does not pass through the
 		// ordinary writer hook. Record confirmed or uncertain publication here
@@ -246,6 +250,8 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 			// Clear this while other writers are still waiting at the gate.
 			// A successful skip also settles the accumulated changes: none of
 			// them can affect this already-published version of the rules.
+			// After a partial save, the saved run record lists the set-aside
+			// steps as unfinished, so the next run still recalculates them.
 			s.changes.Reset()
 		}
 		return runError
@@ -270,6 +276,9 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 		s.stopIfLastAttempt()
 		return false, err
 	}
+	if len(report.SetAside) != 0 {
+		return s.reportSetAside(ctx, report), nil
+	}
 	if report.Skipped {
 		s.report(ctx, "success", "No rules depend on the changed data. Existing extension results were kept.", report.Execution)
 	} else {
@@ -277,6 +286,41 @@ func (s *Service) run(ctx context.Context) (bool, error) {
 	}
 	s.pending = nil
 	return report.Committed, nil
+}
+
+// reportSetAside reports a run that saved everything except the steps set
+// aside after a failure. It is always "partial" (shown in orange), even when
+// no other step needed saving, as on a retry that recalculates only the
+// set-aside steps: the other steps' saved results are still current. The
+// pending run stays for one more automatic attempt.
+func (s *Service) reportSetAside(ctx context.Context, report runner.Report) bool {
+	var (
+		saved    int
+		failures = len(report.Execution.Failures)
+	)
+	for _, query := range report.Execution.Queries {
+		if query.State == "succeeded" {
+			saved++
+		}
+	}
+	message := fmt.Sprintf("Finished with %s: %s saved; %d kept their previous results. %d connections added, %d removed, %d updated.",
+		plural(failures, "failure", "failures"), plural(saved, "step", "steps"), len(report.SetAside), report.Added, report.Removed, report.Updated)
+	if s.pending.attempt < maxRunAttempts {
+		message += " The set-aside steps will be tried once more in about a minute."
+	} else {
+		message += " Automatic retries have stopped; the set-aside steps run again after the next BloodHound analysis (Run Analysis or a data upload)."
+	}
+	s.report(ctx, "partial", message, report.Execution)
+	s.stopIfLastAttempt()
+	return report.Committed
+}
+
+// plural writes a count with the right word: "1 step", "2 steps".
+func plural(count int, one, many string) string {
+	if count == 1 {
+		return fmt.Sprintf("1 %s", one)
+	}
+	return fmt.Sprintf("%d %s", count, many)
 }
 
 // retryNote ends a failure message by saying whether another automatic try is

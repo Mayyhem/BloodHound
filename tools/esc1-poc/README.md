@@ -29,7 +29,7 @@ Existing settings give BloodHound the rule container's address and access secret
 
 ## The main safeguards and limits
 
-- The runner combines every producer’s complete answer before refreshing a relationship type within its declared endpoint scope. Existing edges in that scope participate regardless of their origin. A failed calculation before saving preserves the previous results.
+- The runner combines every producer’s complete answer before refreshing a relationship type within its declared endpoint scope. Existing edges in that scope participate regardless of their origin. A failed calculation before saving preserves the previous results. When the failure belongs to one step, that step and the steps tied to it are set aside (keeping their previous results) and everything else is saved in a new attempt; the run is reported as partial.
 - File checks parse complete queries, suggest missing input declarations, and distinguish those checks from actual database execution.
 - Execution reports show query failures, counts, timings, save outcomes, the last confirmed saved revision, and up to 20 recent attempts.
 - Uploads are saved as inactive drafts. Missing schemas can be installed through OpenGraph Management later; the complete set must validate and be reviewed before activation.

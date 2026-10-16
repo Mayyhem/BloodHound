@@ -13,6 +13,7 @@ This guide explains the current design and its limits. Extension authors should 
 - [Writing query files](#authoring-query-files)
 - [Existing-edge policies](#what-happens-to-an-existing-edge)
 - [Saving results, helpers, and recovery](#saving-results-and-recovering-from-failure)
+- [When one step fails: setting steps aside](#when-one-step-fails-setting-steps-aside)
 - [Resource controls and temporary files](#resource-controls-and-temporary-files)
 - [Both databases and DAWGS changes](#both-databases-and-focused-dawgs-changes)
 - [Selecting affected extension queries](#selecting-affected-extension-queries)
@@ -77,9 +78,11 @@ flowchart TD
     Rules --> Check[Check the complete answers]
     Check --> Save[Save helpers, edges, and success record together]
     Save --> Release[Allow waiting graph changes to continue]
-    Rules -->|Failure before saving| Preserve[Discard unfinished extension changes]
-    Check -->|Failure before saving| Preserve
-    Preserve --> Release
+    Rules -->|A step fails| Preserve[Discard this attempt's changes]
+    Check -->|A step fails| Preserve
+    Preserve --> SetAside[Set aside the failed step and the steps tied to it]
+    SetAside -->|Run the rest again| Rules
+    Preserve -->|Failure belongs to no step| Release
     Readers[People can still search and view] --> Database[Graph database]
     Save --> Database
 ```
@@ -100,9 +103,9 @@ Database-switching and graph-migration tools use separate connections that canno
 
 After BloodHound successfully finishes its own analysis, it can run the extension. That analysis may cover several uploads. Uploading rules alone never starts a calculation. A newer successful analysis replaces any older pending attempt because it provides newer information. Pending attempts are kept in memory; after a restart, BloodHound's startup analysis provides another chance to run the rules.
 
-After a failure, BloodHound retries once, when its background processing is idle and no sooner than one minute later. If the retry also fails, automatic retries stop until the next successful BloodHound analysis (Run Analysis or a data upload). A failure caused by a rule repeats identically, and endless retries pushed useful runs out of the 20 recent reports (changed 16 October 2026; previously it retried every minute). Each failure message says whether one more try is coming. If new data arrives before the retry, the attempt is recorded as **waiting**, not failed: nothing failed, and the next analysis runs the rules. The retry uses the same saved rules. If downloading the rules failed, the next eligible attempt can download them. A retry is allowed only if no other graph update has started since the successful analysis. An update that later fails still prevents a retry, as does a failed new analysis. In those cases, the extension waits for another successful analysis. It checks this condition again after obtaining permission to run.
+After a failure, BloodHound retries once, when its background processing is idle and no sooner than one minute later. A **partial** run (some steps set aside after a failure, everything else saved; see [When one step fails](#when-one-step-fails-setting-steps-aside)) is retried the same way, and its retry calculates only the set-aside steps and what they need. If the retry also fails, automatic retries stop until the next successful BloodHound analysis (Run Analysis or a data upload). A failure caused by a rule repeats identically, and endless retries pushed useful runs out of the 20 recent reports (changed 16 October 2026; previously it retried every minute). Each failure message says whether one more try is coming. If new data arrives before the retry, the attempt is recorded as **waiting**, not failed: nothing failed, and the next analysis runs the rules. The retry uses the same saved rules. If downloading the rules failed, the next eligible attempt can download them. A retry is allowed only if no other graph update has started since the successful analysis. An update that later fails still prevents a retry, as does a failed new analysis. In those cases, the extension waits for another successful analysis. It checks this condition again after obtaining permission to run.
 
-BloodHound can report a successful import and native analysis even if an extension fails. The extension report separately records calculation and saving, each query's name/stage/state/reason, complete answer count, read duration, proposed output count, and confirmed saved output count. Stages describe dependency order. Durations measure producing an answer, including any existing reachability/group-overlap transformation; they do not imply simultaneous execution. Waiting queries become skipped when a run stops, and started peers are canceled after a failure. Calculation can succeed while saving fails. Neo4j reports a save only after BloodHound's outer database operation confirms it.
+BloodHound can report a successful import and native analysis even if an extension fails. The extension report separately records calculation and saving, each query's name/stage/state/reason, complete answer count, read duration, proposed output count, and confirmed saved output count. Stages describe dependency order. Durations measure producing an answer, including any existing reachability/group-overlap transformation; they do not imply simultaneous execution. Waiting queries become skipped when a run stops, and started peers are canceled after a failure. In a partial run, the failed steps are marked failed, the steps set aside because of them are marked `set-aside`, the calculation is `partial`, and `failures` lists every failure (`failure` stays the first). Calculation can succeed while saving fails. Neo4j reports a save only after BloodHound's outer database operation confirms it.
 
 Only counts, rule names, and fixed error explanations are sent to the rule service. Graph answer rows and raw errors remain out of this report. The original error still reaches private application logging. Known errors get specific explanations; unknown errors point to those logs. Connection failures during commit retain an explicit uncertain state and the existing write gate remains blocked.
 
@@ -220,7 +223,7 @@ The page presents one table, sorted initially by calculation order. Users can so
 
 **Up to five ready queries can run together.** Each query starts after its own required earlier queries have succeeded. When its answers are checked, another ready query can use the free place immediately; an unrelated slow query does not hold up the whole group. Shared earlier calculations run once, and their answer files stay available until every reader finishes. The report lists queries in the order their answers were accepted, which can differ between runs.
 
-Before creating supporting graph objects, the runner finishes the independent reads that can already proceed. From that point onward, queries run one at a time in the same database operation so they can see the new objects before saving. All final results still save together. If any query fails, the runner stops the other queries and waits for them to close before discarding unfinished work.
+Before creating supporting graph objects, the runner finishes the independent reads that can already proceed. From that point onward, queries run one at a time in the same database operation so they can see the new objects before saving. All final results still save together. If any query fails, the runner stops the other queries and waits for them to close before discarding unfinished work. It then sets aside the failed query and the queries tied to it and runs the rest again (see [When one step fails](#when-one-step-fails-setting-steps-aside)).
 
 For every changed existing file, the author explicitly chooses whether to overwrite its complete contents, including dependency declarations. `POST /v1/preview` validates a proposed change using its `base_revision` and returns the full proposed plan and revision. `PUT /v1/rules` checks that the active base still matches and requires that exact preview revision as `confirm_revision`. An older browser tab therefore cannot replace newer work or activate a different change. Preview saves nothing.
 
@@ -287,7 +290,7 @@ A match has the same relationship type, source object ID, and target object ID. 
 
 | Query `existing-edge-policy` | Matching edge | New desired edge |
 | --- | --- | --- |
-| `replace-existing` (default) | Delete and recreate with the requested properties. Discard old ordinary properties even if the new map is empty. The database edge ID changes. | Create with requested non-null properties. |
+| `replace-existing` (default) | If it already has exactly the requested non-null properties (same keys and values, nothing extra), leave it alone: its ID stays and nothing is written. Otherwise delete and recreate it with the requested properties, discarding old ordinary properties even if the new map is empty; the database edge ID changes. | Create with requested non-null properties. |
 | `merge-properties` | Keep its ID; update supplied keys, delete keys supplied as `null`, and preserve unmentioned properties. Skip unchanged writes. | Create with requested non-null properties. |
 | `keep-existing` | Keep its ID and every existing property. | Create with requested non-null properties. |
 
@@ -297,7 +300,9 @@ Duplicate existing source/type/target pairs within the managed scope fail public
 
 The [complete properties example](DEVELOPERS.md#calculated-relationships) shows how to add evidence to existing relationships using `merge-properties`. A returned map such as `{confidence: 0.9, old_note: null}` would update confidence and remove `old_note` under that policy. The property map belongs in the producing query; it needs no duplicate schema declaration.
 
-Replacement counts as a removal and addition; a changed merge counts once under `relationships_updated`; no-op merges and kept edges count under `relationships_unchanged`. Replacements are deleted before creation because PostgreSQL permits only one edge of that kind between those endpoints. Every batch remains part of the final transaction, so failure before commit restores original IDs and properties.
+Replacement counts as a removal and addition; a changed merge counts once under `relationships_updated`; identical replacements, no-op merges, and kept edges count under `relationships_unchanged`. Values are compared in their written-out form, so a whole number read back from the database matches the same number in an answer.
+
+*Changed 16 October 2026 at the user's request:* replacement used to delete and recreate every matching edge on every run, even an identical one, so the lab reported "26 added, 26 removed" when nothing had changed. That rewrote every connection each run and gave each one a new database ID. Replacement now first reads the existing properties (as merging already did) and skips edges that would come out identical. The alternative of keeping the old behavior was rejected because it made reports misleading and repeated work grows with the graph. The extra cost is reading each existing edge's properties once per run. Replacements are deleted before creation because PostgreSQL permits only one edge of that kind between those endpoints. Every batch remains part of the final transaction, so failure before commit restores original IDs and properties.
 
 ESC1 uses replacement. The vault example uses `keep-existing` to demonstrate stable IDs and preservation of manually added properties. Replacement writes more even when a pair remains justified; its cost counts toward the change allowance.
 
@@ -331,7 +336,34 @@ The final transaction groups **all helper changes, all calculated relationship c
 
 Before staging a relationship type, the runner finishes every producer’s complete result reads, endpoint checks, property checks, existing-edge checks, and any requested exact native ESC1 comparison. It sorts desired and existing sets and applies changes in batches inside the same transaction. Graph consumers can then use that staged result. Nothing commits until all selected queries succeed. A timeout, invalid row, incomplete file/read, exhausted allowance, or native mismatch fails the calculation. None permits deletion based on a partial answer.
 
-The `PoC_Run` node stores the successful batch ID, plan fingerprint, reference commit, and completion time in the same database transaction. Its identity uses the plan’s schema name. A later process can inspect committed state; it does not reuse unfinished in-memory answers.
+The `PoC_Run` node stores the successful batch ID, plan fingerprint, reference commit, completion time, and `unfinished` list (steps set aside after a failure; empty when every step is current) in the same database transaction. Its identity uses the plan’s schema name. A later process can inspect committed state; it does not reuse unfinished in-memory answers.
+
+### When one step fails: setting steps aside
+
+*Added 16 October 2026.*
+
+**The problem.** Every save is all or nothing, so the graph is never left half-updated. Before this change, that also meant one failing step threw away every other step's work: a single rule with a data problem (for example, a helper whose `name` is empty on a few objects) kept every unrelated extension from updating until someone fixed it.
+
+**What happens now.** `runner.RunSettingAsideFailures` (in `internal/runner/partial.go`) wraps each run:
+
+1. The run is attempted as usual. If it succeeds, nothing changes.
+2. If a step fails, that attempt saves nothing, exactly as before.
+3. The failure names a step, or, when it happened while saving a relationship type, that type. `Plan.SetAside` (in `internal/extension/extension.go`) then lists the steps that cannot be saved without it: the failed step; every step that uses a set-aside step's rows, helper objects, or connections; and every other step that saves the same relationship or helper type. It repeats until nothing new is added. A failed step's own inputs are not set aside.
+4. The run is attempted again without those steps, in a new save. Leaving a step out also leaves its output types out of the save, so their existing connections and helper objects stay exactly as they were. Old-connection cleanup never touches a type it is not saving.
+5. If another step fails, it is set aside too and the run is tried again. Every attempt sets aside at least one more step, so this always ends. All attempts share the run's one time limit.
+6. The saved `PoC_Run` record lists the set-aside steps as `unfinished`. The next run with the same rules selects them again (with their inputs and consumers) even when no data changed, so the single automatic retry, or the next BloodHound analysis, recalculates exactly the set-aside part. A run that saves every step clears the list.
+
+The report's state is `partial` (orange on the page), with a message such as "Finished with 1 failure: 24 steps saved; 5 kept their previous results." It stays `partial` even when no other step needed saving, as on a retry that recalculates only the set-aside steps and they fail again ("0 steps saved"): the other steps' saved results are still current, so red would overstate the problem. The run record is saved either way, so the set-aside steps run again.
+
+It does not set steps aside, and saves nothing, when the failure belongs to no step or type (for example, missing or duplicate object IDs in the graph, an exhausted change allowance, or a commit failure), when the database could not confirm whether a save happened, or when the run was canceled or ran out of time. Those stop the run as before.
+
+**Why a new attempt, instead of carrying on inside the failed one.** A database error ends the save transaction on both PostgreSQL and Neo4j, and the failed step may already have staged helper objects or connections in it. Starting a clean attempt is the only way to be sure none of the failed step's work is saved. On Neo4j, BloodHound owns the outer save transaction, so each attempt is a separate `RunNative` call with its own transaction. The cost is time: steps that ran before the failure run again. Most failures happen early in a step's own chain, and only one extra attempt is usual.
+
+**Alternatives considered.**
+
+- *Continue inside the same save after a failure in the engine's own checks.* Faster, because nothing is recalculated, but it works only for checks done outside the database (an empty property, a bad endpoint), not for database errors. It would need two recovery paths and careful undoing of the failed step's staged writes. Rejected for readability and safety.
+- *Save each extension separately.* Simpler to explain, but extensions can share relationship types and read each other's results, so one extension's save could delete or contradict another's. The dependency-based rule above already keeps unrelated extensions apart without guessing.
+- *Keep the old behavior (any failure discards everything).* Safe, but one broken rule blocked every extension. That is what prompted this change.
 
 ### Helpers stay separate
 
@@ -438,7 +470,7 @@ This is a single-server Community Edition experiment. It has not established Ent
 
 This solution also does not account for privileged zone rules, findings, exposure or impact analysis, or other BloodHound Enterprise features. Calculated connections are not evaluated against zone membership, and no findings or exposure results are derived from them.
 
-Failure preserves the previous committed extension answer when rollback is known, but that answer may be stale. Metadata preparation remains outside rollback. Helpers have no automatic deletion. Rule removal refreshes shared outputs or retires their last producer’s relationship scope only on a later successful run; uploading alone does not run rules or delete graph data. A continuously busy graph can delay admission, database locks/load can delay reads, and direct external writers can invalidate the coordination assumption.
+Failure preserves the previous committed extension answer when rollback is known, but that answer may be stale. After a step fails, the steps set aside with it keep their previous answers until a later run succeeds; the rest of the run is saved. Metadata preparation remains outside rollback. Helpers have no automatic deletion. Rule removal refreshes shared outputs or retires their last producer’s relationship scope only on a later successful run; uploading alone does not run rules or delete graph data. A continuously busy graph can delay admission, database locks/load can delay reads, and direct external writers can invalidate the coordination assumption.
 
 Large deployments still need exact native agreement, total runtime, runner/database memory, temporary-disk measurements, query work, transaction duration, rollback behavior, and lost-connection recovery measured together. [REVIEW.md](REVIEW.md) separates current evidence from historical measurements and preserves failed checks. Those records are the basis for assessing this experiment; they do not replace production qualification.
 

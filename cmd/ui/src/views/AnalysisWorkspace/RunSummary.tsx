@@ -44,7 +44,8 @@ export default function RunSummary({
     const report = latestCompleted(workspace);
     const matching = reportMatches(workspace, report);
     const execution = report?.execution;
-    const failure = execution?.failure;
+    // A partly saved run lists every failure; other runs have at most one.
+    const failures = execution?.failures?.length ? execution.failures : execution?.failure ? [execution.failure] : [];
     const savedRun = [...(workspace.status.history ?? []), workspace.status]
         .filter(
             (attempt) => attempt.revision === workspace.status.saved_revision && attempt.execution?.save === 'succeeded'
@@ -141,6 +142,13 @@ export default function RunSummary({
                                         discarded the changes.
                                     </Typography>
                                 )}
+                                {execution.calculation === 'partial' && (
+                                    <Typography>
+                                        Steps that failed were set aside, together with the steps that use their results
+                                        or save the same types. Those kept their previous results; everything else was
+                                        saved.
+                                    </Typography>
+                                )}
                                 {execution.cleanup_pending && (
                                     <Typography>Relationship cleanup is still pending.</Typography>
                                 )}
@@ -163,10 +171,14 @@ export default function RunSummary({
                                         </Typography>
                                     </>
                                 )}
-                                {failure && (
-                                    <Alert severity='error'>
+                                {failures.map((failure, index) => (
+                                    <Alert severity='error' key={index}>
                                         <strong>
-                                            {failure.query ? `Query ${failure.query}` : 'Run-level failure'}
+                                            {failure.query
+                                                ? `Query ${failure.query}`
+                                                : failure.relationship
+                                                  ? `Saving ${failure.relationship} connections`
+                                                  : 'Run-level failure'}
                                         </strong>
                                         <br />
                                         <strong>Phase:</strong> {failure.phase}
@@ -180,7 +192,7 @@ export default function RunSummary({
                                                 </Button>
                                             )}
                                     </Alert>
-                                )}
+                                ))}
                                 <Box className='overflow-x-auto'>
                                     <Table size='small' aria-label='Completed query outcomes'>
                                         <TableHead>

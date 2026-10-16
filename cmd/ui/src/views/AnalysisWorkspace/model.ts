@@ -36,21 +36,23 @@ export const queryColors = {
     // Green and red are one shade paler than before so the black extension
     // number drawn on each node stays readable.
     enabled: { color: '#66bb6a', label: 'Enabled' },
-    blocked: { color: '#ed8b00', label: 'Blocked' },
+    blocked: { color: '#ed8b00', label: 'Blocked or set aside' },
     failed: { color: '#ef5350', label: 'Failed' },
     disabled: { color: '#9e9e9e', label: 'Disabled' },
     focused: { color: '#1976d2', label: 'Current focus' },
 };
 // A query the author disabled is gray. Otherwise a query whose step failed in
-// the latest completed run of these exact rules is red, a blocked query is
-// orange, and everything else is green. `outcome` is that run's state for the
-// query; it is missing when no completed run matches the current rules.
+// the latest completed run of these exact rules is red. A blocked query is
+// orange: either a prerequisite is disabled, or the latest run set the step
+// aside because a step it is tied to failed. Everything else is green.
+// `outcome` is that run's state for the query; it is missing when no completed
+// run matches the current rules.
 export const queryColor = (query: Query, outcome?: string) =>
     !query.author_enabled
         ? queryColors.disabled.color
         : outcome === 'failed'
           ? queryColors.failed.color
-          : !query.enabled
+          : !query.enabled || outcome === 'set-aside'
             ? queryColors.blocked.color
             : queryColors.enabled.color;
 export const availability = (query: Query) =>
@@ -62,7 +64,13 @@ export const dependencyKey = (dependency: Pick<Dependency, 'prerequisite' | 'con
     JSON.stringify([dependency.prerequisite, dependency.consumer]);
 // These states came from a completed attempt. They are never live progress.
 export const completedState = (state?: string) =>
-    state === 'waiting' ? 'Not reached' : state === 'running' ? 'Outcome unavailable' : state ?? 'Unavailable';
+    state === 'waiting'
+        ? 'Not reached'
+        : state === 'running'
+          ? 'Outcome unavailable'
+          : state === 'set-aside'
+            ? 'Set aside (kept its previous results)'
+            : state ?? 'Unavailable';
 export const dependencyReason = (dependency: Dependency) =>
     dependency.type === 'query'
         ? `As $${dependency.parameter}${dependency.conditions ? ` (${dependency.conditions})` : ''}`
@@ -71,7 +79,7 @@ export const dependencyReason = (dependency: Dependency) =>
 // Choose the newest completed attempt first. Never search backward for a more
 // flattering matching result. A running attempt is shown separately at run level.
 export function latestCompleted(workspace: Workspace): RunRecord | undefined {
-    const completed = (record: RunRecord) => ['success', 'failed', 'uncertain'].includes(record.state);
+    const completed = (record: RunRecord) => ['success', 'partial', 'failed', 'uncertain'].includes(record.state);
     const records = [...(workspace.status.history ?? [])];
     if (completed(workspace.status)) records.push(workspace.status);
     return records
@@ -232,6 +240,14 @@ export function runPhase(
     switch (status.state) {
         case 'success':
             return { active: false, severity: 'success', text: `Last run succeeded · ${when}. ${status.message}` };
+        case 'partial':
+            // Some steps failed and were set aside; everything else was saved.
+            return {
+                active: false,
+                severity: 'warning',
+                text: `Last run partly saved · ${when}. ${status.message}`,
+                failedQuery: status.execution?.failure?.query,
+            };
         case 'failed':
             return {
                 active: false,
@@ -263,7 +279,9 @@ export interface StepTimes {
 
 // stepTimes looks through the latest report and the up to 20 kept before it.
 // A step's calculation can succeed in a run that fails elsewhere; that result
-// is not saved, so "last success" counts only runs that saved their results.
+// is not saved, so "last success" counts only runs that saved their results:
+// fully successful runs, and partly saved runs (where every step marked
+// succeeded was saved). A set-aside step did not run, so it is not "last ran".
 export function stepTimes(workspace: Workspace, name: string): StepTimes {
     const seen = new Set<string>();
     const records = [workspace.status, ...(workspace.status.history ?? [])]
@@ -276,7 +294,9 @@ export function stepTimes(workspace: Workspace, name: string): StepTimes {
         .sort((left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at));
     const stateIn = (record: RunRecord) => record.execution?.queries.find((query) => query.name === name)?.state;
     const ran = records.find((record) => ['succeeded', 'failed'].includes(stateIn(record) ?? ''));
-    const succeeded = records.find((record) => record.state === 'success' && stateIn(record) === 'succeeded');
+    const succeeded = records.find(
+        (record) => ['success', 'partial'].includes(record.state) && stateIn(record) === 'succeeded'
+    );
     return {
         lastRun: ran ? { at: ran.updated_at, state: stateIn(ran)! } : undefined,
         lastSuccess: succeeded?.updated_at,

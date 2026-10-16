@@ -204,6 +204,9 @@ func TestSelectiveReplacementPreservesSkippedOutputsAndFullPlanHash(t *testing.T
 	// Deliberately change skipped answers; selecting ESC1 must not publish them.
 	database.answers[independentHelperQuery][0]["properties"] = map[string]any{"name": "changed independent helper"}
 	database.answers[independentEdgeQuery] = nil
+	// A new property makes the selected ESC1 connection differ, so it is
+	// replaced; an identical connection would be left unchanged.
+	database.answers[relationshipQuery][0]["properties"] = map[string]any{"evidence": "refreshed"}
 	second := runSelection(t, database, plan, known)
 	if !reflect.DeepEqual(second.Queries, []string{"helper.cypher", "esc1.cypher"}) || second.Added != 1 || second.Removed != 1 {
 		t.Fatalf("expected replacement of selected ESC1 only: %+v", second)
@@ -251,6 +254,9 @@ func TestSelectiveLateFailureRollsBackHelpersEdgesAndRunRecord(t *testing.T) {
 		options      = completeBatch()
 	)
 	database.answers[helperQuery][0]["properties"] = map[string]any{"name": "staged change"}
+	// A changed property makes the ESC1 connection differ, so it is staged
+	// for replacement (one removal, one creation) before the late failure.
+	database.answers[relationshipQuery][0]["properties"] = map[string]any{"evidence": "staged change"}
 	database.failRunRecord = true
 	options.Changes = runner.Changes{CoverageKnown: true, Relationships: []string{"Enroll"}}
 	report, err := runner.Run(t.Context(), database, plan, options)

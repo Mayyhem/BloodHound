@@ -149,7 +149,7 @@ func TestPublicationAndRollback(t *testing.T) {
 // prerequisite explicit so rejection still proves that staged writes roll back.
 func replaceESC1Query(plan *extension.Plan, text string) {
 	for index := range plan.Queries {
-		if plan.Queries[index].Name != "esc1.cypher" {
+		if plan.Queries[index].Name != "PoC/esc1.cypher" {
 			continue
 		}
 		plan.Queries[index].Text = text + ", 'PoC_ADCSESC1' AS kind"

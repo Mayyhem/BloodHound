@@ -790,6 +790,81 @@ func (s Plan) ExpandSelection(names []string) []string {
 	return result
 }
 
+// SetAside lists the steps that cannot be saved after the named steps (or
+// the steps producing the named relationship types) fail. Those steps keep
+// their previously saved results, and the rest of the run is still saved.
+//
+// Three reasons put a step in the list. Repeat until nothing changes, since
+// each new step can bring in more:
+//   - It failed.
+//   - It uses a set-aside step's results: its rows, helper objects, or
+//     connections. Running it would use answers that were never calculated.
+//   - It saves the same relationship or helper type as a set-aside step. A
+//     type is saved as one complete set; saving only some of its producers
+//     would delete the connections that came from the failed one.
+//
+// A step's own inputs (its prerequisites) are not set aside: they did not
+// fail, and nothing they produce depends on the failed step.
+func (s Plan) SetAside(failedQueries, failedRelationships []string) []string {
+	var (
+		setAside = make(map[string]bool)
+		result   []string
+		changed  = true
+	)
+	include := func(name string) {
+		if !setAside[name] {
+			setAside[name] = true
+			changed = true
+		}
+	}
+	for _, name := range failedQueries {
+		include(name)
+	}
+	for _, kind := range failedRelationships {
+		for _, binding := range s.Schema.Relationships {
+			if binding.Kind == kind {
+				include(binding.Query)
+			}
+		}
+	}
+	for changed {
+		changed = false
+		for _, binding := range s.Schema.Relationships {
+			if !setAside[binding.Query] {
+				continue
+			}
+			for _, peer := range s.Schema.Relationships {
+				if peer.Kind == binding.Kind {
+					include(peer.Query)
+				}
+			}
+		}
+		for _, binding := range s.Schema.Nodes {
+			if !setAside[binding.Query] {
+				continue
+			}
+			for _, peer := range s.Schema.Nodes {
+				if peer.Kind == binding.Kind {
+					include(peer.Query)
+				}
+			}
+		}
+		for _, query := range s.Queries {
+			for _, prerequisite := range s.Prerequisites(query) {
+				if setAside[prerequisite] {
+					include(query.Name)
+				}
+			}
+		}
+	}
+	for _, query := range s.Queries {
+		if setAside[query.Name] {
+			result = append(result, query.Name)
+		}
+	}
+	return result
+}
+
 // Only executable query text can reference a prerequisite parameter. Ignore
 // strings, escaped identifiers, and comments so examples cannot affect validation.
 func parameterText(contents string) string {

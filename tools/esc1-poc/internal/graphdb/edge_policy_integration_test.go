@@ -33,7 +33,7 @@ func policyPlan(plan extension.Plan, policy extension.ExistingEdgePolicy, proper
 	plan.Schema.CompareNativeESC1 = false
 	plan.Schema.Nodes = nil
 	plan.Schema.Relationships[0].ExistingEdgePolicy = policy
-	plan.Queries = []extension.Query{{Name: "esc1.cypher", OutputKind: "PoC_ADCSESC1", Text: "UNWIND ['PoC_Test_User','PoC_Test_Group'] AS identifier RETURN identifier AS source, 'PoC_Test_Domain' AS target, 'PoC_ADCSESC1' AS kind, " + properties + " AS properties"}}
+	plan.Queries = []extension.Query{{Name: "PoC/esc1.cypher", OutputKind: "PoC_ADCSESC1", Text: "UNWIND ['PoC_Test_User','PoC_Test_Group'] AS identifier RETURN identifier AS source, 'PoC_Test_Domain' AS target, 'PoC_ADCSESC1' AS kind, " + properties + " AS properties"}}
 	return plan
 }
 
@@ -123,14 +123,15 @@ func TestExistingEdgePoliciesOnBothDatabases(t *testing.T) {
 							}
 						}
 					}
-					if policy == extension.MergeProperties {
-						repeated, err := runner.Run(t.Context(), backend.database, secondPlan, options())
-						if err != nil || !repeated.Committed || repeated.Updated != 0 || repeated.Unchanged != 2 || repeated.Added != 0 || repeated.Removed != 0 {
-							t.Fatalf("equivalent repeated merge %+v: %v", repeated, err)
-						}
-						if repeatedEdges := policyEdges(t, backend.database); !reflect.DeepEqual(after, repeatedEdges) {
-							t.Fatalf("no-op merge changed IDs/properties: %v", repeatedEdges)
-						}
+					// Repeating the same answer changes nothing under any policy.
+					// Replacement, too, leaves a connection alone when its saved
+					// properties already match exactly, so its ID stays the same.
+					repeated, err := runner.Run(t.Context(), backend.database, secondPlan, options())
+					if err != nil || !repeated.Committed || repeated.Updated != 0 || repeated.Unchanged != 2 || repeated.Added != 0 || repeated.Removed != 0 {
+						t.Fatalf("equivalent repeated publication %+v: %v", repeated, err)
+					}
+					if repeatedEdges := policyEdges(t, backend.database); !reflect.DeepEqual(after, repeatedEdges) {
+						t.Fatalf("no-op publication changed IDs/properties: %v", repeatedEdges)
 					}
 
 				})

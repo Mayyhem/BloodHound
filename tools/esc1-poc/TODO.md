@@ -2,7 +2,7 @@
 
 Give extension authors a clear path from an idea to working rules: create an extension, check its files, explore and test its execution chains, review the proposed results, and activate the rules.
 
-Open items describe proposed improvements; completed work is listed under [Done](#done). Keep the engine's existing shared calculations, scope and identity checks, complete-result validation, and all-or-nothing saving. The interactive execution graph below replaces the earlier suggestion for a separate development-mode execution preview.
+Open items describe proposed improvements; completed work is listed under [Done](#done). Keep the engine's existing shared calculations, scope and identity checks, complete-result validation, and all-or-nothing saving. (Each save is still all or nothing. Since 16 October 2026, a failing step is set aside with the steps tied to it, and the rest is saved in a new attempt; see DESIGN.md, "When one step fails".) The interactive execution graph below replaces the earlier suggestion for a separate development-mode execution preview.
 
 Earlier validation and useful execution reports are implemented. The read-only analysis workspace MVP for current rules and completed runs is implemented; [verification and remaining checks](evidence/analysis-workspace/README.md) describe its review status. Management, collapsed views, live progress, and interactive testing follow in later phases. Keep the completed authoring documentation current as the engine changes. Coordinate the Cypher work with the existing [implementation plan](CYPHER_IMPLEMENTATION_PLAN.md).
 
@@ -267,6 +267,21 @@ Affected names are exactly `1, t, T, TRUE, true, True, 0, f, F, FALSE, false, Fa
 **Done when:** an extension named `T`, `1` or `NaN` can be uploaded, uploaded again as an update, and found by name, and the new tests cover these names.
 
 Start in [extension lookup](../../cmd/api/src/database/upsert_schema_extension.go) (`findOrCreateExtension`), [the filter builder](../../cmd/api/src/database/helper.go) (`buildSQLFilter`), [the other two name lookups](../../cmd/api/src/database/graphschema.go), and [the extension upload tests](../../cmd/api/src/database/upsert_schema_extension_integration_test.go). This changes BloodHound, so per the project rules it needs approval before coding.
+
+## 18. Profile and optimize OpenGraph Analysis at 20 million nodes and 200 million edges
+
+**Planned follow-up, 16 October 2026.** Apply the supplied `bhe-performance-optimization` skill's measure-first workflow to **BloodHound Community Edition (BHCE)** and its OpenGraph Analysis feature. First test a generated graph containing **20 million nodes and 200 million edges**, counted separately; eventually repeat with a realistic dataset. The earlier comparison stopped at one million objects (#7); it does not establish performance at this new scale or on realistic data.
+
+- [ ] Gather context: identify the analysis workload, rule revisions, slow phases, run frequency, and any existing logs. Read the relevant code and DAWGS queries to identify likely costs without choosing a fix from code inspection alone.
+- [ ] Confirm the actual BHCE environment, graph database, container, profiling endpoints, hardware, and dataset state. Adapt the skill's Enterprise-specific paths and commands to this standalone `BloodHound` checkout; do not assume a BHE parent repository, `bhe-api-primary`, or Enterprise tooling is available. If investigating local DAWGS changes, confirm the BHCE build uses that checkout.
+- [ ] Add useful timing and work-count logs or metrics as a separate reviewable change. Measure preparation, query execution and shared calculations, result validation, and saving, including time spent in the DAWGS database driver. Retain only measurements with lasting troubleshooting value; remove or gate noisy investigation logs.
+- [ ] Ask the user to load the 20-million-node, 200-million-edge dataset, start Parca, and trigger the baseline run. Confirm the actual graph counts and record the data-generation settings, source versions, database settings, and machine resources so the experiment can be repeated. Dataset loading, starting Parca, and triggering runs remain the user's steps.
+- [ ] Capture baseline logs plus Parca CPU and memory profiles; use pprof for focused investigation when useful. Record complete-run and per-phase durations, call counts, peak memory, allocations, database and temporary-storage costs, failures or limits reached, and effects on normal BloodHound use. Preserve the profiles and check the calculated answers, rather than judging speed alone.
+- [ ] Propose and implement one measured optimization at a time. For each before/after comparison, ask the user for a fresh run against the same input and starting database state. Confirm equivalent answers, preserved failure protections, improvement in the target phase, and no regression in other phases. Keep each change and any needed tests separately reviewable; follow this project's rule that the user stages and commits changes.
+- [ ] Eventually repeat the workflow against a realistic dataset supplied and loaded by the user. Record its actual node/edge counts and relevant graph structure; do not assume it has the generated graph's size or behavior. Confirm any dataset-loading tools, including anubis if available, are appropriate for the BHCE setup.
+- [ ] Save a plain-English comparison with reproducible steps, source and dataset versions, profiles, correctness checks, remaining limits, and recommendations. Store new evidence separately and preserve the earlier studies unchanged.
+
+**Done when:** the 20-million-node, 200-million-edge BHCE experiment and the later realistic-data experiment have reproducible baselines and measured follow-up results, with verified answers and documented resource limits. Capacity is demonstrated only for runs that actually complete; unfinished or failed runs remain explicit limitations.
 
 ## Done
 

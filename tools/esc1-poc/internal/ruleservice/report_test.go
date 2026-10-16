@@ -129,3 +129,36 @@ func TestWaitingReportIsAcceptedAndNotCurrent(t *testing.T) {
 		t.Fatal("unknown state accepted")
 	}
 }
+
+// A partly saved run confirms its save, but some steps kept old results, so
+// the results are not shown as current.
+func TestPartialReportIsAcceptedAndNotCurrent(t *testing.T) {
+	store, err := ruleservice.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial, err := store.Update(files(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	failure := runner.Failure{Query: "PoC/failed.cypher", Phase: "check-answers", Message: "The name property is empty."}
+	partial := ruleservice.Status{State: "partial", Event: "first", RunID: "first/1", Revision: initial.Revision, Message: "Finished with 1 failure.", Execution: &runner.Execution{
+		Calculation: "partial", Save: "succeeded", Phase: "complete", Failure: &failure, Failures: []runner.Failure{failure, {Relationship: "PoC_Link", Phase: "saving", Message: "Saving failed."}},
+		Queries: []runner.QueryReport{
+			{Name: "PoC/failed.cypher", Stage: 1, State: "failed"},
+			{Name: "PoC/consumer.cypher", Stage: 2, State: "set-aside"},
+			{Name: "PoC/other.cypher", Stage: 1, State: "succeeded"},
+		},
+	}}
+	if err := store.Report(partial); err != nil {
+		t.Fatalf("partial report rejected: %v", err)
+	}
+	if status := store.LatestStatus(); status.State != "partial" || status.SavedRevision != initial.Revision || !status.ResultsStale {
+		t.Fatalf("partial must confirm the save but not be shown as current: %+v", status)
+	}
+	partial.RunID = "first/2"
+	partial.Execution.Failures[1].Relationship = "not a type name"
+	if err := store.Report(partial); err == nil {
+		t.Fatal("an unsafe relationship name was accepted")
+	}
+}

@@ -142,6 +142,22 @@ func changedProperties(existing, desired map[string]any) map[string]any {
 	return patch
 }
 
+// sameProperties reports whether an existing edge already has exactly the
+// properties that replacing it would give it: the same keys and values, and
+// nothing extra. A missing (null) value in the answer means "no property".
+func sameProperties(existing, desired map[string]any) bool {
+	var wanted = creationProperties(desired)
+	if len(existing) != len(wanted) {
+		return false
+	}
+	for key, value := range wanted {
+		if old, present := existing[key]; !present || !samePropertyValue(old, value) {
+			return false
+		}
+	}
+	return true
+}
+
 func creationProperties(desired map[string]any) map[string]any {
 	var properties = map[string]any{}
 	for key, value := range desired {

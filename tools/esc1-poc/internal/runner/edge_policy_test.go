@@ -66,11 +66,21 @@ func TestEdgePolicyDefaultReplacesIdentityAndProperties(t *testing.T) {
 			if edge.ID == 10 || !reflect.DeepEqual(edge.Properties, map[string]any{"name": "new"}) {
 				t.Fatalf("replacement retained old identity or properties: %+v", edge)
 			}
-			// Replacement remains intentional even when the newly supplied map is equal.
-			var previousID = edge.ID
+			// An edge that already has exactly the new properties is left
+			// alone: same identity, no writes, counted as unchanged.
+			var (
+				previousID = edge.ID
+				writes     = database.relationshipWrites
+			)
 			report = runEdgePolicy(t, database, policy)
-			if database.graph.Edges[0].ID == previousID || report.Added != 1 || report.Removed != 1 {
-				t.Fatalf("equal replacement unexpectedly retained identity: %+v", report)
+			if database.graph.Edges[0].ID != previousID || report.Added != 0 || report.Removed != 0 || report.Unchanged != 1 || database.relationshipWrites != writes {
+				t.Fatalf("an identical edge was replaced: %+v", report)
+			}
+			// An extra saved property is a difference: replacing removes it.
+			database.graph.Edges[0].Properties["added_by_someone_else"] = true
+			report = runEdgePolicy(t, database, policy)
+			if database.graph.Edges[0].ID == previousID || report.Added != 1 || report.Removed != 1 || !reflect.DeepEqual(database.graph.Edges[0].Properties, map[string]any{"name": "new"}) {
+				t.Fatalf("an edge with an extra property was not replaced: %+v edges=%+v", report, database.graph.Edges)
 			}
 		})
 	}

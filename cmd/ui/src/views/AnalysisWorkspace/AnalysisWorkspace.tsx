@@ -227,15 +227,23 @@ export default function AnalysisWorkspace() {
     // The bottom-left buttons sit just above the results table when it is open.
     const canvasBottom = tableView ? tableHeight + 28 : 16;
     const closeUpload = useCallback(() => setUploadOpen(false), []);
-    // How much of each canvas edge the panels cover right now, so Reset Graph
-    // frames the queries in the part of the canvas that is still visible.
+    // The parts of the canvas the panels leave visible right now, so Reset
+    // Graph frames the queries there. The top-left panel leaves two clear
+    // strips: one below it across the full width, and one beside it from the
+    // top of the canvas down. Reset Graph uses whichever shows the queries
+    // larger. Measure the visible box, not its wider invisible wrapper.
     const topPanel = useRef<HTMLDivElement>(null);
-    const coveredEdges = () => ({
-        top: (topPanel.current?.getBoundingClientRect().height ?? 0) + 32,
-        right: panelOpen ? panelWidth + 32 : 16,
-        bottom: canvasBottom + 48,
-        left: 16,
-    });
+    const coveredEdges = () => {
+        const box = topPanel.current?.firstElementChild as HTMLElement | null | undefined;
+        const right = panelOpen ? panelWidth + 32 : 16;
+        const bottom = canvasBottom + 48;
+        if (!box) return [{ top: 16, right, bottom, left: 16 }];
+        const panelTop = topPanel.current!.offsetTop;
+        return [
+            { top: panelTop + box.offsetHeight + 16, right, bottom, left: 16 },
+            { top: 16, right, bottom, left: topPanel.current!.offsetLeft + box.offsetWidth + 16 },
+        ];
+    };
     // Upload, Create, and Rules table sit in the graph's bottom-left row,
     // beside Reset Graph. Each icon's name appears as its tooltip.
     const fileActions = (

@@ -38,13 +38,13 @@ const (
 	endpointQuery           = "MATCH (item {objectid: $id}) RETURN labels(item) AS kinds"
 	helperLookupQuery       = "MATCH (item) WHERE item.objectid STARTS WITH $prefix RETURN item.objectid AS id, labels(item) AS kinds, properties(item) AS properties"
 	stateLookupQuery        = "MATCH (item {objectid: $id}) RETURN labels(item) AS kinds"
-	previousRunQuery        = "MATCH (run:PoC_Run {objectid: $id}) RETURN run.plan_hash AS plan_hash"
+	previousRunQuery        = "MATCH (run:PoC_Run {objectid: $id}) RETURN run.plan_hash AS plan_hash, run.unfinished AS unfinished"
 	relationshipsQuery      = "MATCH (source)-[edge:PoC_ADCSESC1]->(target) RETURN id(edge) AS id, source.objectid AS source, target.objectid AS target"
 	createRelationshipQuery = "MATCH (source {objectid: $source}), (target {objectid: $target}) CREATE (source)-[edge:`PoC_ADCSESC1`]->(target) SET edge = $properties RETURN id(edge) AS id"
 	updateRelationshipQuery = "MATCH ()-[edge:`PoC_ADCSESC1`]->() WHERE id(edge) = $id SET edge += $properties RETURN id(edge) AS id"
 	deleteRelationshipQuery = "MATCH ()-[edge:`PoC_ADCSESC1`]->() WHERE id(edge) = $id WITH edge, id(edge) AS old_id DELETE edge RETURN old_id"
 	helperWriteQuery        = "MERGE (item:`PoC_Helper` {objectid: $id}) SET item = $properties"
-	saveRunQuery            = "MERGE (run:PoC_Run {objectid: $id}) SET run.batch_id = $batch, run.plan_hash = $hash, run.completed_at = $completed, run.reference_commit = $reference"
+	saveRunQuery            = "MERGE (run:PoC_Run {objectid: $id}) SET run.batch_id = $batch, run.plan_hash = $hash, run.completed_at = $completed, run.reference_commit = $reference, run.unfinished = $unfinished"
 )
 
 type fakeNode struct {
@@ -218,7 +218,7 @@ func (s *fakeTransaction) Read(_ context.Context, query string, parameters map[s
 				rows = append(rows, map[string]any{"kinds": node.Kinds})
 			case previousRunQuery:
 				if reflect.DeepEqual(node.Kinds, []string{"PoC_Run"}) {
-					rows = append(rows, map[string]any{"plan_hash": node.Properties["plan_hash"]})
+					rows = append(rows, map[string]any{"plan_hash": node.Properties["plan_hash"], "unfinished": node.Properties["unfinished"]})
 				}
 			}
 		}
@@ -247,7 +247,7 @@ func (s *fakeTransaction) Write(_ context.Context, query string, parameters map[
 		s.database.helperWrites++
 		s.storeNode(fakeNode{ID: parameters["id"].(string), Kinds: []string{"PoC_Helper"}, Properties: cloneProperties(parameters["properties"].(map[string]any))})
 	case saveRunQuery:
-		s.storeNode(fakeNode{ID: parameters["id"].(string), Kinds: []string{"PoC_Run"}, Properties: map[string]any{"batch_id": parameters["batch"], "plan_hash": parameters["hash"], "completed_at": parameters["completed"], "reference_commit": parameters["reference"]}})
+		s.storeNode(fakeNode{ID: parameters["id"].(string), Kinds: []string{"PoC_Run"}, Properties: map[string]any{"batch_id": parameters["batch"], "plan_hash": parameters["hash"], "completed_at": parameters["completed"], "reference_commit": parameters["reference"], "unfinished": parameters["unfinished"]}})
 	case createRelationshipQuery:
 		s.database.relationshipWrites++
 		if len(s.matchingNodes(parameters["source"])) != 1 || len(s.matchingNodes(parameters["target"])) != 1 {

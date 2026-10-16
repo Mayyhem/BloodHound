@@ -166,6 +166,8 @@ describe('graph node colors', () => {
         expect(queryColor({ ...query, enabled: false }, 'failed')).toBe(queryColors.failed.color);
         expect(queryColor({ ...query, author_enabled: false })).toBe(queryColors.disabled.color);
         expect(queryColor({ ...query, author_enabled: false }, 'failed')).toBe(queryColors.disabled.color);
+        // A step set aside after another step failed kept its old results.
+        expect(queryColor(query, 'set-aside')).toBe(queryColors.blocked.color);
         expect(queryColors.disabled.color).toBe('#9e9e9e');
         expect(queryColors.failed.color).toBe('#ef5350');
     });
@@ -243,6 +245,25 @@ describe('analysis run status line', () => {
             severity: 'info',
         });
     });
+    it('shows a partly saved run in orange, naming the first failed step', () => {
+        const status = workspaceFixture().status;
+        const partial = runPhase(idle, {
+            ...status,
+            state: 'partial',
+            message: 'Finished with 1 failure: 24 steps saved; 5 kept their previous results.',
+            execution: {
+                ...status.execution!,
+                calculation: 'partial',
+                failure: { query: 'PoC/domain_helpers.cypher', phase: 'check-answers', message: '' },
+            },
+        });
+        expect(partial).toMatchObject({
+            active: false,
+            severity: 'warning',
+            failedQuery: 'PoC/domain_helpers.cypher',
+        });
+        expect(partial.text).toContain('24 steps saved; 5 kept their previous results.');
+    });
 });
 
 describe('step run times', () => {
@@ -264,6 +285,31 @@ describe('step run times', () => {
         expect(stepTimes(workspace, 'PoC_Other/missing.cypher')).toEqual({
             lastRun: undefined,
             lastSuccess: undefined,
+        });
+    });
+    it('counts a success from a partly saved run, but not a set-aside step as having run', () => {
+        const workspace = workspaceFixture();
+        const execution = workspace.status.execution!;
+        const partial = {
+            ...workspace.status,
+            run_id: 'partial',
+            state: 'partial',
+            updated_at: '2026-10-15T09:00:00Z',
+            execution: {
+                ...execution,
+                calculation: 'partial',
+                queries: execution.queries.map((query, index) =>
+                    index === 0 ? query : { ...query, state: 'set-aside' }
+                ),
+            },
+        };
+        const earlier = { ...workspace.status, run_id: 'earlier', updated_at: '2026-10-14T10:00:00Z' };
+        workspace.status = { ...workspace.status, ...partial, history: [partial, earlier] };
+        const [first, second] = execution.queries;
+        expect(stepTimes(workspace, first.name).lastSuccess).toBe('2026-10-15T09:00:00Z');
+        expect(stepTimes(workspace, second.name)).toEqual({
+            lastRun: { at: '2026-10-14T10:00:00Z', state: 'succeeded' },
+            lastSuccess: '2026-10-14T10:00:00Z',
         });
     });
 });

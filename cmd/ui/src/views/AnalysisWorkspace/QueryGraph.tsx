@@ -53,9 +53,11 @@ interface Props {
     children?: ReactNode;
     // Each query's state in the latest completed run that matches these rules.
     outcomes?: Map<string, string>;
-    // How much of each canvas edge panels currently cover. Reset Graph frames
-    // the shown queries in the rest. Without it, only the button row is avoided.
-    coveredEdges?: () => ClearArea;
+    // The clear parts of the canvas that panels currently leave, each given as
+    // how much of every edge to avoid. Reset Graph frames the shown queries in
+    // the choice that shows them largest. Without it, only the button row is
+    // avoided.
+    coveredEdges?: () => ClearArea[];
 }
 
 function GraphControls({

@@ -97,8 +97,11 @@ func prepareChanges(ctx context.Context, transaction Transaction, binding extens
 		}
 		query += " WHERE " + strings.Join(pairs, " OR ")
 	}
+	// Replacing and merging both compare the saved properties with the new
+	// answer, so both read them. Keeping never changes an existing edge.
+	var compareProperties = policy == extension.ReplaceExisting || policy == extension.MergeProperties
 	query += " RETURN id(edge) AS id, source.objectid AS source, target.objectid AS target"
-	if policy == extension.MergeProperties {
+	if compareProperties {
 		query += ", properties(edge) AS properties"
 	}
 	if err := streamWithTimeout(ctx, transaction, space.limits.QueryTimeout, query, nil, func(row map[string]any) error {
@@ -108,7 +111,7 @@ func prepareChanges(ctx context.Context, transaction Transaction, binding extens
 		if _, ok := row["id"].(int64); !ok {
 			return fmt.Errorf("database returned an invalid relationship identity")
 		}
-		if policy == extension.MergeProperties {
+		if compareProperties {
 			if properties, ok := row["properties"].(map[string]any); !ok || properties == nil {
 				return fmt.Errorf("database returned invalid existing relationship properties")
 			}
@@ -199,13 +202,19 @@ func prepareChanges(ctx context.Context, transaction Transaction, binding extens
 		default:
 			switch policy {
 			case extension.ReplaceExisting:
-				// Replacement is intentional even when properties match. Both
-				// operations remain inside the same final transaction.
-				if err := removals.append(map[string]any{"id": current["id"]}); err != nil {
-					return result, err
-				}
-				if err := additions.append(wanted); err != nil {
-					return result, err
+				// Leave the edge alone when it already has exactly the
+				// properties a new edge would get. Otherwise delete it and
+				// create it again, which also drops properties the answer no
+				// longer has. Both operations stay inside the same final save.
+				if sameProperties(current["properties"].(map[string]any), wanted["properties"].(map[string]any)) {
+					result.unchanged++
+				} else {
+					if err := removals.append(map[string]any{"id": current["id"]}); err != nil {
+						return result, err
+					}
+					if err := additions.append(wanted); err != nil {
+						return result, err
+					}
 				}
 			case extension.MergeProperties:
 				patch := changedProperties(current["properties"].(map[string]any), wanted["properties"].(map[string]any))

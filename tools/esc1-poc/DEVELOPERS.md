@@ -401,7 +401,7 @@ To change how matching edges are updated, add one optional comment to the relati
 
 | Query policy | What happens to an existing matching relationship |
 | --- | --- |
-| `replace-existing` — default | Delete and recreate it with the returned properties. Its database ID changes. |
+| `replace-existing` — default | If its properties already match the returned ones exactly, leave it unchanged. Otherwise delete and recreate it with the returned properties (its database ID changes). |
 | `merge-properties` | Keep its ID, update supplied properties, remove keys explicitly set to null, and retain unmentioned properties. |
 | `keep-existing` | Keep its ID and properties. Returned properties still apply to newly created relationships. |
 
@@ -409,7 +409,7 @@ To change how matching edges are updated, add one optional comment to the relati
 
 Do not add a debugging `LIMIT`, sample rows, or return only recently changed objects in an active producer. Those partial answers can incorrectly remove valid output. Test a limited read separately from the published rule.
 
-The scope is the relationship type and its declared source/target kind pairs. Existing edges within that scope participate regardless of who created them: manual edges can be updated or removed too. Edges outside those endpoint pairs remain untouched. Duplicate existing pairs within the scope cause failure. A failure before commit preserves the last committed output; it may now be stale. Schema registration and database metadata preparation happen separately and can remain after failure.
+The scope is the relationship type and its declared source/target kind pairs. Existing edges within that scope participate regardless of who created them: manual edges can be updated or removed too. Edges outside those endpoint pairs remain untouched. Duplicate existing pairs within the scope cause failure. A failure before commit preserves the last committed output; it may now be stale. When the failure belongs to one query, or to saving one relationship type, that query is set aside together with the queries that use its results and the other producers of its output types, and the rest of the run is saved in a new attempt (see DESIGN.md, "When one step fails"). Nothing changes for authors: no new declaration is needed, and a type's producers are always saved or kept together. Schema registration and database metadata preparation happen separately and can remain after failure.
 
 ### Updating, disabling, and removing rules
 

@@ -18,10 +18,17 @@ type: object
 properties:
   state:
     type: string
+    description: >-
+      partial means some steps failed and were set aside, together with the
+      steps tied to them; they kept their previous results and everything else
+      was saved. waiting means new data arrived before a retry; the next
+      BloodHound analysis runs the rules.
     enum:
     - success
+    - partial
     - failed
     - running
+    - waiting
     - no-rules
     - uncertain
     - unavailable

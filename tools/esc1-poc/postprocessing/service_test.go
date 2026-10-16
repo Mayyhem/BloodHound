@@ -470,3 +470,57 @@ func TestServiceRetriesAFailedRunOnceThenStops(t *testing.T) {
 		t.Fatalf("new analysis did not run the rules: %v, %d attempts", err, attempts)
 	}
 }
+
+// One step fails. The steps tied to it are set aside, everything else is
+// saved, and the run is reported as "partial". The one retry asks for no
+// set-aside steps up front; the runner itself selects the unfinished ones.
+func TestServiceReportsAPartlySavedRunAndRetriesOnce(t *testing.T) {
+	service, client, now, _ := newServiceTest(t)
+	ctx := context.Background()
+	attempts := 0
+	service.execute = func(_ context.Context, plan extension.Plan, options runner.Options) (runner.Report, error) {
+		attempts++
+		var (
+			execution = &runner.Execution{Calculation: "failed", Save: "not-started"}
+			setAside  = map[string]bool{}
+		)
+		for _, name := range options.SetAside {
+			setAside[name] = true
+		}
+		for _, query := range plan.Queries {
+			state := "succeeded"
+			if setAside[query.Name] {
+				state = "skipped"
+			}
+			execution.Queries = append(execution.Queries, runner.QueryReport{Name: query.Name, Stage: 1, State: state})
+		}
+		if len(options.SetAside) == 0 {
+			// The first step of the run fails.
+			execution.Failure = &runner.Failure{Query: plan.Queries[0].Name, Phase: "check-answers", Message: "The name property is empty."}
+			execution.Queries[0].State = "failed"
+			return runner.Report{Execution: execution}, errors.New("injected step failure")
+		}
+		execution.Calculation, execution.Save = "succeeded", "succeeded"
+		return runner.Report{Committed: true, Added: 3, SetAside: options.SetAside, Execution: execution}, nil
+	}
+	if _, err := service.AfterAnalysis(ctx); err != nil {
+		t.Fatal(err)
+	}
+	last := client.statuses[len(client.statuses)-1]
+	if last.State != "partial" || !strings.HasPrefix(last.Message, "Finished with 1 failure: ") || !strings.Contains(last.Message, "kept their previous results. 3 connections added") || !strings.HasSuffix(last.Message, "The set-aside steps will be tried once more in about a minute.") {
+		t.Fatalf("first run: %q %s", last.State, last.Message)
+	}
+	if last.Execution.Calculation != "partial" || service.pending == nil || attempts != 2 {
+		t.Fatalf("expected a partial save with one retry pending: %+v attempts=%d", last.Execution, attempts)
+	}
+	*now = now.Add(time.Minute)
+	if _, err := service.Retry(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if last := client.statuses[len(client.statuses)-1]; last.State != "partial" || !strings.Contains(last.Message, "Automatic retries have stopped; the set-aside steps run again") {
+		t.Fatalf("retry: %q %s", last.State, last.Message)
+	}
+	if service.pending != nil {
+		t.Fatal("a third automatic attempt is still scheduled")
+	}
+}

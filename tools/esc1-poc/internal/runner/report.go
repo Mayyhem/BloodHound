@@ -31,16 +31,19 @@ import (
 // the affected objects, but never copies object IDs or answer values. It can
 // be stored in the rule service without copying any graph answers.
 type Execution struct {
-	CleanupPending bool          `json:"cleanup_pending,omitempty"`
-	SchemaRevision string        `json:"schema_revision,omitempty"`
-	Calculation    string        `json:"calculation"`
-	Save           string        `json:"save"`
-	Phase          string        `json:"phase"`
-	Failure        *Failure      `json:"failure,omitempty"`
-	Queries        []QueryReport `json:"queries"`
-	Proposed       ChangesCount  `json:"proposed"`
-	Saved          *ChangesCount `json:"saved,omitempty"`
-	Elapsed        time.Duration `json:"elapsed_nanoseconds"`
+	CleanupPending bool   `json:"cleanup_pending,omitempty"`
+	SchemaRevision string `json:"schema_revision,omitempty"`
+	Calculation    string `json:"calculation"`
+	Save           string `json:"save"`
+	Phase          string `json:"phase"`
+	// Failure is the first failure. Failures lists every step that failed when
+	// a run set failing steps aside and saved the rest (Calculation "partial").
+	Failure  *Failure      `json:"failure,omitempty"`
+	Failures []Failure     `json:"failures,omitempty"`
+	Queries  []QueryReport `json:"queries"`
+	Proposed ChangesCount  `json:"proposed"`
+	Saved    *ChangesCount `json:"saved,omitempty"`
+	Elapsed  time.Duration `json:"elapsed_nanoseconds"`
 }
 
 type ChangesCount struct {
@@ -68,12 +71,26 @@ type QueryReport struct {
 	Saved         *int64        `json:"saved_outputs,omitempty"`
 }
 
+// Relationship names the connection type being saved when the failure
+// happened, if any. Saving a type combines every step that produces it, so
+// such a failure may have no single step to blame.
 type Failure struct {
-	Query   string `json:"query,omitempty"`
-	Stage   int    `json:"stage,omitempty"`
-	Phase   string `json:"phase"`
-	Message string `json:"message"`
+	Query        string `json:"query,omitempty"`
+	Relationship string `json:"relationship,omitempty"`
+	Stage        int    `json:"stage,omitempty"`
+	Phase        string `json:"phase"`
+	Message      string `json:"message"`
 }
+
+// relationshipFailure marks an error that happened while saving one
+// relationship type.
+type relationshipFailure struct {
+	kind  string
+	cause error
+}
+
+func (s *relationshipFailure) Error() string { return "save " + s.kind + ": " + s.cause.Error() }
+func (s *relationshipFailure) Unwrap() error { return s.cause }
 
 // Raw database errors may contain a password, query literal, or collected ID.
 // Keep them in the returned error for existing private logging; stored reports
@@ -195,8 +212,28 @@ func (s *Execution) selectQueries(plan extension.Plan, reason string) {
 	}
 }
 
+// explainUnfinished gives the reason for steps that run again only because
+// the previous run set them aside after a failure.
+func (s *Execution) explainUnfinished(plan extension.Plan, unfinished []string) {
+	var selected = map[string]bool{}
+	for _, query := range plan.Queries {
+		selected[query.Name] = true
+	}
+	for _, name := range unfinished {
+		if detail := s.query(name); detail != nil && selected[name] {
+			detail.Reason = "The previous run set this step aside after a failure, so it runs again."
+		}
+	}
+}
+
 func (s *Execution) fail(query, phase string, err error) {
-	var failure = &Failure{Query: query, Phase: phase, Message: FailureMessage(err)}
+	var (
+		failure      = &Failure{Query: query, Phase: phase, Message: FailureMessage(err)}
+		relationship *relationshipFailure
+	)
+	if errors.As(err, &relationship) {
+		failure.Relationship = relationship.kind
+	}
 	if detail := s.query(query); detail != nil {
 		failure.Stage = detail.Stage
 		detail.State = "failed"

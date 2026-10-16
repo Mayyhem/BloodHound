@@ -112,7 +112,15 @@ const labelRoom = { x: 160, y: 90 };
 // the part of the canvas that panels and buttons leave uncovered. Sigma keeps
 // node positions in a "framed" space; it converts them to screen pixels for
 // any trial camera, which lets this measure the queries at zoom 1 and scale.
-export function cameraToFrame(sigma: FramingView, nodes: string[], covered: ClearArea): CameraState | undefined {
+//
+// A panel in a corner leaves two clear rectangles: the strip below it and the
+// strip beside it. Pass each as one choice; the queries go in whichever choice
+// shows them largest.
+export function cameraToFrame(
+    sigma: FramingView,
+    nodes: string[],
+    choices: ClearArea | ClearArea[]
+): CameraState | undefined {
     const points = nodes.flatMap((node) => {
         const data = sigma.getNodeDisplayData(node);
         return data ? [data] : [];
@@ -125,30 +133,39 @@ export function cameraToFrame(sigma: FramingView, nodes: string[], covered: Clea
     const maxY = Math.max(...points.map((point) => point.y));
     const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
 
-    // The uncovered area. If panels cover nearly everything, use the whole canvas.
-    let area = {
-        left: covered.left,
-        top: covered.top,
-        width: width - covered.left - covered.right,
-        height: height - covered.top - covered.bottom,
-    };
-    if (area.width < 100 || area.height < 100) area = { left: 0, top: 0, width, height };
-
     // How large the queries appear at zoom ratio 1. A higher ratio shrinks them.
     const atRatioOne: CameraState = { x: center.x, y: center.y, ratio: 1, angle: 0 };
     const corner = sigma.framedGraphToViewport({ x: minX, y: minY }, { cameraState: atRatioOne });
     const opposite = sigma.framedGraphToViewport({ x: maxX, y: maxY }, { cameraState: atRatioOne });
-    const ratio = Math.min(
-        MAX_CAMERA_RATIO,
-        Math.max(
-            MIN_CAMERA_RATIO,
-            (Math.abs(opposite.x - corner.x) + labelRoom.x) / area.width,
-            (Math.abs(opposite.y - corner.y) + labelRoom.y) / area.height
-        )
-    );
+
+    // For each choice: the clear rectangle, and the zoom that fits the queries
+    // in it. A choice too small to use (under 100 pixels) is ignored. If every
+    // choice is too small, use the whole canvas.
+    const fits = (Array.isArray(choices) ? choices : [choices])
+        .map((covered) => ({
+            left: covered.left,
+            top: covered.top,
+            width: width - covered.left - covered.right,
+            height: height - covered.top - covered.bottom,
+        }))
+        .filter((area) => area.width >= 100 && area.height >= 100);
+    if (!fits.length) fits.push({ left: 0, top: 0, width, height });
+    const sized = fits.map((area) => ({
+        area,
+        ratio: Math.min(
+            MAX_CAMERA_RATIO,
+            Math.max(
+                MIN_CAMERA_RATIO,
+                (Math.abs(opposite.x - corner.x) + labelRoom.x) / area.width,
+                (Math.abs(opposite.y - corner.y) + labelRoom.y) / area.height
+            )
+        ),
+    }));
+    // The smallest ratio draws the queries largest.
+    const { area, ratio } = sized.reduce((best, next) => (next.ratio < best.ratio ? next : best));
 
     // Centering the camera on the queries would put them in the middle of the
-    // whole canvas. Shift it so they sit in the middle of the uncovered area:
+    // whole canvas. Shift it so they sit in the middle of the chosen area:
     // the camera moves to the point now shown that far from the canvas center
     // in the opposite direction.
     const centered: CameraState = { x: center.x, y: center.y, ratio, angle: 0 };

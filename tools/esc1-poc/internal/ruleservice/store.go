@@ -261,7 +261,7 @@ func (s *Store) LatestStatus() Status {
 // The caller holds the store lock so rules and status can be read together.
 func (s *Store) latestStatus() Status {
 	var result = cloneStatus(s.status)
-	result.ResultsStale = result.SavedRevision == "" || result.SavedRevision != s.active.Revision || result.ResultsUncertain || result.State == "failed" || result.State == "running" || result.State == "waiting" || result.State == "unavailable" || result.State == "uncertain"
+	result.ResultsStale = result.SavedRevision == "" || result.SavedRevision != s.active.Revision || result.ResultsUncertain || result.State == "failed" || result.State == "partial" || result.State == "running" || result.State == "waiting" || result.State == "unavailable" || result.State == "uncertain"
 	if result.Execution != nil {
 		result.ResultsStale = result.ResultsStale || result.Execution.CleanupPending || (s.plan.SchemaRevision != "" && result.Execution.SchemaRevision != s.plan.SchemaRevision)
 		for _, query := range result.Execution.Queries {
@@ -366,8 +366,10 @@ func (s *Store) Report(status Status) error {
 func validateStatus(status Status) error {
 	// "waiting" means new data arrived before a retry, so the rules will run
 	// again after the next BloodHound analysis. Nothing failed.
-	if !slices.Contains([]string{"success", "failed", "running", "waiting", "no-rules", "uncertain", "unavailable"}, status.State) {
-		return fmt.Errorf("status state must be success, failed, running, waiting, no-rules, uncertain, or unavailable")
+	// "partial" means some steps failed and were set aside with the steps tied
+	// to them; everything else was saved.
+	if !slices.Contains([]string{"success", "partial", "failed", "running", "waiting", "no-rules", "uncertain", "unavailable"}, status.State) {
+		return fmt.Errorf("status state must be success, partial, failed, running, waiting, no-rules, uncertain, or unavailable")
 	}
 	if len(status.RunID) > 180 || len(status.Backend) > 16 || len(status.History) > MaxRecentRuns {
 		return fmt.Errorf("report metadata exceeds its limits")

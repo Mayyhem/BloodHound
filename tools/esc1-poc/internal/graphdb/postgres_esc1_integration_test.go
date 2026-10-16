@@ -207,7 +207,7 @@ func TestPostgresESC1Rollback(t *testing.T) {
 	updatePostgresFixtureProperty(t, driver, "PoC_Test_Domain", "name", "CHANGED DOMAIN")
 	before := postgresFixtureSnapshot(t, driver, false)
 	for index := range plan.Queries {
-		if plan.Queries[index].Name == "esc1.cypher" {
+		if plan.Queries[index].Name == "PoC/esc1.cypher" {
 			plan.Queries[index].Text = "RETURN 17 AS left, [] AS right, 'PoC_Test_Domain' AS target, 'PoC_ADCSESC1' AS kind"
 		}
 	}

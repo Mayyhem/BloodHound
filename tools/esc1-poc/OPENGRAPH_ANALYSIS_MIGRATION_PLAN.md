@@ -71,6 +71,10 @@ The local `origin/main` references were last observed to be stale. Their age mea
 - Do not promise coordination with other BloodHound servers or direct database writers. This design coordinates one modified Community Edition server.
 - Do not change extension author requirements without explicit approval.
 
+## Open items before execution
+
+1. **Branch access.** Confirm the user can create branches in the upstream BloodHound and DAWGS repositories (needed for true stacked pull requests; see "How each pull request is handled"). If not, request write access or accept the one-at-a-time fallback.
+
 ## Phase 1: freeze and back up the source
 
 Before fetching anything:
@@ -113,7 +117,7 @@ Commit numbers (D01, B02, and so on) stay as stable names for the work. This sec
 - The key rule from GitHub: if code in one layer depends on code in another, the dependency must be in the same branch or a lower one. Start a new layer when the concern changes or the layer is big enough to review on its own.
 - Every description says what this layer adds, what the reviewer should focus on, what it deliberately does not do, and what tests were run.
 - A stack is one straight chain. The BloodHound layer table below is a tree, so the "main chain" is one stack, and each side branch (BH-1b, BH-6/7, BH-16, BH-17, BH-18) is opened against the branch it hangs from and retargeted to `main` once that branch merges. Side branches merge after their base.
-- All branches in a stack must be in the same repository; GitHub does not support stacks across forks. BloodHound and DAWGS are separate repositories, so they can never be in one stack. Cross-repository dependencies (for example BH-10 needing DAWGS pull requests) are handled by links and "blocked by" notes, not by stacking. Before opening anything, confirm with the user whether branches will be pushed to the upstream repositories or to forks. If forks, stacking is unavailable and the layers must be opened one at a time as each base merges.
+- All branches in a stack must be in the same repository; GitHub does not support stacks across forks. BloodHound and DAWGS are separate repositories, so they can never be in one stack. Cross-repository dependencies (for example BH-10 needing DAWGS pull requests) are handled by links and "blocked by" notes, not by stacking. **Access requirement:** true stacked pull requests need permission to create branches directly in the upstream BloodHound and DAWGS repositories, not only in a personal fork. The user may need to ask for write access to both repositories before any stack is opened. Until that is confirmed, treat the plan as unable to stack: either ask for access, or open the layers one at a time from a fork as each base merges. Independent pull requests work from a fork. Confirm which applies before opening anything, and do not push to either upstream repository without the user's approval.
 - Stacked pull requests merge from the bottom up. Merging a middle pull request also merges every pull request below it; the ones above it stay open and retarget automatically. Merging the top pull request merges the whole stack. The stack does not have to merge all at once.
 - Rebasing is cascading. Prefer GitHub's server-side cascading rebase or the `gh stack` command-line extension over rebasing branches by hand. After a lower branch changes, rerun the focused tests of every branch above it. When the bottom pull request merges, GitHub rebases the rest so the next one targets `main`. The agent recommends these commands; the user runs them.
 - Merge requirements for every pull request in a stack come from the bottom pull request's base branch (`main`). Branch protection rules, code owner approvals, and the CI checks that run for pull requests to `main` apply to every layer, including middle ones. Run `just prepare-for-codereview` per layer so each one passes on its own.

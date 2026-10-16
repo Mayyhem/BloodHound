@@ -68,3 +68,17 @@ it('uses the whole canvas when panels cover nearly all of it, and skips missing 
     expect(point.y).toBeCloseTo(height / 2);
     expect(cameraToFrame(view as never, ['missing'], { top: 0, right: 0, bottom: 0, left: 0 })).toBeUndefined();
 });
+
+it('uses the clear area that shows the queries largest', () => {
+    // A tall panel in the top-left corner. Below it leaves only 100 px of
+    // height, too little for the 90 px label room (ratio 0.9); beside it
+    // leaves 700 px of width and the full height (ratio 0.8).
+    const below = { top: 700, right: 0, bottom: 0, left: 0 };
+    const beside = { top: 0, right: 0, bottom: 0, left: 500 };
+    const state = cameraToFrame(view as never, ['first', 'second'], [below, beside])!;
+    // 400 px of queries plus 160 px label room fit the 700 px beside the panel.
+    expect(state.ratio).toBeCloseTo(560 / 700);
+    const middle = view.framedGraphToViewport({ x: 0.5, y: 0.5 }, { cameraState: state });
+    expect(middle.x).toBeCloseTo(850);
+    expect(middle.y).toBeCloseTo(400);
+});

@@ -93,7 +93,19 @@ export interface Execution {
     proposed: ChangesCount;
     saved?: ChangesCount;
     cleanup_pending?: boolean;
-    failure?: { query?: string; stage?: number; phase: string; message: string };
+    // The first failure. When failing steps were set aside and the rest was
+    // saved (calculation "partial"), `failures` lists every failure.
+    failure?: Failure;
+    failures?: Failure[];
+}
+
+export interface Failure {
+    query?: string;
+    // The connection type being saved when the failure happened, if any.
+    relationship?: string;
+    stage?: number;
+    phase: string;
+    message: string;
 }
 
 export interface RunRecord {

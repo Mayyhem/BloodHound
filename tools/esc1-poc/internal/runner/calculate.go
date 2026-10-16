@@ -39,9 +39,19 @@ type queryAnswer struct {
 // and their files stay available until every consumer has finished reading.
 func calculate(ctx context.Context, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report, stage func(extension.RelationshipBinding, *answerFile) error, validateOnlyNodes, withheldRelationships map[string]bool) (map[string]*answerFile, error) {
 	var currentQuery string
-	result, err := calculateQueries(ctx, database, transaction, plan, space, report, stage, &currentQuery, validateOnlyNodes, withheldRelationships)
+	// A failing query stops its peers through this context and records itself
+	// as the reason.
+	peers, stopPeers := context.WithCancelCause(ctx)
+	result, err := calculateQueries(peers, stopPeers, database, transaction, plan, space, report, stage, &currentQuery, validateOnlyNodes, withheldRelationships)
 	if err != nil {
 		var failure *queryFailure
+		// When one query fails, a peer whose answers were being checked at
+		// that moment stops with only "canceled". Blame the query that
+		// actually failed, not the peer: otherwise a healthy query would be
+		// set aside in its place.
+		if errors.Is(err, context.Canceled) && errors.As(context.Cause(peers), &failure) {
+			err = failure
+		}
 		if errors.As(err, &failure) {
 			currentQuery = failure.query
 			report.Execution.Phase = "read-query"
@@ -72,7 +82,7 @@ func recordRead(report *Report, answer queryAnswer) {
 	}
 }
 
-func calculateQueries(ctx context.Context, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report, stage func(extension.RelationshipBinding, *answerFile) error, currentQuery *string, validateOnlyNodes, withheldRelationships map[string]bool) (map[string]*answerFile, error) {
+func calculateQueries(ctx context.Context, cancel context.CancelCauseFunc, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report, stage func(extension.RelationshipBinding, *answerFile) error, currentQuery *string, validateOnlyNodes, withheldRelationships map[string]bool) (map[string]*answerFile, error) {
 	var (
 		answers            = map[string]*answerFile{}
 		remaining          = map[string]int{}
@@ -89,7 +99,6 @@ func calculateQueries(ctx context.Context, database Database, transaction Transa
 		graphChangesStaged bool
 		sampleBytes        = maxReportSampleBytes
 	)
-	ctx, cancel := context.WithCancelCause(ctx)
 	defer func() {
 		// A failed query cancels its peers immediately. We must still wait for
 		// all of them to close their readers before rollback or file removal.

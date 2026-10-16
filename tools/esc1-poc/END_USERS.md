@@ -129,9 +129,11 @@ There may be no matching facts, answers may already be correct, or no rules may 
 
 ## What happens if one rule fails?
 
-A failure before saving discards the run's extension changes, including other rules' changes. Previous results remain but may be outdated. This prevents partly updated answers. Imports and BloodHound's own completed analysis are not undone.
+The failed rule is set aside, together with every rule that uses its results and every rule that saves the same kind of connection or helper object. Those rules keep their previous results, which may now be outdated. Every other rule is still calculated and saved. The status line turns orange and says, for example, "Finished with 1 failure: 24 steps saved; 5 kept their previous results." In the graph, the failed rule is red and the set-aside rules are orange; a rule's **Last run** tab says why it was set aside. A retry that reruns only the set-aside rules and fails again also shows orange, with "0 steps saved": the other rules' results are still current. Imports and BloodHound's own completed analysis are not undone.
 
-Share the failed rule name and report with its supplier or administrator. Activate corrected files and request new analysis. Automatic retries use the original files, and there is only one: if the retry fails too, the status line says retries have stopped, and the rules run again after the next analysis (Run Analysis or a data upload). If another graph update has been attempted, the engine waits for new successful analysis before trying again.
+A few failures cannot be pinned on one rule, for example missing or duplicate object IDs in the graph. Then nothing from the run is saved and previous results remain.
+
+Share the failed rule name and report with its supplier or administrator. Activate corrected files and request new analysis. There is one automatic retry, about a minute later, and it reruns only the set-aside rules (with the rules they need). It uses the original files: if the retry fails too, the status line says retries have stopped, and the set-aside rules run again after the next analysis (Run Analysis or a data upload). If another graph update has been attempted, the engine waits for new successful analysis before trying again.
 
 ## What does an unavailable or uncertain report mean?
 

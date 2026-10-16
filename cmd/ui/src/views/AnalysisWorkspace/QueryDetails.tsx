@@ -276,15 +276,20 @@ function LastRun({ query, workspace, outcome }: { query: Query; workspace: Works
     const execution = latestCompleted(workspace)?.execution;
     const saveState = execution?.save;
     // The run report stores why the run failed separately from each step's
-    // outcome. Show it here when this step is the one that failed.
-    const failure = execution?.failure?.query === query.name ? execution.failure : undefined;
+    // outcome. Show it here when this step is one that failed. A partly saved
+    // run can list several failures.
+    const failure = [...(execution?.failures ?? []), ...(execution?.failure ? [execution.failure] : [])].find(
+        (item) => item.query === query.name
+    );
     const savedCount =
         outcome.saved_outputs ??
-        (saveState === 'uncertain'
-            ? 'Save unconfirmed'
-            : ['not-started', 'failed', 'unchanged'].includes(saveState ?? '')
-              ? 'No save in this attempt'
-              : 'Not reported');
+        (['failed', 'set-aside'].includes(outcome.state) && saveState === 'succeeded'
+            ? 'Not saved in this run; its previous results were kept'
+            : saveState === 'uncertain'
+              ? 'Save unconfirmed'
+              : ['not-started', 'failed', 'unchanged'].includes(saveState ?? '')
+                ? 'No save in this attempt'
+                : 'Not reported');
     return (
         <Box className='pt-1'>
             {timeLines}
@@ -299,7 +304,7 @@ function LastRun({ query, workspace, outcome }: { query: Query; workspace: Works
             {outcome.reason && (
                 <Typography variant='body2'>
                     <strong>
-                        {['skipped', 'waiting', 'canceled', 'disabled'].includes(outcome.state)
+                        {['skipped', 'set-aside', 'waiting', 'canceled', 'disabled'].includes(outcome.state)
                             ? 'Why it did not run:'
                             : 'Why it ran:'}
                     </strong>{' '}

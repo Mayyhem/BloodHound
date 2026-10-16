@@ -27540,6 +27540,7 @@
               "not-started",
               "running",
               "succeeded",
+              "partial",
               "failed",
               "skipped"
             ]
@@ -27560,9 +27561,14 @@
           },
           "failure": {
             "type": "object",
+            "description": "The first failure in the run.",
             "properties": {
               "query": {
                 "type": "string"
+              },
+              "relationship": {
+                "type": "string",
+                "description": "The connection type being saved when the failure happened, if any."
               },
               "stage": {
                 "type": "integer",
@@ -27580,6 +27586,37 @@
               "phase",
               "message"
             ]
+          },
+          "failures": {
+            "type": "array",
+            "description": "Every failure, when failing steps were set aside and the rest of the run was saved (calculation partial).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "relationship": {
+                  "type": "string"
+                },
+                "stage": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "phase": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "phase",
+                "message"
+              ]
+            },
+            "maxItems": 32
           },
           "queries": {
             "type": "array",
@@ -27602,6 +27639,7 @@
                     "succeeded",
                     "failed",
                     "skipped",
+                    "set-aside",
                     "disabled",
                     "canceled"
                   ]
@@ -27743,10 +27781,13 @@
         "properties": {
           "state": {
             "type": "string",
+            "description": "partial means some steps failed and were set aside, together with the steps tied to them; they kept their previous results and everything else was saved. waiting means new data arrived before a retry; the next BloodHound analysis runs the rules.",
             "enum": [
               "success",
+              "partial",
               "failed",
               "running",
+              "waiting",
               "no-rules",
               "uncertain",
               "unavailable"
