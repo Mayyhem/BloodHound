@@ -20,10 +20,12 @@ import {
     completedState,
     dependencyKey,
     dependencyReason,
+    extensionTitle,
+    laneTitles,
     latestCompleted,
-    numberedExtensions,
     queryColor,
     queryColors,
+    queryRoles,
     relatedQueries,
     reportMatches,
     runPhase,
@@ -33,14 +35,42 @@ import { workspaceFixture } from './testData';
 import { Dependency } from './types';
 
 describe('analysis plan and completed reports', () => {
-    it('numbers all extensions consistently regardless of query execution order', () => {
-        const queries = workspaceFixture().plan.queries;
-        expect(numberedExtensions(queries)).toEqual([
-            { namespace: 'PoC_AD', number: 1 },
-            { namespace: 'PoC_Other', number: 2 },
-            { namespace: 'PoC_Vault', number: 3 },
-        ]);
-        expect(numberedExtensions([...queries].reverse())).toEqual(numberedExtensions(queries));
+    it('names extensions by display name, then namespace, and adds the namespace only when names repeat', () => {
+        const workspace = workspaceFixture();
+        workspace.installed_extensions = [{ namespace: 'PoC_New', name: 'new', display_name: 'New extension' }];
+        expect(extensionTitle(workspace, 'PoC_AD')).toBe('Active Directory');
+        // An extension installed but not yet used by an active query.
+        expect(extensionTitle(workspace, 'PoC_New')).toBe('New extension');
+        expect(extensionTitle(workspace, 'PoC_Unknown')).toBe('PoC_Unknown');
+        expect(extensionTitle(workspace, '')).toBe('No extension');
+
+        workspace.plan.extensions[1].display_name = 'Active Directory';
+        const titles = laneTitles(workspace, ['PoC_AD', 'PoC_Vault', 'PoC_Other']);
+        expect(titles.get('PoC_AD')).toEqual({ title: 'Active Directory', namespace: 'PoC_AD' });
+        expect(titles.get('PoC_Vault')).toEqual({ title: 'Active Directory', namespace: 'PoC_Vault' });
+        expect(titles.get('PoC_Other')).toEqual({ title: 'Other', namespace: undefined });
+    });
+    it('reads what each query produces from its outputs and from the queries that read its rows', () => {
+        const workspace = workspaceFixture();
+        const [adUsers, vaultUsers, vaultEdges] = workspace.plan.queries;
+        const roles = (query: typeof adUsers) => queryRoles(query, workspace.dependencies);
+        // Vault's users query reads Active Directory's rows; the other two
+        // arrows pass helper objects and relationships, not rows.
+        expect(roles(adUsers)).toEqual(['query']);
+        expect(roles(vaultUsers)).toEqual([]);
+        expect(roles(vaultEdges)).toEqual([]);
+        vaultEdges.outputs = [
+            { type: 'relationship', kind: 'PoC_Link' },
+            { type: 'relationship', kind: 'PoC_Other_Link' },
+        ];
+        // Each role once, however many outputs give it.
+        expect(roles(vaultEdges)).toEqual(['relationship']);
+        // Always in the same order: relationship, node, query.
+        adUsers.outputs = [
+            { type: 'node', kind: 'PoC_Helper' },
+            { type: 'relationship', kind: 'PoC_Link' },
+        ];
+        expect(roles(adUsers)).toEqual(['relationship', 'node', 'query']);
     });
     it('keeps only paths through the selected query or edge, without following side branches or shortcuts', () => {
         const connections = [
@@ -73,7 +103,7 @@ describe('analysis plan and completed reports', () => {
     });
     it('draws shared prerequisites once and keeps disconnected queries', () => {
         const workspace = workspaceFixture();
-        const graph = buildQueryGraph(workspace);
+        const { graph } = buildQueryGraph(workspace);
         expect(graph.order).toBe(4);
         expect(graph.size).toBe(3);
         expect(graph.inDegree('PoC_Other/alone.cypher')).toBe(0);
@@ -103,7 +133,7 @@ describe('analysis plan and completed reports', () => {
         workspace.plan.queries[0].outputs = [
             { type: 'relationship', kind: 'PoC_Link', producers: ['PoC_AD/users.cypher', 'PoC_Vault/users.cypher'] },
         ];
-        const graph = buildQueryGraph(workspace);
+        const { graph } = buildQueryGraph(workspace);
         expect(graph.size).toBe(0);
         const positions = graph.nodes().map((name) => {
             const { x, y } = graph.getNodeAttributes(name);

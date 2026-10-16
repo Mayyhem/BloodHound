@@ -16,12 +16,47 @@
 
 import { Dependency, Query, RunRecord, Workspace } from './types';
 
-// Use the whole plan, not filtered rows. Sorting keeps each extension's number
-// stable when execution order or the selected filter changes.
-export const numberedExtensions = (queries: Query[]) =>
-    [...new Set(queries.map((query) => query.namespace))]
-        .sort()
-        .map((namespace, index) => ({ namespace, number: index + 1 }));
+// The name to show for an extension: its display name, or its namespace when
+// it has none. A query with no namespace belongs to "No extension". The plan
+// lists extensions that have active queries; the installed list also covers an
+// extension whose first file is still being written in the editor.
+export function extensionTitle(workspace: Workspace, namespace: string) {
+    if (!namespace) return 'No extension';
+    const extension = [...workspace.plan.extensions, ...(workspace.installed_extensions ?? [])].find(
+        (entry) => entry.namespace === namespace
+    );
+    return extension?.display_name || namespace;
+}
+
+// Titles for the graph's extension lanes. When two extensions share a display
+// name, `namespace` is filled in so the lane can show it in small text.
+export function laneTitles(workspace: Workspace, namespaces: string[]) {
+    const titles = new Map(namespaces.map((namespace) => [namespace, extensionTitle(workspace, namespace)]));
+    const shared = (title: string) => [...titles.values()].filter((other) => other === title).length > 1;
+    return new Map(
+        [...titles].map(([namespace, title]) => [
+            namespace,
+            { title, namespace: shared(title) && namespace ? namespace : undefined },
+        ])
+    );
+}
+
+// What a query produces. A query can do more than one of these; the graph
+// draws one icon for each.
+//   relationship: it makes relationships in the collected graph (declared in
+//     the extension's schema, listed in the query's outputs)
+//   node: it makes helper objects (also listed in its outputs)
+//   query: another query reads its rows (that query declares
+//     `depends-on: query:...` on it, which the plan lists as a dependency)
+export type QueryRole = 'relationship' | 'node' | 'query';
+export function queryRoles(query: Query, dependencies: Dependency[]): QueryRole[] {
+    const produces: Record<QueryRole, boolean> = {
+        relationship: query.outputs.some((output) => output.type === 'relationship'),
+        node: query.outputs.some((output) => output.type === 'node'),
+        query: dependencies.some((dependency) => dependency.type === 'query' && dependency.prerequisite === query.name),
+    };
+    return (['relationship', 'node', 'query'] as const).filter((role) => produces[role]);
+}
 
 export const queryLabel = (name: string) =>
     name
@@ -33,8 +68,8 @@ export const observedTime = (value?: string) =>
     !value || value.startsWith('0001-') ? 'Unavailable' : new Date(value).toLocaleString();
 // Node colors in the graph. The legend in the top panel shows the same list.
 export const queryColors = {
-    // Green and red are one shade paler than before so the black extension
-    // number drawn on each node stays readable.
+    // Green and red are one shade paler than before so the black role icons
+    // drawn on each node stay readable.
     enabled: { color: '#66bb6a', label: 'Enabled' },
     blocked: { color: '#ed8b00', label: 'Blocked or set aside' },
     failed: { color: '#ef5350', label: 'Failed' },

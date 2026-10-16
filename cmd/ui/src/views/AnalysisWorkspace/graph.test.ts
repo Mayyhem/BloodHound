@@ -14,7 +14,133 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { nearestDependency } from './graph';
+import { MultiDirectedGraph } from 'graphology';
+import { sequentialLayout } from 'src/rendering/utils/sequentialLayout';
+import { buildQueryGraph, laneOrder, nearestDependency } from './graph';
+import { queryFixture, workspaceFixture } from './testData';
+import { Dependency, Workspace } from './types';
+
+// The layout the graph used before lanes: the same queries and arrows, laid
+// out left to right, with nothing moved afterwards.
+function layoutWithoutLanes(workspace: Workspace) {
+    const graph = new MultiDirectedGraph();
+    workspace.plan.queries.forEach((query) => graph.addNode(query.name, { size: 25, x: 0, y: 0 }));
+    workspace.dependencies.forEach((dependency) => graph.addDirectedEdge(dependency.prerequisite, dependency.consumer));
+    sequentialLayout(graph, 200);
+    return graph;
+}
+
+const queryArrow = (prerequisite: string, consumer: string): Dependency => ({
+    prerequisite,
+    consumer,
+    type: 'query',
+    name: prerequisite,
+});
+
+describe('extension lanes', () => {
+    it('keeps every left-to-right position and puts each extension in its own lane', () => {
+        const workspace = workspaceFixture();
+        const { graph, lanes } = buildQueryGraph(workspace);
+        const before = layoutWithoutLanes(workspace);
+        for (const query of workspace.plan.queries)
+            expect(graph.getNodeAttribute(query.name, 'x')).toBe(before.getNodeAttribute(query.name, 'x'));
+
+        // Active Directory feeds Vault, so it is above it. Other is independent
+        // and comes before Vault alphabetically.
+        expect(lanes.map((lane) => lane.namespace)).toEqual(['PoC_AD', 'PoC_Other', 'PoC_Vault']);
+        // Lanes are stacked from the top without overlapping. Larger y is
+        // higher on the screen.
+        lanes.forEach((lane, index) => {
+            expect(lane.top).toBeGreaterThan(lane.bottom);
+            if (index) expect(lane.top).toBeLessThanOrEqual(lanes[index - 1].bottom);
+        });
+        for (const query of workspace.plan.queries) {
+            const lane = lanes.find((entry) => entry.namespace === query.namespace)!;
+            const y = graph.getNodeAttribute(query.name, 'y');
+            expect(y).toBeLessThan(lane.top);
+            expect(y).toBeGreaterThan(lane.bottom);
+        }
+        // Vault's two queries are in different columns, so they share one row.
+        expect(graph.getNodeAttribute('PoC_Vault/users.cypher', 'y')).toBe(
+            graph.getNodeAttribute('PoC_Vault/edges.cypher', 'y')
+        );
+    });
+
+    it('stacks queries that share a column in the order the layout drew them', () => {
+        const workspace = workspaceFixture();
+        workspace.plan.queries.push(queryFixture('PoC_Vault/groups.cypher', 5));
+        workspace.dependencies.push(queryArrow('PoC_AD/users.cypher', 'PoC_Vault/groups.cypher'));
+        const { graph, lanes } = buildQueryGraph(workspace);
+        const before = layoutWithoutLanes(workspace);
+        const sameColumn = ['PoC_Vault/users.cypher', 'PoC_Vault/groups.cypher'];
+        expect(graph.getNodeAttribute(sameColumn[0], 'x')).toBe(graph.getNodeAttribute(sameColumn[1], 'x'));
+        const [higherBefore] = [...sameColumn].sort(
+            (first, second) => before.getNodeAttribute(second, 'y') - before.getNodeAttribute(first, 'y')
+        );
+        const [higherNow] = [...sameColumn].sort(
+            (first, second) => graph.getNodeAttribute(second, 'y') - graph.getNodeAttribute(first, 'y')
+        );
+        expect(higherNow).toBe(higherBefore);
+        // Two rows make the Vault lane taller than the one-row lanes.
+        const height = (namespace: string) => {
+            const lane = lanes.find((entry) => entry.namespace === namespace)!;
+            return lane.top - lane.bottom;
+        };
+        expect(height('PoC_Vault')).toBeGreaterThan(height('PoC_AD'));
+    });
+
+    it('draws no lanes and moves nothing when there is one extension', () => {
+        const workspace = workspaceFixture();
+        workspace.plan.queries = workspace.plan.queries.filter((query) => query.namespace === 'PoC_Vault');
+        workspace.dependencies = workspace.dependencies.filter((dependency) =>
+            dependency.prerequisite.startsWith('PoC_Vault')
+        );
+        const { graph, lanes } = buildQueryGraph(workspace);
+        const before = layoutWithoutLanes(workspace);
+        expect(lanes).toEqual([]);
+        for (const query of workspace.plan.queries) {
+            expect(graph.getNodeAttribute(query.name, 'x')).toBe(before.getNodeAttribute(query.name, 'x'));
+            expect(graph.getNodeAttribute(query.name, 'y')).toBe(before.getNodeAttribute(query.name, 'y'));
+        }
+    });
+
+    it('lists queries in rows of four inside each lane when there are no arrows', () => {
+        const workspace = workspaceFixture();
+        workspace.dependencies = [];
+        workspace.plan.queries = [
+            ...['a', 'b', 'c', 'd', 'e'].map((name, index) => queryFixture(`PoC_AD/${name}.cypher`, index + 1)),
+            queryFixture('PoC_Vault/only.cypher', 6),
+        ];
+        const { graph, lanes } = buildQueryGraph(workspace);
+        expect(lanes.map((lane) => lane.namespace)).toEqual(['PoC_AD', 'PoC_Vault']);
+        const position = (name: string) => graph.getNodeAttributes(`PoC_AD/${name}.cypher`);
+        expect(['a', 'b', 'c', 'd'].map((name) => position(name).y)).toEqual(Array(4).fill(position('a').y));
+        expect(['a', 'b', 'c', 'd'].map((name) => position(name).x)).toEqual([0, 300, 600, 900]);
+        // The fifth query starts a second row, below the first.
+        expect(position('e').x).toBe(0);
+        expect(position('e').y).toBeLessThan(position('a').y);
+        expect(graph.getNodeAttribute('PoC_Vault/only.cypher', 'y')).toBeLessThan(lanes[1].top);
+    });
+
+    it('orders extensions by what they depend on, alphabetically when tied, and survives loops', () => {
+        const namespaceOf = (name: string) => name.split('/')[0];
+        const title = (namespace: string) => namespace;
+        // C feeds A, so C goes before A even though A is first alphabetically.
+        expect(laneOrder(['A', 'B', 'C'], [queryArrow('C/x', 'A/y')], namespaceOf, title)).toEqual(['B', 'C', 'A']);
+        // Arrows inside one extension are ignored.
+        expect(laneOrder(['B', 'A'], [queryArrow('B/x', 'B/y')], namespaceOf, title)).toEqual(['A', 'B']);
+        // A and B feed each other. C waits on nothing, so it goes first; then
+        // the alphabetically first of A and B breaks the loop.
+        expect(
+            laneOrder(['B', 'A', 'C'], [queryArrow('A/x', 'B/y'), queryArrow('B/z', 'A/w')], namespaceOf, title)
+        ).toEqual(['C', 'A', 'B']);
+        // Titles, not namespaces, decide ties.
+        expect(laneOrder(['A', 'B'], [], namespaceOf, (namespace) => (namespace === 'A' ? 'Zebra' : 'Apple'))).toEqual([
+            'B',
+            'A',
+        ]);
+    });
+});
 
 it('selects a thin arrow near the pointer, but leaves empty space and distant extensions unselected', () => {
     const edges = [

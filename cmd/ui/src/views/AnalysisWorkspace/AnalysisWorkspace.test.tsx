@@ -34,6 +34,8 @@ vi.mock('./QueryGraph', () => ({
         onFocus,
         children,
         outcomes,
+        highlightedLane,
+        onLane,
     }: {
         workspace: Workspace;
         visible: Set<string>;
@@ -41,9 +43,17 @@ vi.mock('./QueryGraph', () => ({
         onFocus: (name: string | null) => void;
         children?: React.ReactNode;
         outcomes?: Map<string, string>;
+        highlightedLane?: string | null;
+        onLane?: (namespace: string) => void;
     }) => (
         <div aria-label='Query graph'>
             <button onClick={() => onFocus(null)}>Clear focus</button>
+            {[...new Set(workspace.plan.queries.map((query) => query.namespace))].map((namespace) => (
+                <button
+                    key={namespace}
+                    aria-pressed={namespace === highlightedLane}
+                    onClick={() => onLane?.(namespace)}>{`Lane ${namespace}`}</button>
+            ))}
             {workspace.plan.queries
                 .filter((query) => visible.has(query.name))
                 .map((query) => (
@@ -131,17 +141,74 @@ it('shows zero-based dependency depth in the table and query details', async () 
     ).toHaveTextContent('Dependency depth: 0');
 });
 
-it('numbers the extension filter from the complete plan and preserves numbering after filtering', async () => {
+it('lists extensions in the filter by name, without numbers, and the filter hides other extensions on the graph', async () => {
     render(<AnalysisWorkspace />);
     await screen.findByRole('table', { name: 'Current analysis rules' });
     const user = userEvent.setup();
     await user.click(screen.getByRole('combobox', { name: 'Extension' }));
-    expect(screen.getByRole('option', { name: '1. Active Directory (PoC_AD)' })).toBeVisible();
-    expect(screen.getByRole('option', { name: '2. Other (PoC_Other)' })).toBeVisible();
-    await user.click(screen.getByRole('option', { name: '3. Vault (PoC_Vault)' }));
+    expect(screen.getByRole('option', { name: 'Active Directory (PoC_AD)' })).toBeVisible();
+    expect(screen.getByRole('option', { name: 'Other (PoC_Other)' })).toBeVisible();
+    await user.click(screen.getByRole('option', { name: 'Vault (PoC_Vault)' }));
+    const graph = screen.getByLabelText('Query graph');
+    expect(within(graph).queryByRole('button', { name: 'Graph PoC_AD/users.cypher' })).toBeNull();
+    expect(within(graph).getByRole('button', { name: 'Graph PoC_Vault/users.cypher' })).toBeVisible();
+});
+
+it('filters only the table when a lane is clicked, and undoes it from the lane, the chip, or Clear filters', async () => {
+    render(<AnalysisWorkspace />);
+    const table = await screen.findByRole('table', { name: 'Current analysis rules' });
+    const graph = screen.getByLabelText('Query graph');
+    const user = userEvent.setup();
+    const rows = () => within(table).getAllByRole('row').length - 1;
+    expect(rows()).toBe(4);
+
+    // Clicking the Vault lane: the table shows Vault's two queries, the lane is
+    // marked as pressed, and the graph still has every query.
+    await user.click(within(graph).getByRole('button', { name: 'Lane PoC_Vault' }));
+    expect(rows()).toBe(2);
+    expect(within(table).getByRole('button', { name: 'PoC_Vault/edges.cypher' })).toBeVisible();
+    expect(within(graph).getByRole('button', { name: 'Lane PoC_Vault' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(graph).getByRole('button', { name: 'Graph PoC_AD/users.cypher' })).toBeVisible();
+    expect(screen.getByText('Table: Vault')).toBeVisible();
+    expect(screen.getByText('Rules:').parentElement).toHaveTextContent('Rules: 2');
+
+    // Clicking the same lane again shows every extension again.
+    await user.click(within(graph).getByRole('button', { name: 'Lane PoC_Vault' }));
+    expect(rows()).toBe(4);
+    expect(screen.queryByText('Table: Vault')).toBeNull();
+
+    // The chip's remove button undoes it.
+    await user.click(within(graph).getByRole('button', { name: 'Lane PoC_AD' }));
+    expect(rows()).toBe(1);
+    await user.click(
+        within(screen.getByRole('button', { name: 'Table shows only Active Directory' })).getByTestId('CancelIcon')
+    );
+    expect(rows()).toBe(4);
+
+    // Clear filters undoes it too.
+    await user.click(within(graph).getByRole('button', { name: 'Lane PoC_Other' }));
+    expect(rows()).toBe(1);
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(rows()).toBe(4);
+
+    // Picking an extension in the Extension filter replaces a clicked lane.
+    await user.click(within(graph).getByRole('button', { name: 'Lane PoC_Other' }));
     await user.click(screen.getByRole('combobox', { name: 'Extension' }));
-    expect(screen.getByRole('option', { name: '1. Active Directory (PoC_AD)' })).toBeVisible();
-    expect(screen.getByRole('option', { name: '3. Vault (PoC_Vault)' })).toBeVisible();
+    await user.click(screen.getByRole('option', { name: 'Vault (PoC_Vault)' }));
+    expect(rows()).toBe(2);
+    expect(screen.queryByText('Table: Other')).toBeNull();
+});
+
+it('clears a clicked lane when a details link focuses a query outside it', async () => {
+    render(<AnalysisWorkspace />);
+    const table = await screen.findByRole('table', { name: 'Current analysis rules' });
+    const graph = screen.getByLabelText('Query graph');
+    const user = userEvent.setup();
+    await user.click(within(graph).getByRole('button', { name: 'Lane PoC_Other' }));
+    expect(within(table).getAllByRole('row')).toHaveLength(2);
+    await user.click(within(graph).getByRole('button', { name: 'Graph PoC_AD/users.cypher' }));
+    expect(within(table).getAllByRole('row')).toHaveLength(5);
+    expect(screen.queryByText('Table: Other')).toBeNull();
 });
 
 it('coordinates edge focus with details, keyboard dependency links, filters, and clear focus', async () => {

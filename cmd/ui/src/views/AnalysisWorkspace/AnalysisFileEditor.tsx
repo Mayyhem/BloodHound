@@ -108,7 +108,8 @@ function readableValue(value: unknown) {
 }
 
 // A new file is not in the workspace yet, so the dependency window draws it
-// from this stand-in. Only its name, extension, and version are shown.
+// from this stand-in. Only its name, extension lane, and version are shown.
+// It declares no outputs yet, so its node shows the empty ring until saved.
 function editedFileQuery(name: string, version: string): Query {
     const namespace = name.split('/')[0];
     return {
@@ -739,7 +740,6 @@ export default function AnalysisFileEditor({ open, workspace, canEdit, initial, 
                                     workspace={graphWorkspace}
                                     visible={new Set(graphNames)}
                                     focused={workingCopy.name}
-                                    numberingQueries={[...workspace.plan.queries, edited]}
                                     controlsBottom={8}
                                 />
                             </Box>

@@ -554,6 +554,8 @@ The user added the following instruction while implementation was beginning:
 
 This supersedes the earlier environment-icon choice for the analysis graph. The extension filter and graph must share the same numbering. Ordinary Explore is unaffected.
 
+**Superseded 16 October 2026:** the numbers were replaced by one lane per extension and icons for what each query produces. The requirements and reasons are in [change note 05](../tools/opengraph-designer/changes/05-analysis-graph-extension-lanes.md).
+
 ### Round 11 — graph-write coordination
 
 Architecture explanation:

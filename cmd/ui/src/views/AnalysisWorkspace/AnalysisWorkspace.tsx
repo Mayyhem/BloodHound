@@ -21,6 +21,7 @@ import {
     Box,
     Button,
     Checkbox,
+    Chip,
     CircularProgress,
     FormControl,
     InputLabel,
@@ -54,8 +55,8 @@ import {
     dependencyDepth,
     dependencyKey,
     dependencyReason,
+    extensionTitle,
     latestCompleted,
-    numberedExtensions,
     queryColors,
     relatedQueries,
     reportMatches,
@@ -88,6 +89,10 @@ export default function AnalysisWorkspace() {
     const [focused, setFocused] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [extension, setExtension] = useState('');
+    // The extension whose graph lane was clicked. Unlike the Extension filter,
+    // it narrows only the table: the graph keeps every query and arrow, and
+    // only fades the other lanes. Null when no lane is clicked.
+    const [laneFilter, setLaneFilter] = useState<string | null>(null);
     const [downloadError, setDownloadError] = useState('');
     const [downloading, setDownloading] = useState(false);
     // Explore's details panel is a fixed 400 pixels. This panel holds more
@@ -136,6 +141,8 @@ export default function AnalysisWorkspace() {
             `${query.name} ${query.extension_name}`.toLowerCase().includes(search.toLowerCase())
     );
     const visible = new Set(filtered.map((query) => query.name));
+    // The table also applies the clicked lane, if any.
+    const tableRows = filtered.filter((query) => laneFilter === null || query.namespace === laneFilter);
     const currentNames = new Set(queries.map((query) => query.name));
     const related = relatedQueries(workspace?.dependencies ?? [], focused);
     const hiddenQueries = new Set([
@@ -166,11 +173,19 @@ export default function AnalysisWorkspace() {
     useEffect(() => {
         setFocused(null);
         setDownloadError('');
+        setLaneFilter(null);
     }, [workspace?.plan.revision, workspace?.plan.schema_revision]);
     const clearFilters = () => {
         setSearch('');
         setExtension('');
+        setLaneFilter(null);
     };
+    // Clicking a lane title shows only that extension in the table; clicking
+    // the same title again shows every extension again.
+    const toggleLane = useCallback(
+        (namespace: string) => setLaneFilter((current) => (current === namespace ? null : namespace)),
+        []
+    );
     const focusQuery = useCallback(
         (name: string | null) => {
             if (!name) {
@@ -190,15 +205,17 @@ export default function AnalysisWorkspace() {
                 targets.some(
                     (target) =>
                         (extension && target.namespace !== extension) ||
+                        (laneFilter !== null && target.namespace !== laneFilter) ||
                         !`${target.name} ${target.extension_name}`.toLowerCase().includes(search.toLowerCase())
                 )
             ) {
                 setSearch('');
                 setExtension('');
+                setLaneFilter(null);
             }
             setFocused(name);
         },
-        [workspace, extension, search]
+        [workspace, extension, laneFilter, search]
     );
     const download = async () => {
         if (!workspace || !selected) return;
@@ -286,6 +303,8 @@ export default function AnalysisWorkspace() {
                     visible={visible}
                     focused={focused}
                     onFocus={focusQuery}
+                    highlightedLane={laneFilter}
+                    onLane={toggleLane}
                     outcomes={outcomeStates}
                     coveredEdges={coveredEdges}
                     controlsBottom={canvasBottom}>
@@ -428,7 +447,7 @@ export default function AnalysisWorkspace() {
                                     useFlexGap
                                     className='py-2'>
                                     <Typography>
-                                        <strong>Rules:</strong> {filtered.length}
+                                        <strong>Rules:</strong> {tableRows.length}
                                     </Typography>
                                     <TextField
                                         label='Search queries'
@@ -442,30 +461,45 @@ export default function AnalysisWorkspace() {
                                             labelId='analysis-extension-label'
                                             label='Extension'
                                             value={extension}
-                                            onChange={(event) => setExtension(event.target.value)}>
+                                            onChange={(event) => {
+                                                // Picking an extension here hides the other lanes,
+                                                // so a clicked lane no longer applies.
+                                                setExtension(event.target.value);
+                                                setLaneFilter(null);
+                                            }}>
                                             <MenuItem value=''>All extensions</MenuItem>
-                                            {numberedExtensions(queries).map(({ namespace, number }) => (
-                                                <MenuItem key={namespace} value={namespace}>
-                                                    {number}.{' '}
-                                                    {workspace.plan.extensions.find(
-                                                        (entry) => entry.namespace === namespace
-                                                    )?.display_name || namespace}{' '}
-                                                    ({namespace})
-                                                </MenuItem>
-                                            ))}
+                                            {[...new Set(queries.map((query) => query.namespace))]
+                                                .sort()
+                                                .map((namespace) => (
+                                                    <MenuItem key={namespace} value={namespace}>
+                                                        {extensionTitle(workspace, namespace)} ({namespace})
+                                                    </MenuItem>
+                                                ))}
                                         </Select>
                                     </FormControl>
+                                    {laneFilter !== null && (
+                                        <Chip
+                                            label={`Table: ${extensionTitle(workspace, laneFilter)}`}
+                                            onDelete={() => setLaneFilter(null)}
+                                            aria-label={`Table shows only ${extensionTitle(workspace, laneFilter)}`}
+                                        />
+                                    )}
                                     <Button
                                         className='text-link'
                                         onClick={clearFilters}
-                                        disabled={!search && !extension}>
+                                        disabled={!search && !extension && laneFilter === null}>
                                         Clear filters
                                     </Button>
                                 </Stack>
                                 <Stack direction='row' spacing={1} flexWrap='wrap' alignItems='center' useFlexGap>
                                     <Typography>
                                         <strong>Selected for changes:</strong> {checked.size} (
-                                        {[...checked].filter((name) => !visible.has(name)).length} hidden)
+                                        {
+                                            [...checked].filter(
+                                                (name) => !tableRows.some((query) => query.name === name)
+                                            ).length
+                                        }{' '}
+                                        hidden)
                                     </Typography>
                                     <RuleActions
                                         names={[...checked]}
@@ -491,7 +525,7 @@ export default function AnalysisWorkspace() {
                                         </Button>
                                     </Alert>
                                 )}
-                                {!filtered.length && <Alert severity='info'>No queries match these filters.</Alert>}
+                                {!tableRows.length && <Alert severity='info'>No queries match these filters.</Alert>}
                                 <Table size='small' stickyHeader aria-label='Current analysis rules'>
                                     <TableHead>
                                         <TableRow>
@@ -499,17 +533,17 @@ export default function AnalysisWorkspace() {
                                                 <Checkbox
                                                     inputProps={{ 'aria-label': 'Select all visible rules' }}
                                                     checked={
-                                                        filtered.length > 0 &&
-                                                        filtered.every((query) => checked.has(query.name))
+                                                        tableRows.length > 0 &&
+                                                        tableRows.every((query) => checked.has(query.name))
                                                     }
                                                     indeterminate={
-                                                        filtered.some((query) => checked.has(query.name)) &&
-                                                        !filtered.every((query) => checked.has(query.name))
+                                                        tableRows.some((query) => checked.has(query.name)) &&
+                                                        !tableRows.every((query) => checked.has(query.name))
                                                     }
-                                                    disabled={actionsDisabled || !filtered.length}
+                                                    disabled={actionsDisabled || !tableRows.length}
                                                     onChange={(_, value) =>
                                                         toggleChecked(
-                                                            filtered.map((query) => query.name),
+                                                            tableRows.map((query) => query.name),
                                                             value
                                                         )
                                                     }
@@ -523,7 +557,7 @@ export default function AnalysisWorkspace() {
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {filtered.map((query) => (
+                                        {tableRows.map((query) => (
                                             <TableRow
                                                 key={query.name}
                                                 selected={query.name === focused}

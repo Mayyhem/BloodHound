@@ -107,10 +107,15 @@ export default function drawLabel(context: CanvasRenderingContext2D, data: Graph
         primaryBounds[1] + primaryBounds[3] - LABEL_PADDING
     );
 
-    if (data.source && data.kind) {
-        const nodeSource = labelTextRendered(data.source);
-        const nodeKind = labelTextRendered(data.kind);
-        const sublabelText = `${nodeSource} | ${nodeKind}`;
+    // The second line is "source | kind" (Explore). A graph that wants a
+    // different single line, such as the analysis graph's version, sets
+    // `sublabel` instead.
+    const sublabelText = data.sublabel
+        ? labelTextRendered(data.sublabel)
+        : data.source && data.kind
+          ? `${labelTextRendered(data.source)} | ${labelTextRendered(data.kind)}`
+          : '';
+    if (sublabelText) {
         const sublabelSize = size * SUBLABEL_FONT_RATIO;
         context.font = `${weight} ${sublabelSize}px ${font}`;
 

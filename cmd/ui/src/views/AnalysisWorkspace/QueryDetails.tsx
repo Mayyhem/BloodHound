@@ -100,9 +100,17 @@ export default function QueryDetails({
             </Link>
         </Box>
     );
+    // On the Cypher tab the file box fills the rest of the panel's height, so
+    // it scrolls only when the file is longer than the space left. The chain of
+    // boxes down to it must each fill the space too. A very short panel still
+    // gives the file 200 pixels; the panel itself then scrolls.
+    const fillPanel = section === 'cypher';
     return (
-        <Box component='section' aria-label='Query details' className='px-4 pb-4 [overflow-wrap:anywhere]'>
-            <Stack spacing={1}>
+        <Box
+            component='section'
+            aria-label='Query details'
+            className={`px-4 pb-4 [overflow-wrap:anywhere] ${fillPanel ? 'h-full flex flex-col' : ''}`}>
+            <Stack spacing={1} className={fillPanel ? 'flex-1 min-h-0' : ''}>
                 <Typography variant='h6' component='h2'>
                     {query.name}
                 </Typography>
@@ -230,7 +238,7 @@ export default function QueryDetails({
                     </Stack>
                 )}
                 {section === 'cypher' && (
-                    <Stack spacing={1} className='pt-1'>
+                    <Stack spacing={1} className='pt-1 flex-1 min-h-0'>
                         <Typography variant='body2'>
                             The comment lines at the top hold the namespace, version, declarations, and any optional
                             instructions.
@@ -239,7 +247,7 @@ export default function QueryDetails({
                             component='pre'
                             tabIndex={0}
                             aria-label='Original Cypher file'
-                            className='m-0 overflow-auto max-h-[600px] text-xs whitespace-pre bg-neutral-2 p-2'>
+                            className='m-0 overflow-auto flex-1 min-h-[200px] text-xs whitespace-pre bg-neutral-2 p-2'>
                             {query.text}
                         </Box>
                     </Stack>

@@ -20,8 +20,121 @@ import type { CameraState } from 'sigma/types';
 import { MAX_CAMERA_RATIO, MIN_CAMERA_RATIO } from 'src/ducks/graph/utils';
 import { sequentialLayout } from 'src/rendering/utils/sequentialLayout';
 import { DEFAULT_GRAPH_EDGE_SIZE, DEFAULT_GRAPH_NODE_SIZE } from 'src/rendering/utils/utils';
-import { dependencyKey, queryLabel } from './model';
-import { Workspace } from './types';
+import { dependencyKey, extensionTitle, queryLabel } from './model';
+import { Dependency, Workspace } from './types';
+
+// One horizontal band of the graph holding every query of one extension.
+// `top` and `bottom` are its edges in graph positions. Sigma draws a larger
+// y higher on the screen, so `top` is the larger number.
+export interface Lane {
+    namespace: string;
+    top: number;
+    bottom: number;
+}
+
+// Lane spacing, in the same units as the layout's own spacing (it leaves 140
+// between queries in one column and 200 between columns).
+const laneRowSpacing = 160;
+// Room above a lane's first row, for the lane title, and below its last row,
+// for the query name and version drawn under each node. The labels shrink
+// more slowly than the graph when zooming out, so the room below is larger.
+const laneTopRoom = 125;
+const laneBottomRoom = 150;
+
+// laneOrder puts extensions that other extensions depend on first, so that
+// arrows between extensions mostly point down the screen. Among extensions
+// that are ready at the same time, the one whose title comes first
+// alphabetically goes first. If the remaining extensions all wait on each
+// other (one extension's query feeds the other and the other way round), the
+// alphabetically first of them goes next, which breaks the loop.
+// `namespaceOf` gives the extension of a query name.
+export function laneOrder(
+    namespaces: string[],
+    dependencies: Dependency[],
+    namespaceOf: (name: string) => string | undefined,
+    title: (namespace: string) => string
+) {
+    const waitsOn = new Map(namespaces.map((namespace) => [namespace, new Set<string>()]));
+    for (const dependency of dependencies) {
+        const consumer = namespaceOf(dependency.consumer);
+        const prerequisite = namespaceOf(dependency.prerequisite);
+        if (consumer !== undefined && prerequisite !== undefined && consumer !== prerequisite)
+            waitsOn.get(consumer)?.add(prerequisite);
+    }
+    const remaining = [...namespaces].sort(
+        (first, second) => title(first).localeCompare(title(second)) || first.localeCompare(second)
+    );
+    const ordered: string[] = [];
+    while (remaining.length) {
+        const ready = remaining.find((namespace) =>
+            [...waitsOn.get(namespace)!].every((prerequisite) => !remaining.includes(prerequisite))
+        );
+        const next = ready ?? remaining[0];
+        ordered.push(next);
+        remaining.splice(remaining.indexOf(next), 1);
+    }
+    return ordered;
+}
+
+// placeInLanes keeps every query's left-to-right position from the layout,
+// so further left still means "runs earlier" across the whole graph, and moves
+// it up or down into its extension's lane. Lanes are stacked from the top in
+// laneOrder.
+//
+// Inside a lane, queries that share a column (the same left-to-right position)
+// are stacked in the order the layout drew them, top first. A query alone in
+// its column goes on the lane's first row, so a simple chain sits on one line.
+// A lane is as tall as its busiest column. With no arrows at all there are no
+// columns, so each lane lists its queries in rows of four, like the page does
+// without lanes.
+//
+// With fewer than two extensions nothing moves and no lanes are returned.
+function placeInLanes(graph: MultiDirectedGraph, workspace: Workspace): Lane[] {
+    const queries = workspace.plan.queries.filter((query) => graph.hasNode(query.name));
+    const namespaces = [...new Set(queries.map((query) => query.namespace))];
+    if (namespaces.length < 2) return [];
+    const namespaceOf = new Map(queries.map((query) => [query.name, query.namespace]));
+    const ordered = laneOrder(
+        namespaces,
+        workspace.dependencies,
+        (name) => namespaceOf.get(name),
+        (namespace) => extensionTitle(workspace, namespace)
+    );
+
+    const lanes: Lane[] = [];
+    // How far below the top of the graph the next lane starts.
+    let distanceFromTop = 0;
+    for (const namespace of ordered) {
+        const members = queries.filter((query) => query.namespace === namespace).map((query) => query.name);
+        // Each query's row inside the lane, counted from 0 at the top.
+        const rows = new Map<string, number>();
+        if (graph.size) {
+            const columns = new Map<number, string[]>();
+            for (const name of members) {
+                const column = Math.round(graph.getNodeAttribute(name, 'x'));
+                columns.set(column, [...(columns.get(column) ?? []), name]);
+            }
+            for (const column of columns.values()) {
+                column
+                    .sort((first, second) => graph.getNodeAttribute(second, 'y') - graph.getNodeAttribute(first, 'y'))
+                    .forEach((name, row) => rows.set(name, row));
+            }
+        } else {
+            members.forEach((name, index) => {
+                graph.setNodeAttribute(name, 'x', (index % 4) * 300);
+                rows.set(name, Math.floor(index / 4));
+            });
+        }
+        const rowCount = Math.max(...rows.values()) + 1;
+        for (const [name, row] of rows) {
+            graph.setNodeAttribute(name, 'y', -(distanceFromTop + laneTopRoom + row * laneRowSpacing));
+        }
+        const height = laneTopRoom + (rowCount - 1) * laneRowSpacing + laneBottomRoom;
+        lanes.push({ namespace, top: -distanceFromTop, bottom: -(distanceFromTop + height) });
+        distanceFromTop += height;
+    }
+    return lanes;
+}
 
 export function buildQueryGraph(workspace: Workspace) {
     const graph = new MultiDirectedGraph();
@@ -58,7 +171,8 @@ export function buildQueryGraph(workspace: Workspace) {
                 graph.mergeNodeAttributes(name, { x: (index % 4) * 300, y: Math.floor(index / 4) * 160 })
             );
     }
-    return graph;
+    const lanes = placeInLanes(graph, workspace);
+    return { graph, lanes };
 }
 
 // At a distant zoom, an arrow can be thinner than one screen pixel. Accept a
