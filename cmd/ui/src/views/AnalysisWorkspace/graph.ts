@@ -214,6 +214,65 @@ export interface ClearArea {
     left: number;
 }
 
+// A rectangle on the screen, in pixels from the canvas's top-left corner.
+export interface ScreenBox {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+}
+
+// The uncovered rectangle a ClearArea describes on a canvas of this size.
+export const clearBox = (area: ClearArea, width: number, height: number): ScreenBox => ({
+    left: area.left,
+    top: area.top,
+    right: width - area.right,
+    bottom: height - area.bottom,
+});
+
+// placeLaneTitle decides where a lane title is drawn. Its natural place is at
+// the top-left of its lane, so it moves with the graph like everything else.
+// When that place is off screen or under a panel, the title slides just far
+// enough to sit inside one of the uncovered rectangles, without leaving its
+// own lane: it stops at the edge, like a spreadsheet's sticky header row.
+// Sliding sideways is preferred, because it keeps the title level with the
+// top of its lane, above the lane's queries. It slides down into the lane
+// only when the lane's top is outside every uncovered rectangle (for example
+// scrolled above the canvas). If no uncovered rectangle holds it inside its
+// lane (the lane is off screen or completely under panels), it is hidden: the
+// result is null.
+//
+// `natural` is the title's top-left corner, `size` its width and height, and
+// `laneBottom` the screen position of the lane's bottom edge.
+export function placeLaneTitle(
+    natural: { left: number; top: number },
+    size: { width: number; height: number },
+    laneBottom: number,
+    clearAreas: ScreenBox[]
+): { left: number; top: number } | null {
+    let best: { left: number; top: number } | null = null;
+    let bestDown = Infinity;
+    let bestSideways = Infinity;
+    for (const area of clearAreas) {
+        // Move down only if the top of the lane is above the uncovered area,
+        // and never so far that the title would leave the lane or the area.
+        const top = Math.max(natural.top, area.top);
+        if (top + size.height > Math.min(laneBottom, area.bottom)) continue;
+        // Move sideways only as far as needed to stay inside the area.
+        const left = Math.min(Math.max(natural.left, area.left), area.right - size.width);
+        if (left < area.left) continue;
+        // Least movement down first, then least movement sideways.
+        const down = top - natural.top;
+        const sideways = Math.abs(left - natural.left);
+        if (down < bestDown || (down === bestDown && sideways < bestSideways)) {
+            best = { left, top };
+            bestDown = down;
+            bestSideways = sideways;
+        }
+    }
+    return best;
+}
+
 type FramingView = Pick<
     Sigma,
     'getDimensions' | 'getNodeDisplayData' | 'framedGraphToViewport' | 'viewportToFramedGraph'

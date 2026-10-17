@@ -16,7 +16,7 @@
 
 import { MultiDirectedGraph } from 'graphology';
 import { sequentialLayout } from 'src/rendering/utils/sequentialLayout';
-import { buildQueryGraph, laneOrder, nearestDependency } from './graph';
+import { buildQueryGraph, clearBox, laneOrder, nearestDependency, placeLaneTitle } from './graph';
 import { queryFixture, workspaceFixture } from './testData';
 import { Dependency, Workspace } from './types';
 
@@ -152,4 +152,47 @@ it('selects a thin arrow near the pointer, but leaves empty space and distant ex
     expect(nearestDependency({ x: 120, y: 10 }, edges)).toBeNull();
     expect(nearestDependency({ x: 50, y: 40 }, edges)).toBeNull();
     expect(nearestDependency({ x: 50, y: 11 }, [])).toBeNull();
+});
+
+describe('lane title placement', () => {
+    // A 1,000 × 800 canvas with a top-left panel 400 wide and 300 tall, an
+    // entity panel 300 wide on the right, and a table 200 tall at the bottom.
+    // That leaves two uncovered rectangles: below the top panel, and beside it.
+    const covered = [
+        { top: 316, right: 316, bottom: 248, left: 16 },
+        { top: 16, right: 316, bottom: 248, left: 416 },
+    ];
+    const areas = covered.map((area) => clearBox(area, 1000, 800));
+    const size = { width: 120, height: 22 };
+
+    it('stays at its natural place, moving with the graph, while that place is uncovered', () => {
+        expect(placeLaneTitle({ left: 450, top: 100 }, size, 300, areas)).toEqual({ left: 450, top: 100 });
+        expect(placeLaneTitle({ left: 100, top: 400 }, size, 500, areas)).toEqual({ left: 100, top: 400 });
+    });
+
+    it('stops at the edge of the uncovered area instead of going under a panel or off screen', () => {
+        // Under the top panel: slides right to just beside it.
+        expect(placeLaneTitle({ left: 100, top: 100 }, size, 300, areas)).toEqual({ left: 416, top: 100 });
+        // Just above the top panel's bottom edge: it still slides right, staying
+        // level with its lane's top, instead of dropping onto the lane's queries.
+        expect(placeLaneTitle({ left: 100, top: 300 }, size, 500, areas)).toEqual({ left: 416, top: 300 });
+        // Panned off the left edge, below the top panel: stops at the left edge.
+        expect(placeLaneTitle({ left: -500, top: 400 }, size, 500, areas)).toEqual({ left: 16, top: 400 });
+        // Toward the entity panel: stops before it, title fully visible.
+        expect(placeLaneTitle({ left: 650, top: 400 }, size, 500, areas)).toEqual({ left: 564, top: 400 });
+        // The lane's top has scrolled above the canvas: the title stays at the
+        // top of the part still shown.
+        expect(placeLaneTitle({ left: 450, top: -200 }, size, 300, areas)).toEqual({ left: 450, top: 16 });
+    });
+
+    it('is hidden when its lane has no uncovered space', () => {
+        // The lane is entirely above the canvas.
+        expect(placeLaneTitle({ left: 450, top: -300 }, size, -100, areas)).toBeNull();
+        // The lane is entirely behind the table.
+        expect(placeLaneTitle({ left: 450, top: 600 }, size, 700, areas)).toBeNull();
+        // The lane is too thin to hold its title.
+        expect(placeLaneTitle({ left: 450, top: 100 }, size, 110, areas)).toBeNull();
+        // The uncovered space is narrower than the title.
+        expect(placeLaneTitle({ left: 450, top: 100 }, { width: 600, height: 22 }, 300, areas)).toBeNull();
+    });
 });

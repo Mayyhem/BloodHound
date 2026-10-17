@@ -21,7 +21,7 @@ import { SigmaContainer, useRegisterEvents, useSigma } from '@react-sigma/core';
 import '@react-sigma/core/lib/react-sigma.min.css';
 import { useTheme } from 'bh-shared-ui';
 import { IconButton } from 'doodle-ui';
-import { KeyboardEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { KeyboardEvent, ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MAX_CAMERA_RATIO, MIN_CAMERA_RATIO } from 'src/ducks/graph/utils';
 import EdgeArrowProgram from 'src/rendering/programs/edge.arrow';
@@ -35,7 +35,7 @@ import {
     defaultEdgeColor,
 } from 'src/rendering/utils/utils';
 import { useAppSelector } from 'src/store';
-import { ClearArea, Lane, buildQueryGraph, cameraToFrame, nearestDependency } from './graph';
+import { ClearArea, Lane, buildQueryGraph, cameraToFrame, clearBox, nearestDependency, placeLaneTitle } from './graph';
 import { laneTitles, queryColor, queryColors, queryLabel, queryRoles, relatedQueries } from './model';
 import { roleIconSvg, roleKey } from './roleIcons';
 import { Workspace } from './types';
@@ -65,11 +65,19 @@ interface Props {
     coveredEdges?: () => ClearArea[];
 }
 
-// Where one lane appears on the screen, in pixels from the canvas top-left.
+// Where one lane and its title appear on the screen, in pixels from the
+// canvas top-left. `title` is null when the title has nowhere visible to go.
 interface LanePlacement {
     top: number;
     bottom: number;
+    title: { left: number; top: number } | null;
 }
+
+// Space between the top edge of a lane and its title, in pixels.
+const titleMargin = 10;
+// How far left of the lane's first query a title starts, in pixels, so it
+// sits just before that query.
+const titleLead = 24;
 
 function GraphControls({
     workspace,
@@ -97,14 +105,19 @@ function GraphControls({
     // graph was first drawn.
     const covered = useRef(coveredEdges);
     covered.current = coveredEdges;
+    // The parts of the canvas that panels and buttons leave uncovered. Without
+    // the page's measurements, only the button row is avoided.
+    const clearAreas = useCallback(
+        (): ClearArea[] => covered.current?.() ?? [{ top: 16, right: 16, bottom: controlsBottom + 48, left: 16 }],
+        [controlsBottom]
+    );
     // Reset Graph frames only the queries shown (filters hide the others) and
     // only in the part of the canvas that panels and buttons leave uncovered.
     const fit = useCallback(() => {
         const shown = graph.filterNodes((_node, attributes) => !attributes.hidden);
-        const edges = covered.current?.() ?? { top: 16, right: 16, bottom: controlsBottom + 48, left: 16 };
-        const state = cameraToFrame(sigma, shown, edges);
+        const state = cameraToFrame(sigma, shown, clearAreas());
         if (state) void camera.animate(state, { duration: 250 });
-    }, [sigma, graph, camera, controlsBottom]);
+    }, [sigma, graph, camera, clearAreas]);
     useEffect(() => {
         // Frame once when the graph first appears. Opening details or resizing
         // the table must not move a camera the author has already positioned.
@@ -175,24 +188,50 @@ function GraphControls({
         (!!focused &&
             !workspace.plan.queries.some((query) => query.namespace === namespace && related.nodes.has(query.name)));
 
-    // Sigma redraws whenever the view pans, zooms, or resizes. After each
-    // redraw, work out where every lane now appears on the screen. React only
-    // redraws the lanes when one of them actually moved.
+    // Where each lane starts: the left-to-right position of its first query.
+    // Positions never change after the graph is built.
+    const laneStarts = useMemo(() => {
+        const starts = new Map<string, number>();
+        for (const query of workspace.plan.queries) {
+            if (!graph.hasNode(query.name)) continue;
+            const x = graph.getNodeAttribute(query.name, 'x') as number;
+            starts.set(query.namespace, Math.min(x, starts.get(query.namespace) ?? Infinity));
+        }
+        return starts;
+    }, [graph, workspace]);
+    // The drawn title elements, so their real width and height can be used.
+    const titleElements = useRef(new Map<string, HTMLElement>());
+
+    // Work out where every lane and its title now appear on the screen. React
+    // only redraws them when something actually moved.
     const [placements, setPlacements] = useState<LanePlacement[]>([]);
+    const measure = useCallback(() => {
+        const { width, height } = sigma.getDimensions();
+        const areas = clearAreas().map((area) => clearBox(area, width, height));
+        const next = lanes.map((lane): LanePlacement => {
+            const top = sigma.graphToViewport({ x: 0, y: lane.top }).y;
+            const bottom = sigma.graphToViewport({ x: 0, y: lane.bottom }).y;
+            const element = titleElements.current.get(lane.namespace);
+            const size = { width: element?.offsetWidth || 160, height: element?.offsetHeight || 22 };
+            const start = sigma.graphToViewport({ x: laneStarts.get(lane.namespace) ?? 0, y: 0 }).x;
+            const natural = { left: start - titleLead, top: top + titleMargin };
+            return { top, bottom, title: placeLaneTitle(natural, size, bottom, areas) };
+        });
+        setPlacements((previous) => (JSON.stringify(previous) === JSON.stringify(next) ? previous : next));
+    }, [sigma, lanes, laneStarts, clearAreas]);
+    // Sigma redraws whenever the view pans, zooms, or resizes.
     useEffect(() => {
-        const measure = () => {
-            const next = lanes.map((lane) => ({
-                top: sigma.graphToViewport({ x: 0, y: lane.top }).y,
-                bottom: sigma.graphToViewport({ x: 0, y: lane.bottom }).y,
-            }));
-            setPlacements((previous) => (JSON.stringify(previous) === JSON.stringify(next) ? previous : next));
-        };
-        measure();
         sigma.on('afterRender', measure);
         return () => {
             sigma.removeListener('afterRender', measure);
         };
-    }, [sigma, lanes]);
+    }, [sigma, measure]);
+    // Opening, closing, or resizing a panel changes the page without a Sigma
+    // redraw, so measure again after every page update too. This settles at
+    // once: nothing is redrawn when no position changed.
+    useLayoutEffect(() => {
+        measure();
+    });
     useEffect(() => {
         // Sigma keeps its initial settings. Update canvas text colors explicitly
         // when the user changes theme, just as Explore does.
@@ -335,22 +374,18 @@ function GraphControls({
             />
         );
     });
-    // Lane titles are anchored to the top middle of their lane. A lane spans
-    // the whole canvas width, so the title is centered on the canvas and does
-    // not move sideways when panning. It moves up and down with its lane; when
-    // the top of a tall lane scrolls out of view, the title stays at the top
-    // of the part still shown. A lane squeezed shorter than its title (zoomed
-    // far out) hides its title.
-    const { width: canvasWidth, height: canvasHeight } = sigma.getDimensions();
-    // Space between the top edge of the lane and its title, in pixels.
-    const titleMargin = 10;
+    // Lane titles sit at the top-left of their lane, just before its first
+    // query, and move with the graph. placeLaneTitle keeps each one inside the
+    // part of the canvas that panels leave uncovered, or hides it when its lane
+    // has no uncovered space. A hidden title is still laid out (invisibly) so
+    // its size is known when it reappears.
     const laneTitleElements = shownLanes.map((lane) => {
-        const placement = placements[lanes.indexOf(lane)];
-        if (!placement || placement.bottom - placement.top < 18 + titleMargin) return null;
-        if (placement.bottom < 0 || placement.top > canvasHeight) return null;
+        const position = placements[lanes.indexOf(lane)]?.title;
         const { title, namespace } = titles.get(lane.namespace)!;
-        const top = Math.min(Math.max(placement.top, 0) + titleMargin, placement.bottom - 22);
-        const left = canvasWidth / 2;
+        const remember = (element: HTMLElement | null) => {
+            if (element) titleElements.current.set(lane.namespace, element);
+            else titleElements.current.delete(lane.namespace);
+        };
         const content = (
             <>
                 <span className='font-bold'>{title}</span>
@@ -358,17 +393,17 @@ function GraphControls({
             </>
         );
         const style = {
-            top,
-            left,
+            top: position?.top ?? 0,
+            left: position?.left ?? 0,
+            visibility: position ? ('visible' as const) : ('hidden' as const),
             color: theme.contrast,
             backgroundColor: laneShade(lane.namespace),
             opacity: laneFaded(lane.namespace) ? 0.45 : 1,
-            // Center the title on `left` rather than starting it there.
-            transform: 'translateX(-50%)',
         };
         return onLane ? (
             <Box
                 key={lane.namespace}
+                ref={remember}
                 component='button'
                 type='button'
                 aria-pressed={lane.namespace === highlightedLane}
@@ -378,14 +413,15 @@ function GraphControls({
                         : 'Show only this extension in the table'
                 }
                 onClick={() => onLane(lane.namespace)}
-                className='absolute z-[5] max-w-[240px] truncate rounded px-1 text-center text-sm hover:underline focus-visible:outline'
+                className='absolute z-[5] max-w-[240px] truncate rounded px-1 text-left text-sm hover:underline focus-visible:outline'
                 style={style}>
                 {content}
             </Box>
         ) : (
             <Box
                 key={lane.namespace}
-                className='absolute z-[5] max-w-[240px] truncate px-1 text-center text-sm'
+                ref={remember}
+                className='absolute z-[5] max-w-[240px] truncate px-1 text-sm'
                 style={style}>
                 {content}
             </Box>

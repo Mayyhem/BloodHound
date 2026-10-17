@@ -105,6 +105,8 @@ export default function AnalysisWorkspace() {
     const [editorInitial, setEditorInitial] = useState<EditorWorkingCopy>();
     const [uploadOpen, setUploadOpen] = useState(false);
     const [detailsSection, setDetailsSection] = useState<DetailsSection>('overview');
+    // Counts top panel collapses and expansions; only used to update the page.
+    const [, setTopPanelToggles] = useState(0);
     const { checkPermission } = usePermissions();
     const canEdit = checkPermission(Permission.OPENGRAPH_WRITE);
     const canRun = checkPermission(Permission.APP_WRITE_APPLICATION_CONFIGURATION);
@@ -317,6 +319,10 @@ export default function AnalysisWorkspace() {
                 <Box
                     component='details'
                     open
+                    // Collapsing or expanding this panel uncovers or covers part
+                    // of the graph without any other page update. Update the page
+                    // so graph lane titles can move into or out of that space.
+                    onToggle={() => setTopPanelToggles((count) => count + 1)}
                     className='bg-neutral-2 rounded-lg shadow-outer-1 border p-3 max-h-[60vh] overflow-auto'>
                     <Box component='summary' className='cursor-pointer font-bold'>
                         OpenGraph Analysis
