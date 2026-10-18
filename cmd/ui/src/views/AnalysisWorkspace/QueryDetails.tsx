@@ -18,6 +18,7 @@ import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Alert, Box, Button, IconButton, Link, Stack, Tab, Tabs, Tooltip, Typography } from '@mui/material';
 import { ReactNode } from 'react';
+import CypherText from './CypherText';
 import {
     availability,
     completedState,
@@ -243,13 +244,7 @@ export default function QueryDetails({
                             The comment lines at the top hold the namespace, version, declarations, and any optional
                             instructions.
                         </Typography>
-                        <Box
-                            component='pre'
-                            tabIndex={0}
-                            aria-label='Original Cypher file'
-                            className='m-0 overflow-auto flex-1 min-h-[200px] text-xs whitespace-pre bg-neutral-2 p-2'>
-                            {query.text}
-                        </Box>
+                        <CypherText label='Original Cypher file' value={query.text} readOnly fill className='text-xs' />
                     </Stack>
                 )}
                 {section === 'run' && <LastRun query={query} workspace={workspace} outcome={outcome} />}

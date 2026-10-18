@@ -283,6 +283,26 @@ Start in [extension lookup](../../cmd/api/src/database/upsert_schema_extension.g
 
 **Done when:** the 20-million-node, 200-million-edge BHCE experiment and the later realistic-data experiment have reproducible baselines and measured follow-up results, with verified answers and documented resource limits. Capacity is demonstrated only for runs that actually complete; unfinished or failed runs remain explicit limitations.
 
+## 19. Suggest extension property names in the analysis editor
+
+**Planned follow-up, 17 October 2026.** The analysis file editor now suggests node and relationship types (including installed extension types) and the file's own `$parameters` while typing, the same way Explore's Cypher search does (change note 07). Property-name suggestions still come only from BloodHound's fixed list of common, Active Directory and Azure property names. Extension properties such as a CyberArk account's `user_sid` are never offered, because extension schemas (`*.schema.json`) declare node and relationship kinds but not their properties.
+
+- [ ] Decide with the user how a schema declares properties, for example an optional `properties` list on each node and relationship kind with a name and, if useful, a type and description. This changes the extension author's schema definition, so it needs explicit approval and must stay optional so existing schemas keep working.
+- [ ] Coordinate with the upstream OpenGraph schema format, so BloodHound's own OpenGraph Management upload accepts the same field rather than a project-only variation.
+- [ ] Read the declared properties of the installed extensions and add them to the editor's suggestions, alongside the existing built-in list.
+- [ ] Update the authoring documentation, the shipped example schemas, and tests.
+
+**Done when:** an installed extension's declared properties are suggested in the analysis editor, schemas without the new field still install and work, and the schema change is documented and approved.
+
+## 20. False error underlines in Explore's Cypher search
+
+**Follow-up only, 17 October 2026 (decision 39).** Explore's Cypher search turns on the Cypher editor's error underlining (`lint`). That checker, in `@neo4j-cypher/editor-support` 1.0.x, uses an older Cypher grammar than Neo4j and DAWGS. Run over the 31 shipped analysis files, it underlines valid, working lines in 8 of them, for example `WHERE all(domain IN nodes(route) WHERE domain:Domain)` and `collect(DISTINCT {id: …})` (script and results: `work/extension-lanes-deploy/lint-check.cjs`, `lint-check-results.json`). Explore users likely see the same false underlines on valid queries. The analysis editor keeps underlining off (change note 07).
+
+- [ ] Confirm the same lines are underlined in Explore's Cypher search, with screenshots.
+- [ ] Decide whether to raise it upstream (BloodHound, or a newer `@neo4j-cypher` editor) rather than change Explore here. Changing Explore affects every BloodHound user.
+
+**Done when:** the finding is confirmed and either reported upstream or deliberately left as is.
+
 ## Done
 
 ### 2. Catch mistakes before rules are activated

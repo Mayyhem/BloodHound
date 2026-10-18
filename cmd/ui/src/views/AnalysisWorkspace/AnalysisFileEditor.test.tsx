@@ -37,6 +37,40 @@ vi.mock('./QueryGraph', () => ({
     ),
 }));
 
+// The real Cypher box draws highlighted code with CodeMirror. These tests
+// check the editor's own behavior, so a plain text box stands in for it. It
+// lists the $parameter names the box would suggest.
+vi.mock('./CypherText', () => ({
+    default: ({
+        label,
+        value,
+        onChange,
+        readOnly,
+        suggestions,
+    }: {
+        label: string;
+        value: string;
+        onChange?: (text: string) => void;
+        readOnly?: boolean;
+        suggestions?: { parameters?: string[] };
+    }) => (
+        <textarea
+            aria-label={label}
+            value={value}
+            readOnly={readOnly}
+            data-parameters={suggestions?.parameters?.join(',')}
+            onChange={(event) => onChange?.(event.target.value)}
+        />
+    ),
+}));
+
+// The editor asks BloodHound for its node and relationship types to suggest
+// while typing. These tests do not need them.
+vi.mock('bh-shared-ui', async (original) => ({
+    ...(await original<typeof import('bh-shared-ui')>()),
+    useCypherSchema: () => ({ labels: [], relationshipTypes: [], propertyKeys: [] }),
+}));
+
 vi.mock('./api', () => ({
     activateEditorTest: vi.fn(),
     listEditorWorkingCopies: vi.fn(),
@@ -106,6 +140,23 @@ beforeEach(() => {
         plan: { ...workspaceFixture().plan, queries: [queryFixture(request.name, 0)] },
         dependencies: [],
     }));
+});
+
+it("suggests each declared prerequisite's alias as a $parameter while typing", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    expect(screen.getByLabelText('Cypher')).toHaveAttribute('data-parameters', '');
+    await user.click(screen.getByRole('combobox', { name: 'Prerequisites' }));
+    await user.click(screen.getByRole('option', { name: 'PoC_AD/users.cypher' }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByLabelText('Cypher')).toHaveAttribute('data-parameters', 'users');
+    // An alias renamed in the text is what gets suggested.
+    fireEvent.change(screen.getByLabelText('Cypher'), {
+        target: {
+            value: '// namespace: PoC_AD\n// version: v1.0.0\n// depends-on: query:users as directory_users\nRETURN 1',
+        },
+    });
+    expect(screen.getByLabelText('Cypher')).toHaveAttribute('data-parameters', 'directory_users');
 });
 
 it('adds a prerequisite from the dropdown before Cypher and removes the line again', async () => {

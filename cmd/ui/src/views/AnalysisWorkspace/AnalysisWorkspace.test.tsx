@@ -76,7 +76,12 @@ vi.mock('./QueryGraph', () => ({
 let canEdit = true;
 vi.mock('bh-shared-ui', async (original) => {
     const actual = await original<typeof import('bh-shared-ui')>();
-    return { ...actual, usePermissions: () => ({ checkPermission: () => canEdit }) };
+    return {
+        ...actual,
+        usePermissions: () => ({ checkPermission: () => canEdit }),
+        // The editor's typing suggestions are not needed by these tests.
+        useCypherSchema: () => ({ labels: [], relationshipTypes: [], propertyKeys: [] }),
+    };
 });
 let workspace = workspaceFixture();
 const requests: { method: string; path: string }[] = [];

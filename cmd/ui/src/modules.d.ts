@@ -22,3 +22,16 @@ declare module 'sigma/rendering/webgl/shaders/edge.clamped.vert.glsl';
 declare module 'sigma/rendering/webgl/shaders/edge.frag.glsl';
 
 declare module 'dagrejs';
+
+// The Cypher editor's own type file cannot be found through its package
+// settings, so describe the parts used here. bh-shared-ui has the same
+// declaration for its copy of the editor.
+declare module '@neo4j-cypher/react-codemirror' {
+    type EditorApi = import('@neo4j-cypher/codemirror/src/codemirror.d.ts').EditorApi;
+
+    type CypherEditorProps = import('@neo4j-cypher/react-codemirror/src/react-codemirror.d.ts').CypherEditorProps;
+
+    export class CypherEditor extends React.Component<CypherEditorProps, any> {
+        cypherEditor: EditorApi;
+    }
+}

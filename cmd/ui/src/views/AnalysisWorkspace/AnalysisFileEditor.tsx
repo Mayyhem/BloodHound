@@ -45,6 +45,7 @@ import {
     Typography,
 } from '@mui/material';
 import { isAxiosError } from 'axios';
+import { useCypherSchema } from 'bh-shared-ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -57,6 +58,7 @@ import {
     saveEditorWorkingCopy,
     testEditorFile,
 } from './api';
+import CypherText from './CypherText';
 import { editorDependencyProblem, readEditorDependencies, setEditorDependency, setEditorHeader } from './editorModel';
 import { dependencyKey } from './model';
 import QueryGraph from './QueryGraph';
@@ -198,6 +200,13 @@ export default function AnalysisFileEditor({ open, workspace, canEdit, initial, 
             .filter((name) => !dependencies.some((query) => query.name === name)),
     ];
     const aliases = Object.fromEntries(declarations.map((dependency) => [dependency.name, dependency.alias]));
+    // While typing Cypher, suggest the same node and relationship types and
+    // property names as Explore's Cypher search, plus this file's own
+    // parameters: the alias of each declared prerequisite query.
+    const suggestions = {
+        ...useCypherSchema(),
+        parameters: declarations.map((dependency) => dependency.alias),
+    };
     // Active queries that already read this file's answer (only when editing an existing file).
     const consumers = workspace.dependencies.filter((dependency) => dependency.prerequisite === workingCopy.name);
     const missing = declarations.find((dependency) => !dependencies.some((query) => query.name === dependency.name));
@@ -549,7 +558,10 @@ export default function AnalysisFileEditor({ open, workspace, canEdit, initial, 
                                 ))}
                             </Select>
                         </FormControl>
-                        <Button onClick={() => void resumeCopy()} disabled={!resumeName || busy === 'resume'}>
+                        <Button
+                            className='text-link'
+                            onClick={() => void resumeCopy()}
+                            disabled={!resumeName || busy === 'resume'}>
                             Resume
                         </Button>
                     </Stack>
@@ -565,7 +577,9 @@ export default function AnalysisFileEditor({ open, workspace, canEdit, initial, 
                             <span>
                                 <IconButton
                                     aria-label='Test file'
-                                    color='primary'
+                                    // The page's link color, which stays light enough to
+                                    // read in dark mode (the theme's primary purple does not).
+                                    className='text-link'
                                     onClick={() => void test()}
                                     disabled={!canEdit || !!busy || !!declarationProblem}>
                                     {busy === 'test' ? (
@@ -576,7 +590,11 @@ export default function AnalysisFileEditor({ open, workspace, canEdit, initial, 
                                 </IconButton>
                             </span>
                         </Tooltip>
-                        {busy === 'test' && <Button onClick={cancelTest}>Cancel test</Button>}
+                        {busy === 'test' && (
+                            <Button className='text-link' onClick={cancelTest}>
+                                Cancel test
+                            </Button>
+                        )}
                         <Tooltip title='Save private copy'>
                             <span>
                                 <IconButton
@@ -602,15 +620,16 @@ export default function AnalysisFileEditor({ open, workspace, canEdit, initial, 
                             </span>
                         </Tooltip>
                     </Stack>
-                    <TextField
+                    <Typography variant='subtitle2' component='h2'>
+                        Cypher
+                    </Typography>
+                    <CypherText
                         label='Cypher'
                         value={workingCopy.text}
-                        onChange={(event) => updateCopy({ text: event.target.value })}
-                        multiline
-                        minRows={12}
-                        fullWidth
-                        InputProps={{ readOnly: !canEdit || !!busy }}
-                        inputProps={{ 'aria-label': 'Cypher' }}
+                        onChange={(text) => updateCopy({ text })}
+                        readOnly={!canEdit || !!busy}
+                        className='text-sm'
+                        suggestions={suggestions}
                     />
                     {receipt && tested && (
                         <Box component='section' aria-label='Test results'>
@@ -650,7 +669,10 @@ export default function AnalysisFileEditor({ open, workspace, canEdit, initial, 
                                 </>
                             )}
                             <Box>
-                                <Button onClick={() => void requestReview()} disabled={!canEdit || !!busy}>
+                                <Button
+                                    className='text-link'
+                                    onClick={() => void requestReview()}
+                                    disabled={!canEdit || !!busy}>
                                     {busy === 'review' ? 'Reviewing…' : 'Review tested file'}
                                 </Button>
                             </Box>
@@ -716,6 +738,7 @@ export default function AnalysisFileEditor({ open, workspace, canEdit, initial, 
                         />
                         {declarationProblem && <Alert severity='warning'>{declarationProblem}</Alert>}
                         <Button
+                            className='text-link'
                             onClick={() => void reviewPrerequisites()}
                             disabled={!canEdit || !!busy || !!declarationProblem}>
                             Review prerequisites
@@ -752,7 +775,9 @@ export default function AnalysisFileEditor({ open, workspace, canEdit, initial, 
                 </Stack>
             </DialogContent>
             <DialogActions>
-                <Button onClick={close}>Close</Button>
+                <Button className='text-link' onClick={close}>
+                    Close
+                </Button>
             </DialogActions>
         </Dialog>
     );

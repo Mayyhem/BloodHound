@@ -192,7 +192,9 @@ export default function UploadDialog({
                 </Stack>
             </DialogContent>
             <DialogActions>
-                <Button onClick={onClose}>Close</Button>
+                <Button className='text-link' onClick={onClose}>
+                    Close
+                </Button>
             </DialogActions>
         </Dialog>
     );

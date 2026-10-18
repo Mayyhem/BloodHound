@@ -130,3 +130,31 @@ export function setEditorHeader(text: string, key: 'namespace' | 'version', valu
     }
     return lines.join('\n');
 }
+
+// Which typed keys may open the editor's suggestion list for a cursor at
+// `position` (counted in characters from the start of `text`).
+//
+// The suggestion list is only useful where the editor can tell what kind of
+// word belongs at the cursor. Tested against the editor itself, those places
+// are:
+//   $ anywhere                         -> the file's own $parameters
+//   : straight after ( or [, or after  -> node or relationship types
+//     ( or [ and a name: (n:  (:  -[r:
+//   : after a name straight after      -> node types (a label check)
+//     WHERE: WHERE n:
+// Everywhere else (after . or {, a map key such as {id:, : after a space,
+// or a label check after AND, OR or NOT, which the editor does not recognize)
+// the editor falls back to listing every variable, parameter, built-in
+// property name and keyword, which is noise. There the keys don't open the
+// list; Ctrl+Space still opens it anywhere.
+//
+// Inside a // comment, such as a `// depends-on:` line, nothing opens it.
+export function suggestionKeysAt(text: string, position: number): string[] {
+    const before = text.slice(0, position);
+    const line = before.slice(before.lastIndexOf('\n') + 1);
+    // A // inside a quoted string also counts as a comment; Cypher rarely has
+    // one, and the only effect is no automatic suggestions on that line.
+    if (line.includes('//')) return [];
+    const typesFollow = /[([]\s*([A-Za-z_]\w*)?\s*$/.test(line) || /\bWHERE\s+[A-Za-z_]\w*$/i.test(line);
+    return typesFollow ? ['$', ':'] : ['$'];
+}

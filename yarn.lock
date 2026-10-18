@@ -7170,6 +7170,7 @@ __metadata:
     "@mui/material": "npm:^5.14.0"
     "@mui/styles": "npm:^5.14.0"
     "@mui/x-date-pickers": "npm:^5.0.20"
+    "@neo4j-cypher/react-codemirror": "npm:^1.0.4"
     "@playwright/test": "npm:^1.59.1"
     "@react-sigma/core": "npm:^3.4.1"
     "@reduxjs/toolkit": "npm:^1.8.5"

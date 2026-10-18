@@ -14,7 +14,13 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { editorDependencyProblem, readEditorDependencies, setEditorDependency, setEditorHeader } from './editorModel';
+import {
+    editorDependencyProblem,
+    readEditorDependencies,
+    setEditorDependency,
+    setEditorHeader,
+    suggestionKeysAt,
+} from './editorModel';
 
 describe('editor declaration model', () => {
     it('reads local query aliases and conditions only from leading comments', () => {
@@ -56,5 +62,33 @@ describe('editor declaration model', () => {
         expect(setEditorHeader('// namespace: old\nRETURN "// namespace: body"', 'namespace', 'new')).toBe(
             '// namespace: new\nRETURN "// namespace: body"'
         );
+    });
+});
+
+describe('suggestionKeysAt', () => {
+    // The keys that open suggestions with the cursor at the end of `line`.
+    const keysAfter = (line: string) => {
+        const text = `// namespace: PoC\n${line}`;
+        return suggestionKeysAt(text, text.length);
+    };
+    it('opens types only in node and relationship patterns and label checks', () => {
+        expect(keysAfter('MATCH (n')).toEqual(['$', ':']);
+        expect(keysAfter('MATCH (')).toEqual(['$', ':']);
+        expect(keysAfter('MATCH (n)-[r')).toEqual(['$', ':']);
+        expect(keysAfter('MATCH (n)-[')).toEqual(['$', ':']);
+        expect(keysAfter('MATCH (n) WHERE n')).toEqual(['$', ':']);
+    });
+    it('keeps only $ where the editor would list everything', () => {
+        expect(keysAfter('UNWIND $enabled_cas AS host ')).toEqual(['$']);
+        expect(keysAfter('RETURN host')).toEqual(['$']);
+        expect(keysAfter('RETURN {id')).toEqual(['$']);
+        expect(keysAfter('WITH collect(DISTINCT {principal')).toEqual(['$']);
+        // The editor recognizes a label check only straight after WHERE.
+        expect(keysAfter('MATCH (n) WHERE n.enabled AND n')).toEqual(['$']);
+    });
+    it('opens nothing inside a // comment', () => {
+        expect(keysAfter('// depends-on')).toEqual([]);
+        expect(keysAfter('MATCH (n) // the users')).toEqual([]);
+        expect(suggestionKeysAt('// note\nMATCH (n', '// note\nMATCH (n'.length)).toEqual(['$', ':']);
     });
 });
