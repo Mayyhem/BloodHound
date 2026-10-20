@@ -89,6 +89,11 @@ func TestFailingStepIsSetAsideAndUnrelatedStepsAreSaved(t *testing.T) {
 		if query.Name == "independent_helper.cypher" && (query.Reason == report.Execution.Failure.Message || query.Reason == "") {
 			t.Fatalf("the failed step's reason repeats the failure instead of explaining it: %q", query.Reason)
 		}
+		// The failed step ran in the first attempt; the report keeps the
+		// times from that attempt.
+		if query.Name == "independent_helper.cypher" && (query.StartedAt == nil || query.FinishedAt == nil) {
+			t.Fatalf("the failed step lost its start and finish times: %+v", query)
+		}
 	}
 	if selectionOutputBytes(t, *database.graph, "PoC_Independent") != keptEdges || selectionOutputBytes(t, *database.graph, "PoC_IndependentHelper") != keptHelpers {
 		t.Fatal("a set-aside step's previous results changed")

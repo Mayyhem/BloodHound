@@ -33,7 +33,8 @@ func validateExecution(execution *runner.Execution) error {
 		return nil
 	}
 	// "partial" means failing steps were set aside and the rest was saved.
-	if !slices.Contains([]string{"not-started", "running", "succeeded", "partial", "failed", "skipped"}, execution.Calculation) || !slices.Contains([]string{"not-started", "saving", "succeeded", "failed", "uncertain", "unchanged"}, execution.Save) {
+	// "up-to-date" means nothing was affected, so no step needed to run.
+	if !slices.Contains([]string{"not-started", "running", "succeeded", "partial", "failed", "up-to-date"}, execution.Calculation) || !slices.Contains([]string{"not-started", "saving", "succeeded", "failed", "uncertain", "unchanged"}, execution.Save) {
 		return fmt.Errorf("invalid calculation or save state")
 	}
 	if len(execution.Queries) > MaxFiles || len(execution.Phase) > 64 || execution.Elapsed < 0 {
@@ -77,8 +78,10 @@ func validateExecution(execution *runner.Execution) error {
 		}
 		names[query.Name] = true
 		// "set-aside" means the step was left out because of a failure and
-		// kept its previous results.
-		if !slices.Contains([]string{"waiting", "running", "succeeded", "failed", "skipped", "set-aside", "disabled", "canceled"}, query.State) {
+		// kept its previous results. "up-to-date" means nothing it reads
+		// changed, so it did not need to run. "skipped" means the run stopped
+		// before it could start.
+		if !slices.Contains([]string{"waiting", "running", "succeeded", "failed", "up-to-date", "skipped", "set-aside", "disabled", "canceled"}, query.State) {
 			return fmt.Errorf("invalid query state")
 		}
 		for _, count := range []*int64{query.Rows, query.Proposed, query.Saved} {

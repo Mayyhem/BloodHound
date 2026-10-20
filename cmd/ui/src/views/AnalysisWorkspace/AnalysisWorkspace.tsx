@@ -50,12 +50,15 @@ import BottomPanel from './BottomPanel';
 import EntityPanel from './EntityPanel';
 import ManagementControls from './ManagementControls';
 import {
+    AttemptOutcome,
     availability,
+    combinedOutcomes,
     completedState,
     dependencyDepth,
     dependencyKey,
     dependencyReason,
     extensionTitle,
+    latestAttemptOutcomes,
     latestCompleted,
     queryColors,
     relatedQueries,
@@ -65,7 +68,7 @@ import QueryDetails, { DetailsSection } from './QueryDetails';
 import QueryGraph from './QueryGraph';
 import RuleActions from './RuleActions';
 import RunSummary from './RunSummary';
-import { EditorWorkingCopy, QueryOutcome } from './types';
+import { EditorWorkingCopy } from './types';
 import UploadDialog from './UploadDialog';
 import useRuleManagement from './useRuleManagement';
 
@@ -159,16 +162,18 @@ export default function AnalysisWorkspace() {
     const selected = queries.find((query) => query.name === focused);
     const selectedDependencies =
         workspace?.dependencies.filter((dependency) => dependencyKey(dependency) === focused) ?? [];
+    // Each step's outcome comes from the newest attempt of the latest analysis
+    // that decided something about it, so a retry that reran only the
+    // set-aside steps does not hide the run that did the work. "Show attempts
+    // separately" shows the latest attempt alone instead.
+    const [separateAttempts, setSeparateAttempts] = useState(false);
     const outcomes = useMemo(() => {
         const report = workspace && latestCompleted(workspace);
-        return new Map<string, QueryOutcome>(
-            workspace && reportMatches(workspace, report)
-                ? report!.execution!.queries.map((query) => [query.name, query])
-                : []
-        );
-    }, [workspace]);
+        if (!workspace || !reportMatches(workspace, report)) return new Map<string, AttemptOutcome>();
+        return separateAttempts ? latestAttemptOutcomes(workspace.status) : combinedOutcomes(workspace.status);
+    }, [workspace, separateAttempts]);
     const outcomeStates = useMemo(
-        () => new Map([...outcomes].map(([name, outcome]) => [name, outcome.state])),
+        () => new Map([...outcomes].map(([name, entry]) => [name, entry.outcome.state])),
         [outcomes]
     );
 
@@ -437,6 +442,9 @@ export default function AnalysisWorkspace() {
                         {tableView === 'report' ? (
                             <RunSummary
                                 workspace={workspace}
+                                outcomes={outcomes}
+                                separateAttempts={separateAttempts}
+                                onSeparateAttempts={setSeparateAttempts}
                                 onFocus={focusQuery}
                                 onOpenRun={(name) => {
                                     focusQuery(name);
@@ -603,7 +611,9 @@ export default function AnalysisWorkspace() {
                                                             ? 'Consumer'
                                                             : '—'}
                                                 </TableCell>
-                                                <TableCell>{completedState(outcomes.get(query.name)?.state)}</TableCell>
+                                                <TableCell>
+                                                    {completedState(outcomes.get(query.name)?.outcome.state)}
+                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>

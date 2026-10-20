@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/specterops/bloodhound/tools/esc1-poc/internal/extension"
@@ -27,11 +28,14 @@ import (
 
 // A finished query hands its closed answer file back to the coordinator. Only
 // the coordinator changes the plan's progress, releases files, or writes objects.
+// The two clock times bracket the read, so a report can show which queries
+// ran at the same time.
 type queryAnswer struct {
-	query   extension.Query
-	file    *answerFile
-	elapsed time.Duration
-	err     error
+	query    extension.Query
+	file     *answerFile
+	started  time.Time
+	finished time.Time
+	err      error
 }
 
 // calculate starts ready queries whenever a place is free. A slow query does
@@ -70,8 +74,13 @@ func (s *queryFailure) Error() string { return "run " + s.query + ": " + s.cause
 func (s *queryFailure) Unwrap() error { return s.cause }
 
 func recordRead(report *Report, answer queryAnswer) {
-	var detail = report.Execution.query(answer.query.Name)
-	detail.Elapsed = answer.elapsed
+	var (
+		detail   = report.Execution.query(answer.query.Name)
+		started  = answer.started
+		finished = answer.finished
+	)
+	detail.StartedAt, detail.FinishedAt = &started, &finished
+	detail.Elapsed = finished.Sub(started)
 	if answer.err != nil {
 		detail.State = "canceled"
 		return
@@ -84,20 +93,31 @@ func recordRead(report *Report, answer queryAnswer) {
 
 func calculateQueries(ctx context.Context, cancel context.CancelCauseFunc, database Database, transaction Transaction, plan extension.Plan, space *answerSpace, report *Report, stage func(extension.RelationshipBinding, *answerFile) error, currentQuery *string, validateOnlyNodes, withheldRelationships map[string]bool) (map[string]*answerFile, error) {
 	var (
-		answers            = map[string]*answerFile{}
-		remaining          = map[string]int{}
-		started            = map[string]bool{}
-		completed          = map[string]bool{}
-		helperQueries      = map[string]bool{}
-		desired            = map[string]*answerFile{}
-		produced           = map[string]map[string]*answerFile{}
-		staged             = map[string]bool{}
-		graphInputs        = map[string]bool{}
-		finished           = make(chan queryAnswer, space.limits.Workers)
-		running            int
-		workers            = 1
-		graphChangesStaged bool
-		sampleBytes        = maxReportSampleBytes
+		answers       = map[string]*answerFile{}
+		remaining     = map[string]int{}
+		started       = map[string]bool{}
+		completed     = map[string]bool{}
+		helperQueries = map[string]bool{}
+		desired       = map[string]*answerFile{}
+		produced      = map[string]map[string]*answerFile{}
+		staged        = map[string]bool{}
+		graphInputs   = map[string]bool{}
+		finished      = make(chan queryAnswer, space.limits.Workers)
+		running       int
+		workers       = 1
+		sampleBytes   = maxReportSampleBytes
+		// The run writes helper objects and calculated relationships into
+		// one shared transaction before saving. A query that reads any of
+		// those must read on that transaction to see them. The shared
+		// transaction is one lane: only one reader at a time, and the
+		// coordinator takes its turn too whenever it uses the transaction
+		// while queries may be running. Every other query reads on its own
+		// connection, so independent chains keep overlapping even after the
+		// first graph change.
+		readsOnTransaction = queriesReadingStagedGraph(plan)
+		transactionTurn    sync.Mutex
+		// The query currently reading on the shared transaction, if any.
+		transactionReader string
 	)
 	defer func() {
 		// A failed query cancels its peers immediately. We must still wait for
@@ -137,16 +157,14 @@ func calculateQueries(ctx context.Context, cancel context.CancelCauseFunc, datab
 		desired[kind] = file
 		report.DesiredCounts[kind] = 0
 		report.Desired[kind] = []Pair{}
-		graphChangesStaged = true
-		workers = 1
 	}
 	for len(completed) < len(plan.Queries) {
 		if err := context.Cause(ctx); err != nil {
 			return nil, err
 		}
 		// Graph consumers need the complete combined type, not just the
-		// producer that finished first. Wait for other readers to close before
-		// staging it, then keep later reads on the same transaction.
+		// producer that finished first. Wait for every reader to finish
+		// before staging it, so no reader is halfway through an older view.
 		if running == 0 {
 			for _, binding := range plan.Schema.Relationships {
 				if staged[binding.Kind] || !graphInputs[binding.Kind] {
@@ -170,14 +188,12 @@ func calculateQueries(ctx context.Context, cancel context.CancelCauseFunc, datab
 					if err := stage(binding, file); err != nil {
 						return nil, err
 					}
-					graphChangesStaged = true
-					workers = 1
 				}
 				staged[binding.Kind] = true
 			}
 		}
 		for running < workers {
-			query, ready := nextReadyQuery(plan, started, completed, helperQueries, staged, running)
+			query, ready := nextReadyQuery(plan, started, completed, helperQueries, staged, readsOnTransaction, transactionReader != "", running)
 			if !ready || ctx.Err() != nil {
 				break
 			}
@@ -193,11 +209,20 @@ func calculateQueries(ctx context.Context, cancel context.CancelCauseFunc, datab
 			report.Execution.query(query.Name).State = "running"
 			started[query.Name] = true
 			running++
-			separateReader := workers > 1 && !graphChangesStaged
+			separateReader := workers > 1 && !readsOnTransaction[query.Name]
+			if !separateReader {
+				transactionReader = query.Name
+			}
 			go func() {
 				started := time.Now()
+				if !separateReader {
+					transactionTurn.Lock()
+				}
 				file, err := readQueryAnswers(ctx, database, transaction, separateReader, query, inputs, space, cancel)
-				finished <- queryAnswer{query: query, file: file, err: err, elapsed: time.Since(started)}
+				if !separateReader {
+					transactionTurn.Unlock()
+				}
+				finished <- queryAnswer{query: query, file: file, err: err, started: started, finished: time.Now()}
 			}()
 			if helperQueries[query.Name] {
 				// A helper-producing query starts only when other readers have
@@ -214,6 +239,9 @@ func calculateQueries(ctx context.Context, cancel context.CancelCauseFunc, datab
 		answer := <-finished
 		running--
 		recordRead(report, answer)
+		if answer.query.Name == transactionReader {
+			transactionReader = ""
+		}
 		if err := context.Cause(ctx); err != nil {
 			return nil, err
 		}
@@ -245,12 +273,18 @@ func calculateQueries(ctx context.Context, cancel context.CancelCauseFunc, datab
 			if err != nil {
 				return nil, err
 			}
+			// Helper objects go into the shared transaction, so the coordinator
+			// takes its turn on it. A helper query runs alone, so nothing is
+			// reading at this moment; the turn is taken anyway so that every
+			// use of the transaction follows the same rule.
 			var publishErr error
+			transactionTurn.Lock()
 			if validateOnlyNodes[binding.Kind] {
 				publishErr = validateHelperAnswers(ctx, transaction, binding, sorted, report)
 			} else {
 				publishErr = publishHelperAnswers(ctx, transaction, binding, sorted, report)
 			}
+			transactionTurn.Unlock()
 			if publishErr != nil {
 				return nil, fmt.Errorf("helper answers from %s: %w", query.Name, publishErr)
 			}
@@ -259,7 +293,6 @@ func calculateQueries(ctx context.Context, cancel context.CancelCauseFunc, datab
 			}
 			count := file.rows
 			report.Execution.query(query.Name).Proposed = &count
-			graphChangesStaged = true
 		}
 		for _, binding := range plan.Schema.Relationships {
 			if binding.Query != query.Name {
@@ -269,7 +302,12 @@ func calculateQueries(ctx context.Context, cancel context.CancelCauseFunc, datab
 			if err != nil {
 				return nil, fmt.Errorf("relationship answers from %s: %w", query.Name, err)
 			}
-			if err := validateFileEndpoints(ctx, transaction, binding, pairs); err != nil {
+			// Endpoints are checked on the shared transaction while other
+			// queries may still be reading on it, so take the turn first.
+			transactionTurn.Lock()
+			err = validateFileEndpoints(ctx, transaction, binding, pairs)
+			transactionTurn.Unlock()
+			if err != nil {
 				return nil, err
 			}
 			if produced[binding.Kind] == nil {
@@ -279,12 +317,10 @@ func calculateQueries(ctx context.Context, cancel context.CancelCauseFunc, datab
 			count := pairs.rows
 			report.Execution.query(query.Name).Proposed = &count
 		}
-		// Helpers are not committed yet. Later reads use this same database
-		// operation so they can see them. Publication still succeeds or fails
-		// for the whole run; we never save one chain on its own.
-		if graphChangesStaged {
-			workers = 1
-		}
+		// Helpers and staged relationships are not committed yet. Their declared
+		// readers use this same transaction so they can see them. Publication
+		// still succeeds or fails for the whole run; we never save one chain
+		// on its own.
 		completed[query.Name] = true
 		report.Execution.query(query.Name).State = "succeeded"
 		if space.inspectTestAnswer != nil && query.Name == space.testTarget {
@@ -341,12 +377,53 @@ func calculateQueries(ctx context.Context, cancel context.CancelCauseFunc, datab
 	return desired, nil
 }
 
+// queriesReadingStagedGraph names the queries that must read on the shared
+// transaction, because they read something this run changes before saving:
+// helper objects, calculated relationships, or retired relationships that the
+// run clears. A query that reads without naming kinds could see any of those,
+// so it reads on the transaction too. A producer that reads its own output
+// kind deliberately reads the previous graph and needs nothing from the
+// transaction for that. Every other query reads on its own connection.
+//
+// This trusts each file's declarations, as the loader already does: it rejects
+// a file that reads a kind it did not declare.
+func queriesReadingStagedGraph(plan extension.Plan) map[string]bool {
+	var (
+		changedKinds = map[string]bool{}
+		result       = map[string]bool{}
+	)
+	for _, binding := range plan.Schema.Nodes {
+		changedKinds[binding.Kind] = true
+	}
+	for _, binding := range plan.Schema.Relationships {
+		changedKinds[binding.Kind] = true
+	}
+	for _, kind := range plan.RetiredRelationships {
+		changedKinds[kind] = true
+	}
+	for _, query := range plan.Queries {
+		if query.BroadRead {
+			result[query.Name] = true
+			continue
+		}
+		for _, dependency := range query.Dependencies {
+			if dependency.Type == "query" || !changedKinds[dependency.Name] || dependency.Name == query.OutputKind {
+				continue
+			}
+			result[query.Name] = true
+		}
+	}
+	return result
+}
+
 // Prefer ordinary reads while they can still make progress. A helper can be
 // created once those reads finish, without another connection missing it.
-func nextReadyQuery(plan extension.Plan, started, completed, helpers, staged map[string]bool, running int) (extension.Query, bool) {
+// While one query is reading on the shared transaction, the others that need
+// it wait; queries with their own connection are still started.
+func nextReadyQuery(plan extension.Plan, started, completed, helpers, staged, readsOnTransaction map[string]bool, transactionBusy bool, running int) (extension.Query, bool) {
 	var helper *extension.Query
 	for _, query := range plan.Queries {
-		if started[query.Name] {
+		if started[query.Name] || transactionBusy && readsOnTransaction[query.Name] {
 			continue
 		}
 		ready := true

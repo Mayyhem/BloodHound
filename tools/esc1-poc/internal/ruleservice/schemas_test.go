@@ -207,7 +207,7 @@ func TestMissingSchemaDefersCleanupAndWorkerPauseSurvivesRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	details := &runner.Execution{Calculation: "skipped", Save: "unchanged", Phase: "complete"}
+	details := &runner.Execution{Calculation: "up-to-date", Save: "unchanged", Phase: "complete"}
 	for index, query := range plan.Queries {
 		details.Queries = append(details.Queries, runner.QueryReport{Name: query.Name, Stage: index + 1, State: "disabled", Reason: query.DisabledReason, SchemaPaused: query.SchemaPaused})
 	}

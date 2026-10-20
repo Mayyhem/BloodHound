@@ -14,7 +14,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-import { Dependency, Query, RunRecord, Workspace } from './types';
+import { Dependency, Query, QueryOutcome, RunRecord, Workspace } from './types';
 
 // The name to show for an extension: its display name, or its namespace when
 // it has none. A query with no namespace belongs to "No extension". The plan
@@ -105,7 +105,9 @@ export const completedState = (state?: string) =>
           ? 'Outcome unavailable'
           : state === 'set-aside'
             ? 'Set aside (kept its previous results)'
-            : state ?? 'Unavailable';
+            : state === 'up-to-date'
+              ? 'Up to date (nothing it reads changed)'
+              : state ?? 'Unavailable';
 export const dependencyReason = (dependency: Dependency) =>
     dependency.type === 'query'
         ? `As $${dependency.parameter}${dependency.conditions ? ` (${dependency.conditions})` : ''}`
@@ -129,6 +131,73 @@ export function reportMatches(workspace: Workspace, report?: RunRecord) {
         !!workspace.plan.schema_revision &&
         report.revision === workspace.plan.revision &&
         report.execution.schema_revision === workspace.plan.schema_revision
+    );
+}
+
+// One analysis can take several attempts: the run BloodHound triggered, then
+// the automatic retries of the steps that were set aside after a failure.
+// Every attempt of one analysis reports the same event time and rule
+// revision, which tells it apart from an unrelated earlier run. The attempts
+// come back oldest first, so the first one is the run that did the main work.
+export function analysisAttempts(status: Workspace['status']): RunRecord[] {
+    const completed = (record: RunRecord) => ['success', 'partial', 'failed', 'uncertain'].includes(record.state);
+    const seen = new Set<string>();
+    const records = [status, ...(status.history ?? [])].filter((record) => {
+        const key = `${record.run_id}|${record.updated_at}`;
+        if (seen.has(key) || !completed(record)) return false;
+        seen.add(key);
+        return true;
+    });
+    const latest = records.sort((left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at))[0];
+    if (!latest) return [];
+    return records
+        .filter((record) => record.event === latest.event && record.revision === latest.revision)
+        .sort((left, right) => Date.parse(left.updated_at) - Date.parse(right.updated_at));
+}
+// A step's outcome, and the attempt it came from. A retry reruns only the
+// steps that were set aside, and reports every other step as "up to date",
+// which says nothing new about them. So each step shows its outcome from the
+// newest attempt that actually decided something about it; a step that every
+// attempt found up to date shows the newest. The attempt number counts from 1
+// at the run BloodHound triggered.
+export interface AttemptOutcome {
+    outcome: QueryOutcome;
+    attempt: RunRecord;
+    attemptNumber: number;
+    attempts: number;
+}
+
+export function combinedOutcomes(status: Workspace['status']): Map<string, AttemptOutcome> {
+    const attempts = analysisAttempts(status);
+    const result = new Map<string, AttemptOutcome>();
+    const names = new Set(attempts.flatMap((attempt) => attempt.execution?.queries.map((query) => query.name) ?? []));
+    for (const name of names) {
+        let chosen: AttemptOutcome | undefined;
+        for (let index = attempts.length - 1; index >= 0; index--) {
+            const outcome = attempts[index].execution?.queries.find((query) => query.name === name);
+            if (!outcome) continue;
+            const entry = { outcome, attempt: attempts[index], attemptNumber: index + 1, attempts: attempts.length };
+            chosen ??= entry;
+            if (outcome.state !== 'up-to-date') {
+                chosen = entry;
+                break;
+            }
+        }
+        if (chosen) result.set(name, chosen);
+    }
+    return result;
+}
+
+// The outcomes of the latest attempt alone, in the same shape, for the
+// "show attempts separately" view.
+export function latestAttemptOutcomes(status: Workspace['status']): Map<string, AttemptOutcome> {
+    const attempts = analysisAttempts(status);
+    const latest = attempts[attempts.length - 1];
+    return new Map(
+        (latest?.execution?.queries ?? []).map((outcome) => [
+            outcome.name,
+            { outcome, attempt: latest, attemptNumber: attempts.length, attempts: attempts.length },
+        ])
     );
 }
 
@@ -272,22 +341,28 @@ export function runPhase(
     if (requestedAt && now - requestedAt < 120000 && !(reportTime > requestedAt))
         return { active: true, severity: 'info', text: 'Analysis requested. Waiting for BloodHound to start it.' };
     const when = observedTime(status.updated_at);
+    const attempts = analysisAttempts(status);
     switch (status.state) {
         case 'success':
             return { active: false, severity: 'success', text: `Last run succeeded · ${when}. ${status.message}` };
         case 'partial':
             // Some steps failed and were set aside; everything else was saved.
+            // Describe the whole analysis, not just the latest retry, which
+            // reruns only the set-aside steps and would read as "0 steps saved".
             return {
                 active: false,
                 severity: 'warning',
-                text: `Last run partly saved · ${when}. ${status.message}`,
+                text: analysisSummary(status, attempts),
                 failedQuery: status.execution?.failure?.query,
             };
         case 'failed':
             return {
                 active: false,
                 severity: 'error',
-                text: `Last run failed · ${when}. ${status.message}`,
+                text:
+                    attempts.length > 1
+                        ? `Last run failed on each of its ${attempts.length} attempts · ${when}. ${status.message}`
+                        : `Last run failed · ${when}. ${status.message}`,
                 failedQuery: status.execution?.failure?.query,
             };
         case 'uncertain':
@@ -303,6 +378,38 @@ export function runPhase(
         default:
             return { active: false, severity: 'info', text: 'No extension run has been reported yet.' };
     }
+}
+
+// analysisSummary writes the partly saved status line from every attempt of
+// the analysis: when it started, how many attempts it took, what was saved,
+// what failed, and what the engine says about further retries.
+export function analysisSummary(status: Workspace['status'], attempts = analysisAttempts(status)): string {
+    const first = attempts[0] ?? status;
+    const latest = attempts[attempts.length - 1] ?? status;
+    const outcomes = [...combinedOutcomes(status).values()];
+    const saved = outcomes.filter(
+        (entry) => entry.outcome.state === 'succeeded' && entry.attempt.execution?.save === 'succeeded'
+    ).length;
+    const failed = outcomes.filter((entry) => entry.outcome.state === 'failed').map((entry) => entry.outcome.name);
+    const setAside = outcomes.filter((entry) => entry.outcome.state === 'set-aside').length;
+    const retries =
+        attempts.length > 1
+            ? ` The ${attempts.length === 2 ? 'retry' : `${attempts.length - 1} retries`} at ${observedTime(latest.updated_at)} reran only the set-aside steps, and ${
+                  failed.length ? 'they failed again' : 'they succeeded'
+              }.`
+            : '';
+    // The engine's own message ends with whether another automatic try is
+    // coming; keep that sentence and drop the per-attempt counts before it.
+    const retryNote = (latest.message.match(
+        /(?:Automatic retries have stopped|The set-aside steps will be tried once more|It will be tried once more)[^]*$/
+    ) ?? [''])[0];
+    const kept = [
+        failed.length ? `${failed.length} failed (${failed.join(', ')})` : '',
+        setAside ? `${setAside} set aside` : '',
+    ]
+        .filter(Boolean)
+        .join(' and ');
+    return `Run started ${observedTime(first.updated_at)}${attempts.length > 1 ? `, ${attempts.length} attempts` : ''}: ${saved} ${saved === 1 ? 'step' : 'steps'} saved${kept ? `; ${kept} kept their previous results` : ''}.${retries}${retryNote ? ` ${retryNote}` : ''}`;
 }
 
 export interface StepTimes {

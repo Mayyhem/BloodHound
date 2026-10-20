@@ -16,12 +16,16 @@
 
 import { buildQueryGraph } from './graph';
 import {
+    analysisAttempts,
+    analysisSummary,
     availability,
+    combinedOutcomes,
     completedState,
     dependencyKey,
     dependencyReason,
     extensionTitle,
     laneTitles,
+    latestAttemptOutcomes,
     latestCompleted,
     queryColor,
     queryColors,
@@ -31,7 +35,7 @@ import {
     runPhase,
     stepTimes,
 } from './model';
-import { workspaceFixture } from './testData';
+import { retriedAnalysisFixture, workspaceFixture } from './testData';
 import { Dependency } from './types';
 
 describe('analysis plan and completed reports', () => {
@@ -285,6 +289,9 @@ describe('analysis run status line', () => {
                 ...status.execution!,
                 calculation: 'partial',
                 failure: { query: 'PoC/domain_helpers.cypher', phase: 'check-answers', message: '' },
+                queries: status.execution!.queries.map((query, index) =>
+                    index === 0 ? { ...query, name: 'PoC/domain_helpers.cypher', state: 'failed' } : query
+                ),
             },
         });
         expect(partial).toMatchObject({
@@ -292,7 +299,10 @@ describe('analysis run status line', () => {
             severity: 'warning',
             failedQuery: 'PoC/domain_helpers.cypher',
         });
-        expect(partial.text).toContain('24 steps saved; 5 kept their previous results.');
+        // The line is written from the attempts, not copied from the engine's message.
+        expect(partial.text).toBe(
+            `Run started ${new Date('2026-10-14T12:01:00Z').toLocaleString()}: 3 steps saved; 1 failed (PoC/domain_helpers.cypher) kept their previous results.`
+        );
     });
 });
 
@@ -341,5 +351,55 @@ describe('step run times', () => {
             lastRun: { at: '2026-10-14T10:00:00Z', state: 'succeeded' },
             lastSuccess: '2026-10-14T10:00:00Z',
         });
+    });
+});
+
+describe('attempts of one analysis', () => {
+    it('groups the run and its retries by event time, oldest first, and leaves other runs out', () => {
+        const workspace = retriedAnalysisFixture();
+        const unrelated = {
+            ...workspace.status.history![0],
+            event: 'earlier-collection',
+            run_id: 'old',
+            updated_at: '2026-10-13T12:00:00Z',
+        };
+        workspace.status.history = [...workspace.status.history!, unrelated];
+        expect(analysisAttempts(workspace.status).map((attempt) => attempt.run_id)).toEqual(['attempt-1', 'attempt-2']);
+    });
+    it('shows each step from the newest attempt that decided something about it', () => {
+        const workspace = retriedAnalysisFixture();
+        const outcomes = combinedOutcomes(workspace.status);
+        // The retry reran the failed step, so its outcome comes from attempt 2.
+        expect(outcomes.get('PoC_AD/users.cypher')).toMatchObject({
+            outcome: { state: 'failed', started_at: '2026-10-14T12:02:00Z' },
+            attemptNumber: 2,
+            attempts: 2,
+        });
+        // The retry only said the others were up to date; attempt 1 ran them.
+        expect(outcomes.get('PoC_Vault/users.cypher')).toMatchObject({
+            outcome: { state: 'succeeded', rows: 1 },
+            attemptNumber: 1,
+            attempts: 2,
+        });
+        // The latest attempt alone still says "up to date".
+        expect(latestAttemptOutcomes(workspace.status).get('PoC_Vault/users.cypher')).toMatchObject({
+            outcome: { state: 'up-to-date' },
+            attemptNumber: 2,
+        });
+    });
+    it('describes the whole analysis in the status line, not the retry alone', () => {
+        const workspace = retriedAnalysisFixture();
+        const text = analysisSummary(workspace.status);
+        expect(text).toBe(
+            `Run started ${new Date('2026-10-14T12:01:00Z').toLocaleString()}, 2 attempts: 3 steps saved; 1 failed (PoC_AD/users.cypher) kept their previous results. The retry at ${new Date('2026-10-14T12:02:00Z').toLocaleString()} reran only the set-aside steps, and they failed again. Automatic retries have stopped; the set-aside steps run again after the next BloodHound analysis (Run Analysis or a data upload).`
+        );
+        expect(runPhase({ request: '', status: 'idle' }, workspace.status)).toMatchObject({
+            severity: 'warning',
+            text,
+            failedQuery: 'PoC_AD/users.cypher',
+        });
+    });
+    it('reads up to date as good news', () => {
+        expect(completedState('up-to-date')).toBe('Up to date (nothing it reads changed)');
     });
 });

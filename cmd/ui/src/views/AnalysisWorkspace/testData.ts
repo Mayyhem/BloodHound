@@ -86,6 +86,8 @@ export function workspaceFixture(): Workspace {
                 reason: 'Complete answer.',
                 rows: index,
                 elapsed_nanoseconds: 1e9,
+                started_at: `2026-10-14T12:01:${String(index).padStart(2, '0')}Z`,
+                finished_at: `2026-10-14T12:01:${String(index + 1).padStart(2, '0')}Z`,
                 proposed_outputs: index,
                 saved_outputs: index,
             })),
@@ -117,4 +119,70 @@ export function workspaceFixture(): Workspace {
         ],
         status,
     };
+}
+
+// A partly saved analysis that took two attempts: the run BloodHound
+// triggered, where the first step failed and the rest saved, then the
+// automatic retry a minute later, which reran only the failed step (and
+// failed again) and reported every other step as up to date.
+export function retriedAnalysisFixture(): Workspace {
+    const workspace = workspaceFixture();
+    const base = workspace.status;
+    const execution = base.execution!;
+    const [failing, ...others] = execution.queries;
+    const failure = {
+        query: failing.name,
+        phase: 'check-answers',
+        message: 'The name property is empty (null) for 5 helper objects.',
+    };
+    const first: Workspace['status'] = {
+        ...base,
+        state: 'partial',
+        event: '2026-10-14T12:00:00Z',
+        run_id: 'attempt-1',
+        updated_at: '2026-10-14T12:01:00Z',
+        message:
+            'Finished with 1 failure: 3 steps saved; 1 kept their previous results. 2 connections added, 0 removed, 0 updated. The set-aside steps will be tried once more in about a minute.',
+        history: undefined,
+        execution: {
+            ...execution,
+            calculation: 'partial',
+            failure,
+            failures: [failure],
+            queries: [
+                { ...failing, state: 'failed', reason: 'The rules are new or changed.', rows: 25 },
+                ...others.map((query) => ({ ...query, reason: 'The rules are new or changed.' })),
+            ],
+        },
+    };
+    const retry: Workspace['status'] = {
+        ...first,
+        run_id: 'attempt-2',
+        updated_at: '2026-10-14T12:02:00Z',
+        message:
+            'Finished with 1 failure: 0 steps saved; 1 kept their previous results. 0 connections added, 0 removed, 0 updated. Automatic retries have stopped; the set-aside steps run again after the next BloodHound analysis (Run Analysis or a data upload).',
+        execution: {
+            ...first.execution!,
+            elapsed_nanoseconds: 1e9,
+            queries: [
+                {
+                    ...failing,
+                    state: 'failed',
+                    rows: 25,
+                    reason: 'It ran in an earlier attempt of this run and failed, so it was set aside and kept its previous results.',
+                    started_at: '2026-10-14T12:02:00Z',
+                    finished_at: '2026-10-14T12:02:01Z',
+                },
+                ...others.map((query) => ({
+                    name: query.name,
+                    stage: query.stage,
+                    state: 'up-to-date',
+                    reason: 'No declared input or connected calculation was affected by the confirmed changes.',
+                    elapsed_nanoseconds: 0,
+                })),
+            ],
+        },
+    };
+    workspace.status = { ...retry, history: [first, retry] };
+    return workspace;
 }

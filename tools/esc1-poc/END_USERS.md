@@ -53,7 +53,7 @@ No. Authors' instructions tell the engine which calculations must finish before 
 
 **Order** and **Dependency depth** describe this plan in the analysis workspace. Depth is the number of arrows in the longest prerequisite chain leading to a query, starting at 0. The older rules page uses **Stage**, starting at 1. Sorting or filtering only changes your view. If no workable order exists, activation is blocked; ask the supplier for corrected files.
 
-## Why did some rules run while others were skipped?
+## Why did some rules run while others show "up to date"?
 
 The engine runs rules affected by changed types of data and their supporting rules. Unaffected results stay saved, avoiding unnecessary work.
 
@@ -119,7 +119,7 @@ Open **Latest analysis report** and check:
 
 - **Time and revision:** compare the report and last confirmed saved revision with your active rules.
 - **Calculation and save outcomes:** finishing calculations alone does not confirm that results were saved.
-- **Skipped or paused rules:** read their reasons before expecting new results.
+- **Up to date, skipped, or paused rules:** read their reasons before expecting new results. "Up to date" means nothing the rule reads has changed since it last saved; "skipped" means a run stopped before the rule could start.
 
 Proposed counts describe intended changes; saved counts confirm them. Adding rule counts can overcount shared connections. The latest 20 attempts are retained. A successful collection upload alone does not prove extension success.
 
@@ -133,7 +133,7 @@ The failed rule is set aside, together with every rule that uses its results and
 
 A few failures cannot be pinned on one rule, for example missing or duplicate object IDs in the graph. Then nothing from the run is saved and previous results remain.
 
-Share the failed rule name and report with its supplier or administrator. Activate corrected files and request new analysis. There is one automatic retry, about a minute later, and it reruns only the set-aside rules (with the rules they need). It uses the original files: if the retry fails too, the status line says retries have stopped, and the set-aside rules run again after the next analysis (Run Analysis or a data upload). If another graph update has been attempted, the engine waits for new successful analysis before trying again.
+Share the failed rule name and report with its supplier or administrator. Activate corrected files and request new analysis. There is one automatic retry, about a minute later, and it reruns only the set-aside rules (with the rules they need). It uses the original files: if the retry fails too, the status line says retries have stopped, and the set-aside rules run again after the next analysis (Run Analysis or a data upload). The page shows the run and its retry as one analysis: the status line counts what the whole analysis saved and what failed, and each rule in the report shows the attempt that actually decided its outcome. Rules the retry did not need to rerun are **up to date**, which is good news, not a problem. If another graph update has been attempted, the engine waits for new successful analysis before trying again.
 
 ## What does an unavailable or uncertain report mean?
 

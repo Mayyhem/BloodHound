@@ -21,7 +21,7 @@ import { setupServer } from 'msw/node';
 import { render } from 'src/test-utils';
 import AnalysisWorkspace from './AnalysisWorkspace';
 import { dependencyKey } from './model';
-import { workspaceFixture } from './testData';
+import { retriedAnalysisFixture, workspaceFixture } from './testData';
 import { Workspace } from './types';
 
 // These checks cover graph/table/details coordination. Actual canvas drawing
@@ -128,6 +128,13 @@ it('coordinates graph, keyboard-accessible table, and prerequisite links without
     expect(within(table).getByRole('button', { name: 'PoC_AD/users.cypher' })).toHaveAttribute('aria-pressed', 'true');
     await user.click(within(panel).getByRole('tab', { name: 'Last run' }));
     expect(within(panel).getByText('Rows:').parentElement).toHaveTextContent('Rows: 0');
+    // The run report records when each step's read started and finished.
+    expect(within(panel).getByText('Started:').parentElement).toHaveTextContent(
+        new Date('2026-10-14T12:01:00Z').toLocaleString()
+    );
+    expect(within(panel).getByText('Finished:').parentElement).toHaveTextContent(
+        new Date('2026-10-14T12:01:01Z').toLocaleString()
+    );
     await user.click(within(panel).getByRole('tab', { name: 'Cypher' }));
     expect(within(panel).getByLabelText('Original Cypher file')).toHaveTextContent('// namespace: PoC_AD');
     expect(requests.every((request) => request.method === 'GET')).toBe(true);
@@ -675,8 +682,10 @@ it('shows why the failed step failed in its Last run tab', async () => {
 });
 
 it('opens a step on its Last run tab from the analysis report, with last ran and last success times', async () => {
+    // An earlier, separate analysis, not an attempt of the latest one.
     const earlier = {
         ...workspace.status,
+        event: 'earlier-collection',
         run_id: 'attempt-0',
         updated_at: '2026-10-14T11:00:00Z',
         history: undefined,
@@ -698,4 +707,34 @@ it('opens a step on its Last run tab from the analysis report, with last ran and
     expect(within(panel).getByText('Last success:').parentElement).toHaveTextContent(
         new Date('2026-10-14T12:01:00Z').toLocaleString()
     );
+});
+
+it('shows a retried analysis as one run: saved steps from the first attempt, the failure from the retry', async () => {
+    workspace = retriedAnalysisFixture();
+    render(<AnalysisWorkspace />);
+    const line = await screen.findByLabelText('Analysis status');
+    await waitFor(() => expect(line).toHaveTextContent('Failed at PoC_AD/users.cypher.'));
+    expect(line).toHaveTextContent(
+        '2 attempts: 3 steps saved; 1 failed (PoC_AD/users.cypher) kept their previous results.'
+    );
+    expect(line).toHaveTextContent('Automatic retries have stopped');
+    expect(line).not.toHaveTextContent('0 steps saved');
+    await userEvent.click(screen.getByRole('button', { name: 'Latest status report' }));
+    const attempts = await screen.findByRole('region', { name: 'Attempts of the latest analysis' });
+    expect(within(attempts).getAllByRole('listitem')).toHaveLength(2);
+    const report = screen.getByRole('table', { name: 'Completed query outcomes' });
+    const row = (name: string) => within(report).getByRole('button', { name }).closest('tr')!;
+    expect(row('PoC_Vault/users.cypher')).toHaveTextContent('succeeded');
+    expect(within(row('PoC_Vault/users.cypher')).getAllByRole('cell')[2]).toHaveTextContent('1');
+    expect(row('PoC_AD/users.cypher')).toHaveTextContent('failed');
+    expect(within(row('PoC_AD/users.cypher')).getAllByRole('cell')[2]).toHaveTextContent('2 (retry)');
+    // The details panel says which attempt the outcome came from.
+    await userEvent.click(within(report).getByRole('button', { name: 'PoC_Vault/users.cypher' }));
+    const panel = screen.getByRole('region', { name: 'Query details' });
+    expect(within(panel).getByText('Outcome:').parentElement).toHaveTextContent('succeeded');
+    expect(within(panel).getByText('From attempt:').parentElement).toHaveTextContent('1 of 2');
+    // The switch shows the latest attempt on its own, where the step is only "up to date".
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Show the latest attempt on its own' }));
+    expect(row('PoC_Vault/users.cypher')).toHaveTextContent('Up to date (nothing it reads changed)');
+    expect(within(panel).getByText('Outcome:').parentElement).toHaveTextContent('Up to date');
 });

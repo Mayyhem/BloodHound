@@ -51,6 +51,15 @@ func TestReportsSeparateCalculationAndSaving(t *testing.T) {
 				if query.Elapsed <= 0 || query.Reason == "" {
 					t.Fatalf("missing timing/reason: %+v", query)
 				}
+				// Every step that ran has the clock times around its read, and
+				// its elapsed time is exactly the distance between them.
+				if query.StartedAt == nil || query.FinishedAt == nil || query.FinishedAt.Before(*query.StartedAt) || query.FinishedAt.Sub(*query.StartedAt) != query.Elapsed {
+					t.Fatalf("missing or inconsistent start and finish times: %+v", query)
+				}
+			}
+			encoded, encodeErr := json.Marshal(execution.Queries[0])
+			if encodeErr != nil || !strings.Contains(string(encoded), `"started_at":"`) || !strings.Contains(string(encoded), `"finished_at":"`) {
+				t.Fatalf("times are not in the stored report: %s %v", encoded, encodeErr)
 			}
 			if failure == "" {
 				if err != nil || execution.Calculation != "succeeded" || execution.Save != "succeeded" || execution.Saved == nil || execution.Queries[1].Saved == nil || *execution.Queries[1].Saved != 1 {
@@ -122,11 +131,11 @@ func TestReportsExplainSkippedAndDisabledQueries(t *testing.T) {
 	options := completeBatch()
 	options.Changes = runner.Changes{CoverageKnown: true, Nodes: []string{"Computer"}}
 	skipped, err := runner.Run(context.Background(), database, plan, options)
-	if err != nil || !skipped.Skipped || skipped.Execution.Save != "unchanged" {
+	if err != nil || !skipped.Skipped || skipped.Execution.Calculation != "up-to-date" || skipped.Execution.Save != "unchanged" {
 		t.Fatalf("skip: %+v, %v", skipped, err)
 	}
 	for _, query := range skipped.Execution.Queries {
-		if query.State != "skipped" || query.Rows != nil || query.Reason == "" {
+		if query.State != "up-to-date" || query.Rows != nil || query.Reason == "" || query.StartedAt != nil || query.FinishedAt != nil {
 			t.Fatalf("skip explanation: %+v", query)
 		}
 	}

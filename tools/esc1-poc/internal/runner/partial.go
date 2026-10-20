@@ -148,6 +148,7 @@ func markSetAside(report *Report, failures []Failure, failedRuns map[string]Quer
 			query.Reason = "It ran in an earlier attempt of this run and failed, so it was set aside and kept its previous results."
 			if earlier, ok := failedRuns[name]; ok {
 				query.Elapsed, query.Rows = earlier.Elapsed, earlier.Rows
+				query.StartedAt, query.FinishedAt = earlier.StartedAt, earlier.FinishedAt
 			}
 			continue
 		}

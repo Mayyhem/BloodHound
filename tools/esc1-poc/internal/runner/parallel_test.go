@@ -582,8 +582,211 @@ func TestDependentReadSeesNewHelperInPublicationTransaction(t *testing.T) {
 		}
 		return nil, true, fmt.Errorf("dependent read cannot see staged helper")
 	}
-	report, err := runner.Run(t.Context(), database, fixturePlan(), parallelOptions(t))
+	// A file that reads helper objects must declare their kind; the loader
+	// rejects it otherwise. That declaration is what places the read on the
+	// shared transaction, where the staged helper is visible.
+	plan := fixturePlan()
+	plan.Queries[1].Dependencies = append(plan.Queries[1].Dependencies, extension.Dependency{Type: "node", Name: "PoC_Helper"})
+	report, err := runner.Run(t.Context(), database, plan, parallelOptions(t))
 	if err != nil || !report.Committed || !observed || database.begins != 2 {
 		t.Fatalf("helper visibility failed: report=%+v err=%v begins=%d", report, err, database.begins)
+	}
+}
+
+// seesStagedHelper tells whether a read is on the shared transaction: only
+// that transaction holds the helper object published earlier in the run.
+func seesStagedHelper(transaction *fakeTransaction) bool {
+	for _, node := range transaction.staged.Nodes {
+		if node.ID == "PoC_Helper_example" {
+			return true
+		}
+	}
+	return false
+}
+
+// After the helper is published, the query that declares the helper kind reads
+// on the shared transaction while an unrelated query reads on its own
+// connection at the same time. Before this rule, every query after the first
+// graph change ran one at a time.
+func TestIndependentQueryOverlapsWithTransactionReaderAfterGraphChanges(t *testing.T) {
+	var (
+		database = &concurrentDatabase{fakeDatabase: fixtureDatabase()}
+		plan     = fixturePlan()
+		started  = make(chan string, 2)
+		release  = make(chan struct{})
+		done     = make(chan error, 1)
+		options  = parallelOptions(t)
+	)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	plan.Queries[1].Dependencies = append(plan.Queries[1].Dependencies, extension.Dependency{Type: "node", Name: "PoC_Helper"})
+	// The independent query uses the helper query's rows, so it becomes ready
+	// at the same moment as esc1.cypher, but it never reads the graph.
+	plan.Queries = append(plan.Queries, extension.Query{Name: "independent.cypher", Parameter: "independent", Text: "independent", Dependencies: []extension.Dependency{{Type: "query", Name: "helper.cypher"}}})
+	database.read = func(ctx context.Context, transaction *fakeTransaction, query string, _ map[string]any) (runner.Rows, bool, error) {
+		switch query {
+		case relationshipQuery:
+			if !seesStagedHelper(transaction) {
+				return nil, true, fmt.Errorf("the declared helper reader cannot see the staged helper")
+			}
+		case "independent":
+			if seesStagedHelper(transaction) {
+				return nil, true, fmt.Errorf("the independent query read on the shared transaction")
+			}
+		default:
+			return nil, false, nil
+		}
+		started <- query
+		// Neither read finishes until both have started, so the run can only
+		// complete if the two reads overlap.
+		select {
+		case <-release:
+		case <-ctx.Done():
+			return nil, true, ctx.Err()
+		}
+		if query == relationshipQuery {
+			return runner.Rows{{"source": "USER", "target": "DOMAIN"}}, true, nil
+		}
+		return nil, true, nil
+	}
+	go func() { report, err := runner.Run(ctx, database, plan, options); done <- firstProblem(report, err) }()
+	first, second := awaitRead(t, ctx, started), awaitRead(t, ctx, started)
+	if first == second {
+		t.Fatalf("the same query started twice: %q", first)
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	// One shared transaction, plus one connection each for the helper query
+	// and the independent query.
+	if database.begins != 3 {
+		t.Fatalf("opened %d transactions, want 3", database.begins)
+	}
+}
+
+func firstProblem(report runner.Report, err error) error {
+	if err != nil {
+		return err
+	}
+	if !report.Committed {
+		return fmt.Errorf("the run did not commit: %+v", report.Execution)
+	}
+	return nil
+}
+
+// Two queries that need the shared transaction read on it one after the
+// other. A read without named kinds could see any staged object, so it
+// counts as needing the transaction even without a declaration.
+func TestQueriesNeedingTheSharedTransactionTakeTurns(t *testing.T) {
+	var (
+		database  = &concurrentDatabase{fakeDatabase: fixtureDatabase()}
+		plan      = fixturePlan()
+		options   = parallelOptions(t)
+		mutex     sync.Mutex
+		reading   int
+		onShared  int
+		sharedErr error
+	)
+	plan.Queries[1].Dependencies = append(plan.Queries[1].Dependencies, extension.Dependency{Type: "node", Name: "PoC_Helper"})
+	plan.Queries = append(plan.Queries, extension.Query{Name: "broad.cypher", Parameter: "broad", Text: "broad", BroadRead: true, Dependencies: []extension.Dependency{{Type: "query", Name: "helper.cypher"}}})
+	database.read = func(ctx context.Context, transaction *fakeTransaction, query string, _ map[string]any) (runner.Rows, bool, error) {
+		if query != relationshipQuery && query != "broad" {
+			return nil, false, nil
+		}
+		mutex.Lock()
+		if !seesStagedHelper(transaction) {
+			sharedErr = fmt.Errorf("%s read on its own connection instead of the shared transaction", query)
+		} else if reading > 0 {
+			sharedErr = fmt.Errorf("%s started while another query was reading on the shared transaction", query)
+		}
+		reading++
+		onShared++
+		mutex.Unlock()
+		// Stay inside the read long enough for an overlapping start to show.
+		time.Sleep(20 * time.Millisecond)
+		mutex.Lock()
+		reading--
+		mutex.Unlock()
+		if query == relationshipQuery {
+			return runner.Rows{{"source": "USER", "target": "DOMAIN"}}, true, nil
+		}
+		return nil, true, nil
+	}
+	report, err := runner.Run(t.Context(), database, plan, options)
+	if err := firstProblem(report, err); err != nil {
+		t.Fatal(err)
+	}
+	if sharedErr != nil {
+		t.Fatal(sharedErr)
+	}
+	if onShared != 2 || database.begins != 2 {
+		t.Fatalf("shared reads=%d transactions=%d, want 2 and 2", onShared, database.begins)
+	}
+}
+
+// The coordinator checks a relationship answer's endpoints on the shared
+// transaction. When another query is still reading on that transaction, the
+// check waits for it instead of using the transaction at the same time.
+func TestEndpointCheckWaitsForTheTransactionReader(t *testing.T) {
+	var (
+		database     = &concurrentDatabase{fakeDatabase: fixtureDatabase()}
+		plan         = fixturePlan()
+		options      = parallelOptions(t)
+		producerDone = make(chan string, 1)
+		releaseSlow  = make(chan struct{})
+		done         = make(chan error, 1)
+		mutex        sync.Mutex
+		slowReading  bool
+		checkErr     error
+	)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	// slow.cypher is listed before the producer, so it takes the shared
+	// transaction first. The producer reads on its own connection and
+	// finishes at once; checking its endpoints then needs the transaction.
+	plan.Queries = []extension.Query{
+		plan.Queries[0],
+		{Name: "slow.cypher", Parameter: "slow", Text: "slow", Dependencies: []extension.Dependency{{Type: "query", Name: "helper.cypher"}, {Type: "node", Name: "PoC_Helper"}}},
+		plan.Queries[1],
+	}
+	database.read = func(ctx context.Context, transaction *fakeTransaction, query string, _ map[string]any) (runner.Rows, bool, error) {
+		switch query {
+		case "slow":
+			mutex.Lock()
+			slowReading = true
+			mutex.Unlock()
+			select {
+			case <-releaseSlow:
+			case <-ctx.Done():
+				return nil, true, ctx.Err()
+			}
+			mutex.Lock()
+			slowReading = false
+			mutex.Unlock()
+			return nil, true, nil
+		case relationshipQuery:
+			producerDone <- query
+			return runner.Rows{{"source": "USER", "target": "DOMAIN"}}, true, nil
+		case endpointQuery:
+			mutex.Lock()
+			if slowReading && seesStagedHelper(transaction) {
+				checkErr = fmt.Errorf("endpoints were checked on the shared transaction while slow.cypher was reading on it")
+			}
+			mutex.Unlock()
+		}
+		return nil, false, nil
+	}
+	go func() { report, err := runner.Run(ctx, database, plan, options); done <- firstProblem(report, err) }()
+	awaitRead(t, ctx, producerDone)
+	// Give a wrong coordinator time to check the endpoints before the slow
+	// read is released; a correct one is waiting for its turn.
+	time.Sleep(50 * time.Millisecond)
+	close(releaseSlow)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if checkErr != nil {
+		t.Fatal(checkErr)
 	}
 }

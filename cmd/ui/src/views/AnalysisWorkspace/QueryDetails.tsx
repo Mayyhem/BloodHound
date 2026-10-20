@@ -20,23 +20,24 @@ import { Alert, Box, Button, IconButton, Link, Stack, Tab, Tabs, Tooltip, Typogr
 import { ReactNode } from 'react';
 import CypherText from './CypherText';
 import {
+    AttemptOutcome,
     availability,
     completedState,
     dependencyDepth,
     dependencyKey,
     dependencyReason,
     duration,
-    latestCompleted,
     observedTime,
     queryColor,
     stepTimes,
 } from './model';
-import { Dependency, Query, QueryOutcome, Workspace } from './types';
+import { Dependency, Query, Workspace } from './types';
 
 interface Props {
     query: Query;
     workspace: Workspace;
-    outcome?: QueryOutcome;
+    // The step's outcome and the attempt of the latest analysis it came from.
+    outcome?: AttemptOutcome;
     onFocus: (name: string) => void;
     onDownload: () => void;
     downloading: boolean;
@@ -120,7 +121,7 @@ export default function QueryDetails({
                         component='span'
                         aria-hidden
                         className='inline-block w-3 h-3 rounded-full shrink-0'
-                        style={{ backgroundColor: queryColor(query, outcome?.state) }}
+                        style={{ backgroundColor: queryColor(query, outcome?.outcome.state) }}
                     />
                     <Typography variant='body2'>
                         {availability(query)}
@@ -253,8 +254,17 @@ export default function QueryDetails({
     );
 }
 
-function LastRun({ query, workspace, outcome }: { query: Query; workspace: Workspace; outcome?: QueryOutcome }) {
+function LastRun({
+    query,
+    workspace,
+    outcome: entry,
+}: {
+    query: Query;
+    workspace: Workspace;
+    outcome?: AttemptOutcome;
+}) {
     const times = stepTimes(workspace, query.name);
+    const outcome = entry?.outcome;
     const timeLines = (
         <Box className='pb-1'>
             <Typography>
@@ -276,7 +286,9 @@ function LastRun({ query, workspace, outcome }: { query: Query; workspace: Works
                 <Typography>No matching completed outcome is available for this query.</Typography>
             </Box>
         );
-    const execution = latestCompleted(workspace)?.execution;
+    // Facts about the attempt this outcome came from: a retry reruns only
+    // the set-aside steps, so most steps' outcomes come from the first attempt.
+    const execution = entry!.attempt.execution;
     const saveState = execution?.save;
     // The run report stores why the run failed separately from each step's
     // outcome. Show it here when this step is one that failed. A partly saved
@@ -299,6 +311,13 @@ function LastRun({ query, workspace, outcome }: { query: Query; workspace: Works
             <Typography>
                 <strong>Outcome:</strong> {completedState(outcome.state)}
             </Typography>
+            {entry!.attempts > 1 && (
+                <Typography variant='body2'>
+                    <strong>From attempt:</strong> {entry!.attemptNumber} of {entry!.attempts}
+                    {entry!.attemptNumber > 1 ? ' (an automatic retry)' : ''} ·{' '}
+                    {observedTime(entry!.attempt.updated_at)}
+                </Typography>
+            )}
             {failure && (
                 <Alert severity='error' aria-label='Why it failed' className='my-1'>
                     {failure.message}
@@ -307,7 +326,9 @@ function LastRun({ query, workspace, outcome }: { query: Query; workspace: Works
             {outcome.reason && (
                 <Typography variant='body2'>
                     <strong>
-                        {['skipped', 'set-aside', 'waiting', 'canceled', 'disabled'].includes(outcome.state)
+                        {['up-to-date', 'skipped', 'set-aside', 'waiting', 'canceled', 'disabled'].includes(
+                            outcome.state
+                        )
                             ? 'Why it did not run:'
                             : 'Why it ran:'}
                     </strong>{' '}
@@ -317,6 +338,16 @@ function LastRun({ query, workspace, outcome }: { query: Query; workspace: Works
             <Typography>
                 <strong>Time:</strong> {duration(outcome.elapsed_nanoseconds)}
             </Typography>
+            {outcome.started_at && (
+                <Typography>
+                    <strong>Started:</strong> {observedTime(outcome.started_at)}
+                </Typography>
+            )}
+            {outcome.finished_at && (
+                <Typography>
+                    <strong>Finished:</strong> {observedTime(outcome.finished_at)}
+                </Typography>
+            )}
             <Typography>
                 <strong>Rows:</strong> {outcome.rows ?? 'Unavailable'}
             </Typography>

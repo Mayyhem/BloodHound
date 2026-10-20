@@ -70,6 +70,10 @@ export interface QueryOutcome {
     state: string;
     reason: string;
     elapsed_nanoseconds: number;
+    // Clock times around the step's read, absent for a step that never
+    // started. Compared across steps they show which ones ran together.
+    started_at?: string;
+    finished_at?: string;
     rows?: number;
     proposed_outputs?: number;
     saved_outputs?: number;

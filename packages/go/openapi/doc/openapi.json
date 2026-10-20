@@ -27542,7 +27542,7 @@
               "succeeded",
               "partial",
               "failed",
-              "skipped"
+              "up-to-date"
             ]
           },
           "save": {
@@ -27638,6 +27638,7 @@
                     "running",
                     "succeeded",
                     "failed",
+                    "up-to-date",
                     "skipped",
                     "set-aside",
                     "disabled",
@@ -27651,6 +27652,16 @@
                   "type": "integer",
                   "format": "int64",
                   "minimum": 0
+                },
+                "started_at": {
+                  "description": "When the step's read started. Absent for a step that never started.",
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "finished_at": {
+                  "description": "When the step's read finished, whether it succeeded or was canceled.",
+                  "type": "string",
+                  "format": "date-time"
                 },
                 "rows": {
                   "type": "integer",

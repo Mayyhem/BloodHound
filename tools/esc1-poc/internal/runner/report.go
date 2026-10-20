@@ -67,8 +67,13 @@ type QueryReport struct {
 	Reason        string        `json:"reason"`
 	Rows          *int64        `json:"rows,omitempty"`
 	Elapsed       time.Duration `json:"elapsed_nanoseconds"`
-	Proposed      *int64        `json:"proposed_outputs,omitempty"`
-	Saved         *int64        `json:"saved_outputs,omitempty"`
+	// StartedAt and FinishedAt are the clock times around the query's read.
+	// Together with the other steps' times they show which steps overlapped.
+	// A step that never started has neither.
+	StartedAt  *time.Time `json:"started_at,omitempty"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	Proposed   *int64     `json:"proposed_outputs,omitempty"`
+	Saved      *int64     `json:"saved_outputs,omitempty"`
 }
 
 // Relationship names the connection type being saved when the failure
@@ -206,7 +211,10 @@ func (s *Execution) selectQueries(plan extension.Plan, reason string) {
 				detail.Reason = "Graph reads without named kinds require conservative recalculation, along with their connected calculations."
 			}
 		} else {
-			detail.State = "skipped"
+			// Nothing this step reads has changed since it last saved, so its
+			// saved result is still current. This is good news, unlike
+			// "skipped", which means a run stopped before the step could start.
+			detail.State = "up-to-date"
 			detail.Reason = "No declared input or connected calculation was affected by the confirmed changes."
 		}
 	}
@@ -258,7 +266,8 @@ func finishReport(report *Report, started time.Time, err error) {
 			}
 		}
 	} else if report.Skipped {
-		detail.Calculation, detail.Save, detail.Phase = "skipped", "unchanged", "complete"
+		// No step was affected by the changes; every saved result is current.
+		detail.Calculation, detail.Save, detail.Phase = "up-to-date", "unchanged", "complete"
 	}
 	if err != nil {
 		if detail.Calculation != "succeeded" {
